@@ -4,11 +4,11 @@ package decrypt12;
  * 
  *** decrypt12.jar: Decrypts WhatsApp msgstore.db.crypt12 files. ***
  *
- * Author		:	TripCode
- * Copyright		:	Copyright (C) 2016
- * License		:	GPLv3
- * Status		:	Production
- * Version		:	1.0
+ * Author	:	TripCode
+ * Copyright	:	Copyright (C) 2016
+ * License	:	GPLv3
+ * Status	:	Production
+ * Version	:	1.0
  *
  */
 
