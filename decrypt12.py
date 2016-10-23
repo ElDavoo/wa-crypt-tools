@@ -51,8 +51,8 @@ def decrypt12(cf, of):
 
 def primer(tf, crypt12, sb):
     with open(tf, 'wb') as header:
-	    header.write(crypt12.read())
-	    header.close()
+        header.write(crypt12.read())
+        header.close()
     with open(tf, 'rb+') as footer:
         footer.seek(-sb, os.SEEK_END)
         footer.truncate()
