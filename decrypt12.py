@@ -33,14 +33,14 @@ def decrypt12(cf, of):
         quit('The specified input crypt12 file does not exist.')
     tf = cf+'.tmp'
     with open(cf, 'rb') as crypt12:
-        crypt12.seek(3)
+        crypt12.seek(14)
         t2 = crypt12.read(32)
         if t1 != t2:
             quit('Key file mismatch or crypt12 file is corrupt.')
-        crypt12.seek(51)
+        crypt12.seek(66)
         iv = crypt12.read(16)
-        crypt12.seek(67)
-        primer(tf, crypt12, 20)
+        crypt12.seek(99)
+        primer(tf, crypt12, 0)
     cipher = AES.new(key, AES.MODE_GCM, iv)
     sqlite = zlib.decompress(cipher.decrypt(open(tf, 'rb').read()))
     with open(of, 'wb') as msgstore:
