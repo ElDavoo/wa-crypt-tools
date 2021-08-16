@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-""" decrypt12.py: Decrypts WhatsApp msgstore.db.crypt12 files. """
+""" decrypt14.py: Decrypts WhatsApp msgstore.db.crypt14 files. """
 """               Requires pycrypto and pycryptodome packages. """
 
 __author__       =    'TripCode'
@@ -27,20 +27,20 @@ def keyfile(kf):
         key = keyfile.read(32)
     return True
 
-def decrypt12(cf, of):
+def decrypt14(cf, of):
     global t2, iv
     if os.path.isfile(cf) == False:
-        quit('The specified input crypt12 file does not exist.')
+        quit('The specified input crypt14 file does not exist.')
     tf = cf+'.tmp'
-    with open(cf, 'rb') as crypt12:
-        crypt12.seek(15)
-        t2 = crypt12.read(32)
+    with open(cf, 'rb') as crypt14:
+        crypt14.seek(15)
+        t2 = crypt14.read(32)
         if t1 != t2:
-            quit('Key file mismatch or crypt12 file is corrupt.')
-        crypt12.seek(67)
-        iv = crypt12.read(16)
-        crypt12.seek(191)
-        primer(tf, crypt12, 0)
+            quit('Key file mismatch or crypt14 file is corrupt.')
+        crypt14.seek(67)
+        iv = crypt14.read(16)
+        crypt14.seek(191)
+        primer(tf, crypt14, 0)
     cipher = AES.new(key, AES.MODE_GCM, iv)
     sqlite = zlib.decompress(cipher.decrypt(open(tf, 'rb').read()))
     with open(of, 'wb') as msgstore:
@@ -49,9 +49,9 @@ def decrypt12(cf, of):
         os.remove(tf)
     return True
 
-def primer(tf, crypt12, sb):
+def primer(tf, crypt14, sb):
     with open(tf, 'wb') as header:
-        header.write(crypt12.read())
+        header.write(crypt14.read())
         header.close()
     with open(tf, 'rb+') as footer:
         footer.seek(-sb, os.SEEK_END)
@@ -62,9 +62,9 @@ def validate(ms):
     with open(ms, 'rb') as msgstore:
         if msgstore.read(6).decode('ascii').lower() != 'sqlite':
             os.remove(ms)
-            msg = 'Decryption of crypt12 file has failed.'
+            msg = 'Decryption of crypt14 file has failed.'
         else:
-            msg = 'Decryption of crypt12 file was successful.'
+            msg = 'Decryption of crypt14 file was successful.'
     msgstore.close()
     quit(msg)
 
@@ -74,11 +74,11 @@ def main():
             outfile = 'msgstore.db'
         else:
             outfile = sys.argv[3]
-        if keyfile(sys.argv[1]) and decrypt12(sys.argv[2], outfile):
+        if keyfile(sys.argv[1]) and decrypt14(sys.argv[2], outfile):
             validate(outfile)
     else:
-        print('\nWhatsApp Crypt12 Database Decrypter '+__version__+' '+__copyright__+' by '+__author__+'\n')
-        print('\tUsage: python '+str(sys.argv[0])+' key msgstore.db.crypt12 msgstore.db\n')
+        print('\nWhatsApp Crypt14 Database Decrypter '+__version__+' '+__copyright__+' by '+__author__+'\n')
+        print('\tUsage: python '+str(sys.argv[0])+' key msgstore.db.crypt14 msgstore.db\n')
 
 if __name__ == "__main__":
     main()
