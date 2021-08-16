@@ -14,4 +14,4 @@ Decrypts WhatsApp msgstore.db.crypt14 files.
  ```
   
 ###### Credits:
- Author: TripCode
+ Authors: TripCode & ElDavoo & DjEdu28
