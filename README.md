@@ -4,11 +4,14 @@ Decrypts WhatsApp msgstore.db.crypt14 files.
 ###### Usage:
 
               python decrypt12.py key msgstore.db.crypt14 msgstore.db   
-              java -jar decrypt12.jar key msgstore.db.crypt14 msgstore.db  
   
 ###### Requirements:
   
  Python 2.x or 3.x with pycrypto and pycryptodome packages installed.
+ 
+ ```
+              pip install pycrypto pycryptodome
+ ```
   
 ###### Credits:
- Author: TripCode
+ Authors: [TripCode](https://github.com/TripCode) & [ElDavoo](https://github.com/ElDavoo) & [DjEdu28](https://github.com/DjEdu28)
