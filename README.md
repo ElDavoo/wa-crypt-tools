@@ -4,7 +4,7 @@ Working with my stable WhatsApp at version 2.21.16.20.
 
 ###### Usage:
 
-              python decrypt12.py key msgstore.db.crypt14 msgstore.db   
+              python decrypt14.py key msgstore.db.crypt14 msgstore.db   
   
 ###### Requirements:
   
