@@ -1,5 +1,6 @@
 # WhatsApp Crypt14 Database Decrypter
-Decrypts WhatsApp msgstore.db.crypt14 files.
+Decrypts WhatsApp msgstore.db.crypt14 files.  
+Working with my stable WhatsApp at version 2.21.16.20.
 
 ###### Usage:
 
