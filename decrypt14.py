@@ -177,7 +177,6 @@ def decrypt14(t1, key, crypt14, of):
     iv = heade[iv_offset:iv_offset + 16]
     cipher = AES.new(key, AES.MODE_GCM, iv)
     crypt14.seek(offset)
-    print(DEFAULT_BUFFER_SIZE)
 
 
     zobj = zlib.decompressobj()
