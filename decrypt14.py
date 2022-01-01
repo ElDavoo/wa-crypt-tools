@@ -7,6 +7,8 @@ import os
 import re
 import sys
 import zlib
+from io import DEFAULT_BUFFER_SIZE
+
 
 __author__ = 'TripCode, ElDavo'
 __copyright__ = 'Copyright (C) 2022'
@@ -175,11 +177,21 @@ def decrypt14(t1, key, crypt14, of):
     iv = heade[iv_offset:iv_offset + 16]
     cipher = AES.new(key, AES.MODE_GCM, iv)
     crypt14.seek(offset)
+    print(DEFAULT_BUFFER_SIZE)
 
-    of.write(zlib.decompressobj().decompress((cipher.decrypt(crypt14.read()))))
+
+    zobj = zlib.decompressobj()
+    while True:
+
+        block = crypt14.read(DEFAULT_BUFFER_SIZE)
+        if not block:
+            break
+        of.write(zobj.decompress(cipher.decrypt(block)))
+    # of.write(zlib.decompressobj().decompress((cipher.decrypt(crypt14.read()))))
     of.close()
     crypt14.close()
     print("Decryption successful")
+
 
 def main():
     args = parsecmdline()
