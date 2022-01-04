@@ -41,54 +41,59 @@ ZIP_HEADERS = [
     b'x\x01'
 ]
 
-force = False
-
-
 class Log:
     """Simple logger class. Supports 4 verbosity levels."""
+
     def __init__(self, verbose, force):
         self.verbose = verbose
         self.force = force
 
     def v(self, msg):
-        """Will only print messages if verbose mode is enabled."""
+        """Will only print message if verbose mode is enabled."""
         if self.verbose:
             print('[V] {}'.format(msg))
 
     def i(self, msg):
-        """Will always print messages."""
+        """Always prints message."""
         print('[I] {}'.format(msg))
 
-    def w(self, msg):
-        """Will print message and exit, unless force is enabled."""
-        print('[W] {}'.format(msg))
+    def e(self, msg):
+        """Prints message and exit, unless force is enabled."""
+        print('[E] {}'.format(msg))
         if not self.force:
+            print("To bypass checks, use the \"--force\" parameter")
             sys.exit(1)
 
-    def e(self, msg):
-        """Will always print message and exit."""
-        print('[E] {}'.format(msg))
+    def f(self, msg):
+        """Always prints message and exit."""
+        print('[F] {}'.format(msg))
         sys.exit(1)
 
 
-def oscillate(n, min, max):
+def oscillate(n, n_min, n_max):
     """Yields n, n-1, n+1, n-2, n+2..., with constraints:
     - n is in [min, max]
     - n is never negative
-    It will revert to range() if n touches min or max.
+    Reverts to range() when n touches min or max. Example:
+    oscillate(8, 2, 10) => 8, 7, 9, 6, 10, 5, 4, 3, 2
     """
-    if min < 0:
-        min = 0
+
+    if n_min < 0:
+        n_min = 0
+
     i = n
     c = 1
+
     # First phase (n, n-1, n+1...)
     while True:
-        if i == max:
+
+        if i == n_max:
             break
         yield i
         i = i - c
         c = c + 1
-        if i == 0 or i == min:
+
+        if i == 0 or i == n_min:
             break
         yield i
         i = i + c
@@ -96,19 +101,19 @@ def oscillate(n, min, max):
 
     # Second phase (range of remaining numbers)
     # n != i/2 fixes a bug where we would yield min and max two times if n == (max-min)/2
-    if i == min and n != i/2:
+    if i == n_min and n != i / 2:
+
         yield i
-        # i touched min, revert to range()
         i = i + c
-        for j in range(i,max + 1):
-            yield j
-    if i == max and n != i/2:
-        yield max
-        # i touched max, revert to range()
-        i = i - c
-        for j in range(i,min - 1, -1):
+        for j in range(i, n_max + 1):
             yield j
 
+    if i == n_max and n != i / 2:
+
+        yield n_max
+        i = i - c
+        for j in range(i, n_min - 1, -1):
+            yield j
 
 
 def parsecmdline():
@@ -125,23 +130,35 @@ def parsecmdline():
 
 
 # This function extracts t1 and the key from the keyfile
-def get_t1_key(kf):
+def get_t1_and_key(key_file_stream):
+    """Extracts t1 and key from the keyfile (a file stream)."""
+
+    try:
+        keyfile = key_file_stream.read()
+    except OSError as e:
+        log.f("Couldn't read keyfile: {}".format(e))
+
     # Check if the keyfile is big enough
-    keyfile = kf.read()
     if len(keyfile) != KEY_LENGTH:
-        log.e(
-            'Invalid key file: Smaller than expected (wanted {} bytes, got {} bytes)'.format(KEY_LENGTH, len(keyfile)))
+        log.f(
+            "Invalid keyfile: Smaller than expected (wanted {} bytes, got {} bytes)".format(KEY_LENGTH, len(keyfile)))
 
     # Check if the keyfile is small enough
-    if kf.read(1) != b'':
-        log.w('Invalid key file: Expected length of {} bytes, got more'.format(KEY_LENGTH))
+    try:
+        if key_file_stream.read(1) != b'':
+            log.e("Invalid keyfile: Expected a file of {} bytes, got more.\n"
+                  "Did you swap the keyfile and the database by mistake?".format(KEY_LENGTH))
+    except OSError as e:
+        log.f("Couldn't check keyfile size: {}".format(e))
+
+    key_file_stream.close()
 
     # Check if the keyfile has the correct header
     if keyfile[:len(KEY_HEADER)] != KEY_HEADER:
-        log.w('Invalid key file: Invalid header (expected {}, got {})'
-             .format(KEY_HEADER.hex(), keyfile[:len(KEY_HEADER)].hex()))
+        log.e('Invalid keyfile: Invalid header\nExpected:\t{}\nGot:\t\t{}'
+              .format(KEY_HEADER.hex(), keyfile[:len(KEY_HEADER)].hex()))
 
-    # FIXME check the "married key" (whatever that is)
+    # TODO check the "married key" (whatever that is)
 
     # Check if the keyfile has the correct padding
     padding_found = False
@@ -149,9 +166,10 @@ def get_t1_key(kf):
         if p == keyfile[len(KEY_HEADER):len(KEY_HEADER) + len(KEY_PADDINGS[0])]:
             padding_found = True
             break
+
     if not padding_found:
-        log.w('Invalid key file: Invalid padding ({}), expected one of:'
-             .format(keyfile[len(KEY_HEADER):len(KEY_HEADER) + len(KEY_PADDINGS[0])].hex()))
+        log.e('Invalid keyfile: Invalid padding {}'
+              .format(keyfile[len(KEY_HEADER):len(KEY_HEADER) + len(KEY_PADDINGS[0])].hex()))
         for p in KEY_PADDINGS:
             print('\t{}'.format(p.hex()))
 
@@ -161,40 +179,57 @@ def get_t1_key(kf):
 
     # Check if the padding is correct
     for byte in padding:
-        if byte != 0:
-            log.w('Invalid key file: Padding is not padding: {}'.format(padding.hex()))
+        if byte:
+            log.e("Invalid keyfile: Padding is not padding: {}".format(padding.hex()))
             break
 
     key = keyfile[126:]
 
     return t1, key
 
+def test_decompression(test_data):
+    """Returns true if the SQLite header is valid.
+    It is assumed that the data are valid.
+    (If it is valid, it also means the decryption and decompression were successful.)"""
+    zlib_obj = zlib.decompressobj().decompress(test_data)
+    # These two errors should never happen
+    try:
+        if len(zlib_obj) < 16:
+            log.e("Test decompression: chunk too small")
+            return False
+        if zlib_obj[:15].decode('ascii') != 'SQLite format 3':
+            log.e("Test decompression: Decryption and decompression ok but not a valid SQLite database")
+            return True
+        else:
+            return True
+    except zlib.error:
+        return False
 
-def find_offset(heade, iv_offset, key):
-    iv = heade[iv_offset:iv_offset + 16]
-    # Determine start of data
-    for f in oscillate(n=191, min=iv_offset + 16, max=512):
+
+def find_data_offset(header, iv_offset, key):
+    """Tries to find the offset in which the encrypted data starts.
+    Returns the offset or -1 if the offset is not found."""
+
+    iv = header[iv_offset:iv_offset + 16]
+
+    # oscillate ensures we try the closest values to the default value first.
+    for i in oscillate(n=191, n_min=iv_offset + len(iv), n_max=len(header)):
+
         cipher = AES.new(key, AES.MODE_GCM, iv)
-        d = cipher.decrypt(heade[f:f + 2])
-        for h in ZIP_HEADERS:
-            if d == h:
+
+        # We only decrypt the first two bytes.
+        test_bytes = cipher.decrypt(header[i:i + 2])
+
+        for heade in ZIP_HEADERS:
+
+            if test_bytes == heade:
+                # We found a match, but this might also happen by chance.
+                # Let's run another test by decrypting some hundreds of bytes.
                 # We need to reinitialize the cipher everytime as it has an internal status
                 cipher = AES.new(key, AES.MODE_GCM, iv)
-                d2 = cipher.decrypt(heade[f:])
-                try:
-                    zobj = zlib.decompressobj().decompress(d2)
-                    if len(zobj) < 16:
-
-                        log.e("Internal error: chunk too small (this should never happen)")
-                    if zobj[:15].decode('ascii') != 'SQLite format 3':
-                        log.e("Decryption and decompression ok but not a valid SQLite database. WTF?")
-                    offset = f
-                    return offset
-                except zlib.error:
-                    # We want to ignore exceptions, as that means we have a false positive
-                    # (e.g., the "decrypted" bytes by chance match a valid zip header)
-                    pass
-                break
+                d2 = cipher.decrypt(header[i:])
+                if test_decompression(d2):
+                    return i
     return -1
 
 
@@ -202,30 +237,30 @@ def decrypt14(t1, key, crypt14, of):
     # Arbitrary number (if it is too small (<310) zlib test decompression will fail)
     heade = crypt14.read(512)
     if len(heade) < 512:
-        log.e("Error: Encrypted DB is too small")
+        log.f("Error: Encrypted DB is too small")
 
     result = heade.find(t1)
     if result == -1:
-        log.w('t1 not found in crypt14 file')
+        log.e('t1 not found in crypt14 file')
     else:
         log.v("t1 offset: " + str(result))
 
     # Finding WA version is cool and is another confirmation that the file is correct
     result = re.findall(b'\d(?:\.\d{1,3}){3}', heade)
     if len(result) != 1:
-        log.w('WhatsApp version not found')
+        log.e('WhatsApp version not found')
     else:
         log.v("WhatsApp version: {}".format(result[0].decode()))
 
     # Determine IV offset and data offset
-    for iv_offset in oscillate(n=67, min=0, max=512):
-        offset = find_offset(heade, iv_offset, key)
+    for iv_offset in oscillate(n=67, n_min=0, n_max=512):
+        offset = find_data_offset(heade, iv_offset, key)
         if offset != -1:
             log.v("IV offset: {}".format(iv_offset))
             log.v("Data offset: {}".format(offset))
             break
     if offset == -1:
-        log.e("Could not find IV or data start offset")
+        log.f("Could not find IV or data start offset")
 
     iv = heade[iv_offset:iv_offset + 16]
     cipher = AES.new(key, AES.MODE_GCM, iv)
@@ -248,7 +283,7 @@ def main():
     args = parsecmdline()
     global log
     log = Log(verbose=False, force=args.force)
-    t1, key = get_t1_key(args.keyfile)
+    t1, key = get_t1_and_key(args.keyfile)
     decrypt14(t1, key, args.encrypted, args.decrypted)
 
 
