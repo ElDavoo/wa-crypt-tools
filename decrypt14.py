@@ -5,6 +5,7 @@ This script decrypts WhatsApp's encrypted DB file.
 
 # noinspection PyPackageRequirements
 # This is from pycryptodome
+
 from Crypto.Cipher import AES
 
 from io import DEFAULT_BUFFER_SIZE
@@ -55,21 +56,21 @@ DEFAULT_IV_OFFSET = 67
 class Log:
     """Simple logger class. Supports 4 verbosity levels."""
 
-    def __init__(self, verbose, force):
+    def __init__(self, verbose: bool, force: bool):
         self.verbose = verbose
         self.force = force
 
-    def v(self, msg):
+    def v(self, msg: str):
         """Will only print message if verbose mode is enabled."""
         if self.verbose:
             print('[V] {}'.format(msg))
 
     @staticmethod
-    def i(msg):
+    def i(msg: str):
         """Always prints message."""
         print('[I] {}'.format(msg))
 
-    def e(self, msg):
+    def e(self, msg: str):
         """Prints message and exit, unless force is enabled."""
         print('[E] {}'.format(msg))
         if not self.force:
@@ -77,13 +78,13 @@ class Log:
             exit(1)
 
     @staticmethod
-    def f(msg):
+    def f(msg: str):
         """Always prints message and exit."""
         print('[F] {}'.format(msg))
         exit(1)
 
 
-def oscillate(n, n_min, n_max):
+def oscillate(n: int, n_min: int, n_max: int):
     """Yields n, n-1, n+1, n-2, n+2..., with constraints:
     - n is in [min, max]
     - n is never negative
@@ -151,11 +152,11 @@ def parsecmdline():
     return parser.parse_args()
 
 
-def get_t1_and_key(key_file_stream):
+def get_t1_and_key(key_file_stream) -> tuple[bytes, bytes]:
     """Extracts t1 and key from the keyfile (a file stream)."""
 
     # Assign variables to suppress warnings
-    keyfile = None
+    keyfile: bytes = b''
 
     try:
         keyfile = key_file_stream.read()
@@ -185,7 +186,7 @@ def get_t1_and_key(key_file_stream):
     # TODO check the "married key" (whatever that is)
 
     # Check if the keyfile has the correct dynamic header
-    padding_found = False
+    padding_found: bool = False
     for p in KEY_DYN_HEADERS:
         if p == keyfile[len(KEY_HEADER):len(KEY_HEADER) + len(KEY_DYN_HEADERS[0])]:
             padding_found = True
@@ -212,7 +213,7 @@ def get_t1_and_key(key_file_stream):
     return t1, key
 
 
-def test_decompression(test_data):
+def test_decompression(test_data: bytes) -> bool:
     """Returns true if the SQLite header is valid.
     It is assumed that the data are valid.
     (If it is valid, it also means the decryption and decompression were successful.)"""
