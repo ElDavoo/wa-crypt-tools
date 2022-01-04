@@ -5,9 +5,9 @@ This script decrypts WhatsApp's encrypted DB file.
 
 # This is from pycryptodome
 from Crypto.Cipher import AES
+from re import findall
 
 import argparse
-import re
 import sys
 import zlib
 from io import DEFAULT_BUFFER_SIZE
@@ -16,14 +16,14 @@ __author__ = 'TripCode, ElDavo'
 __copyright__ = 'Copyright (C) 2022'
 __license__ = 'GPLv3'
 __status__ = 'Production'
-__version__ = '2.'
+__version__ = '2.1'
 
 # Key file format:
 # fixed header (27 bytes)
 KEY_HEADER = b'\xac\xed\x00\x05\x75\x72\x00\x02\x5b\x42\xac\xf3\x17\xf8' \
              b'\x06\x08\x54\xe0\x02\x00\x00\x78\x70\x00\x00\x00\x83'
-# Padding: Multiple variations: 00 00 01, 00 01 01, 00 01 02 ...
-KEY_PADDINGS = [
+# Dynamic header (Multiple variations), like 00 00 01, 00 01 01, 00 01 02 ...
+KEY_DYN_HEADERS = [
     b'\x00\x00\x01',
     b'\x00\x01\x01',
     b'\x00\x01\x02'
@@ -41,6 +41,10 @@ ZIP_HEADERS = [
     b'x\x01'
 ]
 
+# Size of header (number chosen arbitrarily, but values less than ~310 makes test_decompression fail)
+HEADER_SIZE = 512
+
+
 class Log:
     """Simple logger class. Supports 4 verbosity levels."""
 
@@ -53,7 +57,8 @@ class Log:
         if self.verbose:
             print('[V] {}'.format(msg))
 
-    def i(self, msg):
+    @staticmethod
+    def i(msg):
         """Always prints message."""
         print('[I] {}'.format(msg))
 
@@ -64,7 +69,8 @@ class Log:
             print("To bypass checks, use the \"--force\" parameter")
             sys.exit(1)
 
-    def f(self, msg):
+    @staticmethod
+    def f(msg):
         """Always prints message and exit."""
         print('[F] {}'.format(msg))
         sys.exit(1)
@@ -117,21 +123,32 @@ def oscillate(n, n_min, n_max):
 
 
 def parsecmdline():
-    parser = argparse.ArgumentParser(description='Decrypts WhatsApp msgstore.db.crypt14 files')
+    """Sets up the argument parser"""
+    parser = argparse.ArgumentParser(description='Decrypts WhatsApp encrypted database backup files')
     parser.add_argument('keyfile', nargs='?', type=argparse.FileType('rb', bufsize=KEY_LENGTH), default="key",
-                        help='The WhatsApp keyfile')
+                        help='The WhatsApp keyfile.\n'
+                             'Default: key')
     parser.add_argument('encrypted', nargs='?', type=argparse.FileType('rb'), default="msgstore.db.crypt14",
-                        help='The encrypted crypt14 database')
+                        help='The encrypted crypt14 database.\n'
+                             'Default: msgstore.db.crypt14')
     parser.add_argument('decrypted', nargs='?', type=argparse.FileType('wb'), default="msgstore.db",
-                        help='The decrypted database')
-    parser.add_argument('-f', '--force', action='store_true', help='Skip safety checks')
+                        help='The decrypted output database file.\n'
+                             'Default: msgstore.db')
+    parser.add_argument('-f', '--force', action='store_true', help='Makes errors non fatal.\n'
+                                                                   'Default: false')
+    parser.add_argument('-nm', '--no-mem', action='store_true', help='Does not load files in RAM,'
+                                                                     'stresses the disk more.\n'
+                                                                     'Default: load files into RAM')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
 
     return parser.parse_args()
 
 
-# This function extracts t1 and the key from the keyfile
 def get_t1_and_key(key_file_stream):
     """Extracts t1 and key from the keyfile (a file stream)."""
+
+    # Assign variables to suppress warnings
+    keyfile = None
 
     try:
         keyfile = key_file_stream.read()
@@ -160,17 +177,17 @@ def get_t1_and_key(key_file_stream):
 
     # TODO check the "married key" (whatever that is)
 
-    # Check if the keyfile has the correct padding
+    # Check if the keyfile has the correct dynamic header
     padding_found = False
-    for p in KEY_PADDINGS:
-        if p == keyfile[len(KEY_HEADER):len(KEY_HEADER) + len(KEY_PADDINGS[0])]:
+    for p in KEY_DYN_HEADERS:
+        if p == keyfile[len(KEY_HEADER):len(KEY_HEADER) + len(KEY_DYN_HEADERS[0])]:
             padding_found = True
             break
 
     if not padding_found:
-        log.e('Invalid keyfile: Invalid padding {}'
-              .format(keyfile[len(KEY_HEADER):len(KEY_HEADER) + len(KEY_PADDINGS[0])].hex()))
-        for p in KEY_PADDINGS:
+        log.e('Invalid keyfile: Invalid dynamic header {}'
+              .format(keyfile[len(KEY_HEADER):len(KEY_HEADER) + len(KEY_DYN_HEADERS[0])].hex()))
+        for p in KEY_DYN_HEADERS:
             print('\t{}'.format(p.hex()))
 
     t1 = keyfile[30:62]
@@ -187,13 +204,15 @@ def get_t1_and_key(key_file_stream):
 
     return t1, key
 
+
 def test_decompression(test_data):
     """Returns true if the SQLite header is valid.
     It is assumed that the data are valid.
     (If it is valid, it also means the decryption and decompression were successful.)"""
-    zlib_obj = zlib.decompressobj().decompress(test_data)
-    # These two errors should never happen
+
     try:
+        zlib_obj = zlib.decompressobj().decompress(test_data)
+        # These two errors should never happen
         if len(zlib_obj) < 16:
             log.e("Test decompression: chunk too small")
             return False
@@ -220,41 +239,52 @@ def find_data_offset(header, iv_offset, key):
         # We only decrypt the first two bytes.
         test_bytes = cipher.decrypt(header[i:i + 2])
 
-        for heade in ZIP_HEADERS:
+        for zheader in ZIP_HEADERS:
 
-            if test_bytes == heade:
+            if test_bytes == zheader:
                 # We found a match, but this might also happen by chance.
                 # Let's run another test by decrypting some hundreds of bytes.
-                # We need to reinitialize the cipher everytime as it has an internal status
+                # We need to reinitialize the cipher everytime as it has an internal status.
                 cipher = AES.new(key, AES.MODE_GCM, iv)
                 d2 = cipher.decrypt(header[i:])
                 if test_decompression(d2):
                     return i
+
     return -1
 
 
-def decrypt14(t1, key, crypt14, of):
-    # Arbitrary number (if it is too small (<310) zlib test decompression will fail)
-    heade = crypt14.read(512)
-    if len(heade) < 512:
-        log.f("Error: Encrypted DB is too small")
+def decrypt14(t1, key, crypt14, of, mem_approach):
+    """Decrypts an encrypted database file, given t1 and the key."""
 
-    result = heade.find(t1)
+    # Assign variables to suppress warnings
+    db_header, offset, iv_offset = None, None, None
+
+    try:
+        db_header = crypt14.read(512)
+    except OSError as e:
+        log.f("Reading encrypted database failed: {}".format(e))
+
+    if len(db_header) < 512:
+        log.f("The encrypted database is too small.\n"
+              "Did you swap the keyfile and the encrypted database file by mistake?")
+
+    result = db_header.find(t1)
     if result == -1:
-        log.e('t1 not found in crypt14 file')
+        log.e("t1 not found in header of crypt14 file.\n"
+              "This probably means the key does not match the encrypted database.")
     else:
-        log.v("t1 offset: " + str(result))
+        log.v("t1 found at offset {}".format(result))
 
-    # Finding WA version is cool and is another confirmation that the file is correct
-    result = re.findall(b'\d(?:\.\d{1,3}){3}', heade)
+    # Finding WhatsApp's version is cool and is another confirmation that the encrypted database is correct
+    result = findall(b"\\d(?:\\.\\d{1,3}){3}", db_header)
     if len(result) != 1:
         log.e('WhatsApp version not found')
     else:
         log.v("WhatsApp version: {}".format(result[0].decode()))
 
-    # Determine IV offset and data offset
+    # Determine IV offset and data offset.
     for iv_offset in oscillate(n=67, n_min=0, n_max=512):
-        offset = find_data_offset(heade, iv_offset, key)
+        offset = find_data_offset(db_header, iv_offset, key)
         if offset != -1:
             log.v("IV offset: {}".format(iv_offset))
             log.v("Data offset: {}".format(offset))
@@ -262,29 +292,49 @@ def decrypt14(t1, key, crypt14, of):
     if offset == -1:
         log.f("Could not find IV or data start offset")
 
-    iv = heade[iv_offset:iv_offset + 16]
+    # Now that we have everything we can do the real job
+    iv = db_header[iv_offset:iv_offset + 16]
     cipher = AES.new(key, AES.MODE_GCM, iv)
     crypt14.seek(offset)
 
-    zobj = zlib.decompressobj()
-    while True:
+    z_obj = zlib.decompressobj()
 
-        block = crypt14.read(DEFAULT_BUFFER_SIZE)
-        if not block:
-            break
-        of.write(zobj.decompress(cipher.decrypt(block)))
-    # of.write(zlib.decompressobj().decompress((cipher.decrypt(crypt14.read()))))
-    of.close()
-    crypt14.close()
-    print("Decryption successful")
+    try:
+
+        if mem_approach:
+            # Load the encrypted file into RAM
+            # Decrypts into RAM
+            # Decompresses into RAM
+            # Writes into disk
+            # More RAM used, less I/O used
+            of.write(z_obj.decompress((cipher.decrypt(crypt14.read()))))
+
+        else:
+            # Does the thing above but only with buffer_size bytes at a time.
+            # Less RAM used, more I/O used
+            while True:
+                block = crypt14.read(DEFAULT_BUFFER_SIZE)
+                if not block:
+                    break
+                of.write(z_obj.decompress(cipher.decrypt(block)))
+
+    except OSError as e:
+        log.f("I/O error: {}".format(e))
+
+    finally:
+        of.close()
+        crypt14.close()
+
+    log.i("Decryption successful")
 
 
 def main():
+
     args = parsecmdline()
     global log
-    log = Log(verbose=False, force=args.force)
+    log = Log(verbose=args.verbose, force=args.force)
     t1, key = get_t1_and_key(args.keyfile)
-    decrypt14(t1, key, args.encrypted, args.decrypted)
+    decrypt14(t1, key, args.encrypted, args.decrypted, args.no_mem)
 
 
 if __name__ == "__main__":
