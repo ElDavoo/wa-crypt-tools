@@ -15,7 +15,6 @@ from sys import exit
 import argparse
 import zlib
 
-
 __author__ = 'TripCode, ElDavo'
 __copyright__ = 'Copyright (C) 2022'
 __license__ = 'GPLv3'
@@ -134,18 +133,15 @@ def parsecmdline():
     """Sets up the argument parser"""
     parser = argparse.ArgumentParser(description='Decrypts WhatsApp encrypted database backup files')
     parser.add_argument('keyfile', nargs='?', type=argparse.FileType('rb', bufsize=KEY_LENGTH), default="key",
-                        help='The WhatsApp keyfile.\n'
-                             'Default: key')
+                        help='The WhatsApp keyfile. Default: key')
     parser.add_argument('encrypted', nargs='?', type=argparse.FileType('rb'), default="msgstore.db.crypt14",
-                        help='The encrypted crypt14 database.\n'
-                             'Default: msgstore.db.crypt14')
+                        help='The encrypted crypt14 database. Default: msgstore.db.crypt14')
     parser.add_argument('decrypted', nargs='?', type=argparse.FileType('wb'), default="msgstore.db",
-                        help='The decrypted output database file.\n'
-                             'Default: msgstore.db')
-    parser.add_argument('-f', '--force', action='store_true', help='Makes errors non fatal.\n'
+                        help='The decrypted output database file. Default: msgstore.db')
+    parser.add_argument('-f', '--force', action='store_true', help='Makes errors non fatal.'
                                                                    'Default: false')
-    parser.add_argument('-nm', '--no-mem', action='store_true', help='Does not load files in RAM,'
-                                                                     'stresses the disk more.\n'
+    parser.add_argument('-nm', '--no-mem', action='store_true', help='Does not load files in RAM, '
+                                                                     'stresses the disk more.'
                                                                      'Default: load files into RAM')
     parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
 
@@ -233,7 +229,7 @@ def test_decompression(test_data: bytes) -> bool:
         return False
 
 
-def find_data_offset(header, iv_offset, key):
+def find_data_offset(header: bytes, iv_offset: int, key: bytes) -> int:
     """Tries to find the offset in which the encrypted data starts.
     Returns the offset or -1 if the offset is not found."""
 
@@ -254,21 +250,21 @@ def find_data_offset(header, iv_offset, key):
                 # Let's run another test by decrypting some hundreds of bytes.
                 # We need to reinitialize the cipher everytime as it has an internal status.
                 cipher = AES.new(key, AES.MODE_GCM, iv)
-                d2 = cipher.decrypt(header[i:])
-                if test_decompression(d2):
+                decrypted = cipher.decrypt(header[i:])
+                if test_decompression(decrypted):
                     return i
 
     return -1
 
 
-def decrypt14(t1, key, crypt14, of, mem_approach):
+def decrypt14(t1: bytes, key: bytes, encrypted, decrypted, mem_approach: bool):
     """Decrypts an encrypted database file, given t1 and the key."""
 
     # Assign variables to suppress warnings
     db_header, offset, iv_offset = None, None, None
 
     try:
-        db_header = crypt14.read(HEADER_SIZE)
+        db_header = encrypted.read(HEADER_SIZE)
     except OSError as e:
         log.f("Reading encrypted database failed: {}".format(e))
 
@@ -303,7 +299,7 @@ def decrypt14(t1, key, crypt14, of, mem_approach):
     # Now that we have everything we can do the real job
     iv = db_header[iv_offset:iv_offset + 16]
     cipher = AES.new(key, AES.MODE_GCM, iv)
-    crypt14.seek(offset)
+    encrypted.seek(offset)
 
     z_obj = zlib.decompressobj()
 
@@ -315,23 +311,23 @@ def decrypt14(t1, key, crypt14, of, mem_approach):
             # Decompresses into RAM
             # Writes into disk
             # More RAM used, less I/O used
-            of.write(z_obj.decompress((cipher.decrypt(crypt14.read()))))
+            decrypted.write(z_obj.decompress((cipher.decrypt(encrypted.read()))))
 
         else:
             # Does the thing above but only with buffer_size bytes at a time.
             # Less RAM used, more I/O used
             while True:
-                block = crypt14.read(DEFAULT_BUFFER_SIZE)
+                block = encrypted.read(DEFAULT_BUFFER_SIZE)
                 if not block:
                     break
-                of.write(z_obj.decompress(cipher.decrypt(block)))
+                decrypted.write(z_obj.decompress(cipher.decrypt(block)))
 
     except OSError as e:
         log.f("I/O error: {}".format(e))
 
     finally:
-        of.close()
-        crypt14.close()
+        decrypted.close()
+        encrypted.close()
 
     log.i("Decryption successful")
 
@@ -341,8 +337,8 @@ def main():
     args = parsecmdline()
     global log
     log = Log(verbose=args.verbose, force=args.force)
-    t1, key = get_t1_and_key(args.keyfile)
-    decrypt14(t1, key, args.encrypted, args.decrypted, args.no_mem)
+    t1, key = get_t1_and_key(key_file_stream=args.keyfile)
+    decrypt14(t1=t1, key=key, encrypted=args.encrypted, decrypted=args.decrypted, mem_approach=not args.no_mem)
 
 
 if __name__ == "__main__":
