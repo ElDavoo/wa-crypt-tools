@@ -3,14 +3,17 @@
 This script decrypts WhatsApp's encrypted DB file.
 """
 
+# noinspection PyPackageRequirements
 # This is from pycryptodome
 from Crypto.Cipher import AES
+
+from io import DEFAULT_BUFFER_SIZE
 from re import findall
+from sys import exit
 
 import argparse
-import sys
 import zlib
-from io import DEFAULT_BUFFER_SIZE
+
 
 __author__ = 'TripCode, ElDavo'
 __copyright__ = 'Copyright (C) 2022'
@@ -20,6 +23,7 @@ __version__ = '2.1'
 
 # Key file format:
 # fixed header (27 bytes)
+
 KEY_HEADER = b'\xac\xed\x00\x05\x75\x72\x00\x02\x5b\x42\xac\xf3\x17\xf8' \
              b'\x06\x08\x54\xe0\x02\x00\x00\x78\x70\x00\x00\x00\x83'
 # Dynamic header (Multiple variations), like 00 00 01, 00 01 01, 00 01 02 ...
@@ -44,6 +48,9 @@ ZIP_HEADERS = [
 # Size of header (number chosen arbitrarily, but values less than ~310 makes test_decompression fail)
 HEADER_SIZE = 512
 
+DEFAULT_DATA_OFFSET = 191
+DEFAULT_IV_OFFSET = 67
+
 
 class Log:
     """Simple logger class. Supports 4 verbosity levels."""
@@ -67,13 +74,13 @@ class Log:
         print('[E] {}'.format(msg))
         if not self.force:
             print("To bypass checks, use the \"--force\" parameter")
-            sys.exit(1)
+            exit(1)
 
     @staticmethod
     def f(msg):
         """Always prints message and exit."""
         print('[F] {}'.format(msg))
-        sys.exit(1)
+        exit(1)
 
 
 def oscillate(n, n_min, n_max):
@@ -232,7 +239,7 @@ def find_data_offset(header, iv_offset, key):
     iv = header[iv_offset:iv_offset + 16]
 
     # oscillate ensures we try the closest values to the default value first.
-    for i in oscillate(n=191, n_min=iv_offset + len(iv), n_max=len(header)):
+    for i in oscillate(n=DEFAULT_DATA_OFFSET, n_min=iv_offset + len(iv), n_max=len(header)):
 
         cipher = AES.new(key, AES.MODE_GCM, iv)
 
@@ -260,11 +267,11 @@ def decrypt14(t1, key, crypt14, of, mem_approach):
     db_header, offset, iv_offset = None, None, None
 
     try:
-        db_header = crypt14.read(512)
+        db_header = crypt14.read(HEADER_SIZE)
     except OSError as e:
         log.f("Reading encrypted database failed: {}".format(e))
 
-    if len(db_header) < 512:
+    if len(db_header) < HEADER_SIZE:
         log.f("The encrypted database is too small.\n"
               "Did you swap the keyfile and the encrypted database file by mistake?")
 
@@ -283,7 +290,7 @@ def decrypt14(t1, key, crypt14, of, mem_approach):
         log.v("WhatsApp version: {}".format(result[0].decode()))
 
     # Determine IV offset and data offset.
-    for iv_offset in oscillate(n=67, n_min=0, n_max=512):
+    for iv_offset in oscillate(n=DEFAULT_IV_OFFSET, n_min=0, n_max=HEADER_SIZE):
         offset = find_data_offset(db_header, iv_offset, key)
         if offset != -1:
             log.v("IV offset: {}".format(iv_offset))
