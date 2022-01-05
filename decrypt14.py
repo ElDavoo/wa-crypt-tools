@@ -3,6 +3,8 @@
 This script decrypts WhatsApp's encrypted DB file.
 """
 
+from __future__ import annotations
+
 # noinspection PyPackageRequirements
 # This is from pycryptodome
 
