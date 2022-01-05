@@ -10,7 +10,7 @@ It should be much more efficient, and it should handle small variations of offse
 
 ## Requirements:
 
-Python 3.x (developed with 3.10)    
+Python 3.7 or more recent    
 pycriptodome  
 
 Use:
