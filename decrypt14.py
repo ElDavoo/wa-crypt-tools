@@ -173,8 +173,8 @@ def get_t1_and_key(key_file_stream) -> tuple[bytes, bytes]:
                   "Did you swap the keyfile and the database by mistake?".format(KEY_LENGTH))
     except OSError as e:
         log.f("Couldn't check keyfile size: {}".format(e))
-
-    key_file_stream.close()
+    finally:
+        key_file_stream.close()
 
     # Check if the keyfile has the correct header
     if keyfile[:len(KEY_HEADER)] != KEY_HEADER:
