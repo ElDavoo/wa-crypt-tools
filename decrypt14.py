@@ -224,7 +224,7 @@ def test_decompression(test_data: bytes) -> bool:
             return False
         if zlib_obj[:15].decode('ascii') != 'SQLite format 3':
             log.e("Test decompression: Decryption and decompression ok but not a valid SQLite database")
-            return True
+            return log.force
         else:
             return True
     except zlib.error:
