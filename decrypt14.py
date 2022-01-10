@@ -238,7 +238,7 @@ def find_data_offset(header: bytes, iv_offset: int, key: bytes) -> int:
     iv = header[iv_offset:iv_offset + 16]
 
     # oscillate ensures we try the closest values to the default value first.
-    for i in oscillate(n=DEFAULT_DATA_OFFSET, n_min=iv_offset + len(iv), n_max=len(header)):
+    for i in oscillate(n=DEFAULT_DATA_OFFSET, n_min=iv_offset + len(iv), n_max=HEADER_SIZE - 128):
 
         cipher = AES.new(key, AES.MODE_GCM, iv)
 
@@ -289,7 +289,7 @@ def decrypt14(t1: bytes, key: bytes, encrypted, decrypted, mem_approach: bool):
         log.v("WhatsApp version: {}".format(result[0].decode()))
 
     # Determine IV offset and data offset.
-    for iv_offset in oscillate(n=DEFAULT_IV_OFFSET, n_min=0, n_max=HEADER_SIZE):
+    for iv_offset in oscillate(n=DEFAULT_IV_OFFSET, n_min=0, n_max=HEADER_SIZE - 128):
         offset = find_data_offset(db_header, iv_offset, key)
         if offset != -1:
             log.v("IV offset: {}".format(iv_offset))
@@ -312,11 +312,11 @@ def decrypt14(t1: bytes, key: bytes, encrypted, decrypted, mem_approach: bool):
             # Decrypts into RAM
             # Decompresses into RAM
             # Writes into disk
-            # More RAM used, less I/O used
+            # More RAM used (x3), less I/O used
             decrypted.write(z_obj.decompress((cipher.decrypt(encrypted.read()))))
 
         else:
-            # Does the thing above but only with buffer_size bytes at a time.
+            # Does the thing above but only with DEFAULT_BUFFER_SIZE bytes at a time.
             # Less RAM used, more I/O used
             while True:
                 block = encrypted.read(DEFAULT_BUFFER_SIZE)
@@ -331,11 +331,13 @@ def decrypt14(t1: bytes, key: bytes, encrypted, decrypted, mem_approach: bool):
         decrypted.close()
         encrypted.close()
 
-    log.i("Decryption successful")
-
+    if z_obj.eof:
+        log.i("Decryption successful")
+    else:
+        log.i("The encrypted database file is truncated (damaged).\n"
+              "The available data has been decrypted.")
 
 def main():
-
     args = parsecmdline()
     global log
     log = Log(verbose=args.verbose, force=args.force)
