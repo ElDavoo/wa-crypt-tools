@@ -156,6 +156,8 @@ def get_t1_and_key(key_file_stream) -> tuple[bytes, bytes]:
     # Assign variables to suppress warnings
     keyfile: bytes = b''
 
+    log.v("Reading keyfile...")
+
     try:
         keyfile = key_file_stream.read()
     except OSError as e:
@@ -207,6 +209,8 @@ def get_t1_and_key(key_file_stream) -> tuple[bytes, bytes]:
             break
 
     key = keyfile[126:]
+
+    log.v("Keyfile loaded")
 
     return t1, key
 
@@ -265,6 +269,8 @@ def decrypt14(t1: bytes, key: bytes, encrypted, decrypted, mem_approach: bool):
     # Assign variables to suppress warnings
     db_header, offset, iv_offset = None, None, None
 
+    log.v("Parsing database header...")
+
     try:
         db_header = encrypted.read(HEADER_SIZE)
     except OSError as e:
@@ -305,6 +311,8 @@ def decrypt14(t1: bytes, key: bytes, encrypted, decrypted, mem_approach: bool):
 
     z_obj = zlib.decompressobj()
 
+    log.v("Offsets found, decrypting...")
+
     try:
 
         if mem_approach:
@@ -313,16 +321,25 @@ def decrypt14(t1: bytes, key: bytes, encrypted, decrypted, mem_approach: bool):
             # Decompresses into RAM
             # Writes into disk
             # More RAM used (x3), less I/O used
-            decrypted.write(z_obj.decompress((cipher.decrypt(encrypted.read()))))
+            output_file = z_obj.decompress((cipher.decrypt(encrypted.read())))
+            if not z_obj.eof:
+                log.e("The encrypted database file is truncated (damaged).")
+            decrypted.write(output_file)
 
         else:
             # Does the thing above but only with DEFAULT_BUFFER_SIZE bytes at a time.
             # Less RAM used, more I/O used
+            # TODO use assignment expression, which drops compatibility with 3.7
+            # while chunk := encrypted.read(DEFAULT_BUFFER_SIZE):
             while True:
-                block = encrypted.read(DEFAULT_BUFFER_SIZE)
-                if not block:
+                chunk = encrypted.read(DEFAULT_BUFFER_SIZE)
+                if not chunk:
                     break
-                decrypted.write(z_obj.decompress(cipher.decrypt(block)))
+                decrypted.write(z_obj.decompress(cipher.decrypt(chunk)))
+            if not z_obj.eof:
+                if not log.force:
+                    decrypted.truncate(0)
+                log.e("The encrypted database file is truncated (damaged).")
 
     except OSError as e:
         log.f("I/O error: {}".format(e))
@@ -331,11 +348,9 @@ def decrypt14(t1: bytes, key: bytes, encrypted, decrypted, mem_approach: bool):
         decrypted.close()
         encrypted.close()
 
-    if z_obj.eof:
-        log.i("Decryption successful")
-    else:
-        log.i("The encrypted database file is truncated (damaged).\n"
-              "The available data has been decrypted.")
+    log.i("Decryption successful")
+
+
 
 def main():
     args = parsecmdline()
