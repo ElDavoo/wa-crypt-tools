@@ -171,7 +171,7 @@ def get_t1_and_key(key_file_stream) -> tuple[bytes, bytes]:
     # Check if the keyfile is small enough
     try:
         if key_file_stream.read(1) != b'':
-            log.e("Invalid keyfile: Expected a file of {} bytes, got more.\n"
+            log.e("Invalid keyfile: Expected a file of {} bytes, got more.\n\t"
                   "Did you swap the keyfile and the database by mistake?".format(KEY_LENGTH))
     except OSError as e:
         log.f("Couldn't check keyfile size: {}".format(e))
@@ -180,7 +180,7 @@ def get_t1_and_key(key_file_stream) -> tuple[bytes, bytes]:
 
     # Check if the keyfile has the correct header
     if keyfile[:len(KEY_HEADER)] != KEY_HEADER:
-        log.e('Invalid keyfile: Invalid header\nExpected:\t{}\nGot:\t\t{}'
+        log.e('Invalid keyfile: Invalid header\n\tExpected:\t{}\n\tGot:\t\t{}'
               .format(KEY_HEADER.hex(), keyfile[:len(KEY_HEADER)].hex()))
 
     # TODO check the "married key" (whatever that is)
@@ -277,12 +277,19 @@ def decrypt14(t1: bytes, key: bytes, encrypted, decrypted, mem_approach: bool):
         log.f("Reading encrypted database failed: {}".format(e))
 
     if len(db_header) < HEADER_SIZE:
-        log.f("The encrypted database is too small.\n"
+        log.f("The encrypted database is too small.\n\t"
               "Did you swap the keyfile and the encrypted database file by mistake?")
+
+    try:
+        if db_header[:15].decode('ascii') == 'SQLite format 3':
+            log.e("The database file is not encrypted.\n\t"
+                  "Did you swap the input and the output files by mistake?")
+    except ValueError:
+        pass
 
     result = db_header.find(t1)
     if result == -1:
-        log.e("t1 not found in header of crypt14 file.\n"
+        log.e("t1 not found in header of crypt14 file.\n\t"
               "This probably means the key does not match the encrypted database.")
     else:
         log.v("t1 found at offset {}".format(result))
