@@ -50,7 +50,9 @@ ZIP_HEADERS = [
 # Size of header (number chosen arbitrarily, but values less than ~310 makes test_decompression fail)
 HEADER_SIZE = 512
 
-DEFAULT_DATA_OFFSET = 191
+# Actual data offset = this constant + whatsapp version string length
+DEFAULT_DATA_OFFSET = 181
+
 DEFAULT_IV_OFFSET = 67
 
 
@@ -235,14 +237,14 @@ def test_decompression(test_data: bytes) -> bool:
         return False
 
 
-def find_data_offset(header: bytes, iv_offset: int, key: bytes) -> int:
+def find_data_offset(header: bytes, iv_offset: int, key: bytes, starting_data_offset: int) -> int:
     """Tries to find the offset in which the encrypted data starts.
     Returns the offset or -1 if the offset is not found."""
 
     iv = header[iv_offset:iv_offset + 16]
 
     # oscillate ensures we try the closest values to the default value first.
-    for i in oscillate(n=DEFAULT_DATA_OFFSET, n_min=iv_offset + len(iv), n_max=HEADER_SIZE - 128):
+    for i in oscillate(n=starting_data_offset, n_min=iv_offset + len(iv), n_max=HEADER_SIZE - 128):
 
         cipher = AES.new(key, AES.MODE_GCM, iv)
 
@@ -294,16 +296,17 @@ def decrypt14(t1: bytes, key: bytes, encrypted, decrypted, mem_approach: bool):
     else:
         log.v("t1 found at offset {}".format(result))
 
-    # Finding WhatsApp's version is cool and is another confirmation that the encrypted database is correct
-    result = findall(b"\\d(?:\\.\\d{1,3}){3}", db_header)
-    if len(result) != 1:
+    # Finding WhatsApp's version's length allows us to determine the data offset
+    version = findall(b"\\d(?:\\.\\d{1,3}){3}", db_header)
+    if len(version) != 1:
         log.e('WhatsApp version not found')
     else:
-        log.v("WhatsApp version: {}".format(result[0].decode()))
+        log.v("WhatsApp version: {}".format(version[0].decode('ascii')))
+    starting_data_offset = DEFAULT_DATA_OFFSET + len(version[0])
 
     # Determine IV offset and data offset.
     for iv_offset in oscillate(n=DEFAULT_IV_OFFSET, n_min=0, n_max=HEADER_SIZE - 128):
-        offset = find_data_offset(db_header, iv_offset, key)
+        offset = find_data_offset(db_header, iv_offset, key, starting_data_offset)
         if offset != -1:
             log.v("IV offset: {}".format(iv_offset))
             log.v("Data offset: {}".format(offset))
@@ -356,7 +359,6 @@ def decrypt14(t1: bytes, key: bytes, encrypted, decrypted, mem_approach: bool):
         encrypted.close()
 
     log.i("Decryption successful")
-
 
 
 def main():
