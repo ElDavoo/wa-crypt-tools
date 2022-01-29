@@ -335,6 +335,7 @@ def decrypt14(t1: bytes, key: bytes, encrypted, decrypted, mem_approach: bool):
             if not z_obj.eof:
                 log.e("The encrypted database file is truncated (damaged).")
             decrypted.write(output_file)
+            decrypted.flush()
 
         else:
             # Does the thing above but only with DEFAULT_BUFFER_SIZE bytes at a time.
@@ -350,6 +351,7 @@ def decrypt14(t1: bytes, key: bytes, encrypted, decrypted, mem_approach: bool):
                 if not log.force:
                     decrypted.truncate(0)
                 log.e("The encrypted database file is truncated (damaged).")
+            decrypted.flush()
 
     except OSError as e:
         log.f("I/O error: {}".format(e))
