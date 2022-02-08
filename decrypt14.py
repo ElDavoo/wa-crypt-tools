@@ -25,19 +25,19 @@ __version__ = '2.1'
 
 # Key file format:
 # fixed header (27 bytes)
-
 KEY_HEADER = b'\xac\xed\x00\x05\x75\x72\x00\x02\x5b\x42\xac\xf3\x17\xf8' \
              b'\x06\x08\x54\xe0\x02\x00\x00\x78\x70\x00\x00\x00\x83'
-# Dynamic header (Multiple variations), like 00 00 01, 00 01 01, 00 01 02 ...
-KEY_DYN_HEADERS = [
-    b'\x00\x00\x01',
-    b'\x00\x01\x01',
-    b'\x00\x01\x02'
-]
-# t1 (32 bytes)
-# random IV (unused) + married key (useless for us) (total: 48 bytes)
-# 16 bytes of zeroes (padding)
-# key (32 bytes)
+
+# The cipher version (2 bytes). Known values are 0x0000 and 0x0001. So far we only support the latter.
+SUPPORTED_CIPHER_VERSION = b'\x00\x01'
+# The key version (1 byte). Both of the known versions are supported.
+SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02']
+
+# Server salt (32 bytes)
+# googleIdSalt (unused?) (16 bytes)
+# hashedGoogleID (unused?) (32 bytes)
+# encryption IV (zeroed out) (16 bytes)
+# cipherKey (32 bytes)
 # total length = 158 bytes
 KEY_LENGTH = 158
 
@@ -152,8 +152,8 @@ def parsecmdline():
     return parser.parse_args()
 
 
-def get_t1_and_key(key_file_stream) -> tuple[bytes, bytes]:
-    """Extracts t1 and key from the keyfile (a file stream)."""
+def get_server_salt_and_key(key_file_stream) -> tuple[bytes, bytes]:
+    """Extracts server salt and key from the keyfile (a file stream)."""
 
     # Assign variables to suppress warnings
     keyfile: bytes = b''
@@ -185,36 +185,41 @@ def get_t1_and_key(key_file_stream) -> tuple[bytes, bytes]:
         log.e('Invalid keyfile: Invalid header\n\tExpected:\t{}\n\tGot:\t\t{}'
               .format(KEY_HEADER.hex(), keyfile[:len(KEY_HEADER)].hex()))
 
-    # TODO check the "married key" (whatever that is)
+    index = len(KEY_HEADER)
 
-    # Check if the keyfile has the correct dynamic header
-    padding_found: bool = False
-    for p in KEY_DYN_HEADERS:
-        if p == keyfile[len(KEY_HEADER):len(KEY_HEADER) + len(KEY_DYN_HEADERS[0])]:
-            padding_found = True
+    # Check if the keyfile has a supported cipher version
+    if SUPPORTED_CIPHER_VERSION != keyfile[index:index + len(SUPPORTED_CIPHER_VERSION)]:
+        log.e("Invalid keyfile: Unsupported cipher version {}"
+              .format(keyfile[len(KEY_HEADER):len(KEY_HEADER) + len(SUPPORTED_CIPHER_VERSION)].hex()))
+    index += len(SUPPORTED_CIPHER_VERSION)
+
+    # Check if the keyfile has a supported key version
+    version_supported = False
+    for version in SUPPORTED_KEY_VERSIONS:
+        if version == keyfile[index:index + len(SUPPORTED_KEY_VERSIONS[0])]:
+            version_supported = True
             break
+    if not version_supported:
+        log.e('Invalid keyfile: Unsupported key version {}'
+              .format(keyfile[index:index + len(SUPPORTED_KEY_VERSIONS[0])].hex()))
 
-    if not padding_found:
-        log.e('Invalid keyfile: Invalid dynamic header {}'
-              .format(keyfile[len(KEY_HEADER):len(KEY_HEADER) + len(KEY_DYN_HEADERS[0])].hex()))
-        for p in KEY_DYN_HEADERS:
-            print('\t{}'.format(p.hex()))
+    # TODO check, if possible, the hashed google id and the google id salt
 
-    t1 = keyfile[30:62]
+    server_salt = keyfile[30:62]
 
     padding = keyfile[110:126]
 
     # Check if the padding is correct
     for byte in padding:
         if byte:
-            log.e("Invalid keyfile: Padding is not padding: {}".format(padding.hex()))
+            log.e("Invalid keyfile: IV is not zeroed out but is: {}".format(padding.hex()))
             break
 
     key = keyfile[126:]
 
     log.v("Keyfile loaded")
 
-    return t1, key
+    return server_salt, key
 
 
 def test_decompression(test_data: bytes) -> bool:
@@ -265,8 +270,8 @@ def find_data_offset(header: bytes, iv_offset: int, key: bytes, starting_data_of
     return -1
 
 
-def decrypt14(t1: bytes, key: bytes, encrypted, decrypted, mem_approach: bool):
-    """Decrypts an encrypted database file, given t1 and the key."""
+def decrypt14(server_salt: bytes, key: bytes, encrypted, decrypted, mem_approach: bool):
+    """Decrypts an encrypted database file, given the server salt and the key."""
 
     # Assign variables to suppress warnings
     db_header, offset, iv_offset = None, None, None
@@ -289,12 +294,12 @@ def decrypt14(t1: bytes, key: bytes, encrypted, decrypted, mem_approach: bool):
     except ValueError:
         pass
 
-    result = db_header.find(t1)
+    result = db_header.find(server_salt)
     if result == -1:
-        log.e("t1 not found in header of crypt14 file.\n\t"
+        log.e("Server salt not found in header of crypt14 file.\n\t"
               "This probably means the key does not match the encrypted database.")
     else:
-        log.v("t1 found at offset {}".format(result))
+        log.v("Server salt found at offset {}".format(result))
 
     # Finding WhatsApp's version's length allows us to determine the data offset
     version = findall(b"\\d(?:\\.\\d{1,3}){3}", db_header)
@@ -367,8 +372,9 @@ def main():
     args = parsecmdline()
     global log
     log = Log(verbose=args.verbose, force=args.force)
-    t1, key = get_t1_and_key(key_file_stream=args.keyfile)
-    decrypt14(t1=t1, key=key, encrypted=args.encrypted, decrypted=args.decrypted, mem_approach=not args.no_mem)
+    serversalt, key = get_server_salt_and_key(key_file_stream=args.keyfile)
+    decrypt14(server_salt=serversalt, key=key,
+              encrypted=args.encrypted, decrypted=args.decrypted, mem_approach=not args.no_mem)
 
 
 if __name__ == "__main__":
