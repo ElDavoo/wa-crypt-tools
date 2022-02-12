@@ -71,5 +71,11 @@ Anyway, on rooted Android, you can just copy  `/data/data/com.whatsapp/files/key
 Stable: 2.21.24.22  
 Beta: 2.22.1.10
 
+
+### Stargazers over time
+
+[![Stargazers over time](https://starchart.cc/ElDavoo/WhatsApp-Crypt14-Decrypter.svg)](https://starchart.cc/ElDavoo/WhatsApp-Crypt14-Decrypter)
+
+
 ###### Credits:
  Authors: [TripCode](https://github.com/TripCode) & [ElDavoo](https://github.com/ElDavoo) & [DjEdu28](https://github.com/DjEdu28)
