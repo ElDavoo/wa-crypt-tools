@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from Crypto.Cipher import AES
 
+from hashlib import sha256
 from io import DEFAULT_BUFFER_SIZE
 from re import findall
 from sys import exit
@@ -24,7 +25,9 @@ __status__ = 'Production'
 __version__ = '2.1'
 
 # Key file format:
-# fixed header (27 bytes)
+# The key file is actually a serialized byte[] object.
+# For this reason we have a strange header at the beginning: it is actually the serialization of byte[].
+# byte[] serialization header (27 bytes)
 KEY_HEADER = b'\xac\xed\x00\x05\x75\x72\x00\x02\x5b\x42\xac\xf3\x17\xf8' \
              b'\x06\x08\x54\xe0\x02\x00\x00\x78\x70\x00\x00\x00\x83'
 
@@ -35,7 +38,7 @@ SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02']
 
 # Server salt (32 bytes)
 # googleIdSalt (unused?) (16 bytes)
-# hashedGoogleID (unused?) (32 bytes)
+# hashedGoogleID (The SHA-256 hash of googleIdSalt) (32 bytes)
 # encryption IV (zeroed out) (16 bytes)
 # cipherKey (32 bytes)
 # total length = 158 bytes
@@ -203,9 +206,15 @@ def get_server_salt_and_key(key_file_stream) -> tuple[bytes, bytes]:
         log.e('Invalid keyfile: Unsupported key version {}'
               .format(keyfile[index:index + len(SUPPORTED_KEY_VERSIONS[0])].hex()))
 
-    # TODO check, if possible, the hashed google id and the google id salt
-
     server_salt = keyfile[30:62]
+
+    # Check the SHA-256 of the salt
+    googleidsalt = keyfile[62:78]
+    expected_digest = sha256(googleidsalt).digest()
+    actual_digest = keyfile[78:110]
+    if expected_digest != actual_digest:
+        log.e("Invalid keyfile: Invalid SHA-256 of salt.\n\t"
+              "Expected:\t{}\n\tGot:\t\t{}".format(expected_digest, actual_digest))
 
     padding = keyfile[110:126]
 
