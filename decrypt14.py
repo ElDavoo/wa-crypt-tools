@@ -11,6 +11,7 @@ from __future__ import annotations
 from Crypto.Cipher import AES
 
 from hashlib import sha256
+import javaobj.v2 as javaobj
 from io import DEFAULT_BUFFER_SIZE
 from re import findall
 from sys import exit
@@ -24,25 +25,25 @@ __license__ = 'GPLv3'
 __status__ = 'Production'
 __version__ = '2.1'
 
+from javaobj.v2.beans import JavaArray
+
 # Key file format:
 # The key file is actually a serialized byte[] object.
-# For this reason we have a strange header at the beginning: it is actually the serialization of byte[].
-# byte[] serialization header (27 bytes)
-KEY_HEADER = b'\xac\xed\x00\x05\x75\x72\x00\x02\x5b\x42\xac\xf3\x17\xf8' \
-             b'\x06\x08\x54\xe0\x02\x00\x00\x78\x70\x00\x00\x00\x83'
-
-# The cipher version (2 bytes). Known values are 0x0000 and 0x0001. So far we only support the latter.
+# For this reason we first need to deserialize the object.
+# 1) The serialization header, that takes 28 bytes, but it might change.
+SER_HEADER_LENGTH = 28
+# 2) The cipher version (2 bytes). Known values are 0x0000 and 0x0001. So far we only support the latter.
 SUPPORTED_CIPHER_VERSION = b'\x00\x01'
-# The key version (1 byte). Both of the known versions are supported.
+# 3) The key version (1 byte). Both of the known versions are supported.
 SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02']
 
-# Server salt (32 bytes)
-# googleIdSalt (unused?) (16 bytes)
-# hashedGoogleID (The SHA-256 hash of googleIdSalt) (32 bytes)
-# encryption IV (zeroed out) (16 bytes)
-# cipherKey (32 bytes)
+# 4) Server salt (32 bytes)
+# 5) googleIdSalt (unused?) (16 bytes)
+# 6) hashedGoogleID (The SHA-256 hash of googleIdSalt) (32 bytes)
+# 7) encryption IV (zeroed out, as it is read from the database) (16 bytes)
+# 8) cipherKey (32 bytes)
 # total length = 158 bytes
-KEY_LENGTH = 158
+KEY_LENGTH = 2 + 1 + 32 + 16 + 32 + 16 + 32
 
 # zlib magic header is 78 01 (Low Compression).
 # The first two bytes of the decrypted data should be those.
@@ -164,37 +165,27 @@ def get_server_salt_and_key(key_file_stream) -> tuple[bytes, bytes]:
     log.v("Reading keyfile...")
 
     try:
-        keyfile = key_file_stream.read()
+        # TODO Handle parsing exceptions (?)
+        barr: JavaArray = javaobj.load(key_file_stream).data
+        # Convert from a list of Int8 to a byte array
+        for i in range(0, KEY_LENGTH):
+            keyfile += barr[i].to_bytes(1, byteorder='big', signed=True)
+
     except OSError as e:
         log.f("Couldn't read keyfile: {}".format(e))
 
     # Check if the keyfile is big enough
     if len(keyfile) != KEY_LENGTH:
         log.f(
-            "Invalid keyfile: Smaller than expected (wanted {} bytes, got {} bytes)".format(KEY_LENGTH, len(keyfile)))
+            "Invalid keyfile: Smaller than expected (wanted {} bytes, got {} bytes).\n"
+                .format(KEY_LENGTH + SER_HEADER_LENGTH, len(keyfile) + SER_HEADER_LENGTH))
 
-    # Check if the keyfile is small enough
-    try:
-        if key_file_stream.read(1) != b'':
-            log.e("Invalid keyfile: Expected a file of {} bytes, got more.\n\t"
-                  "Did you swap the keyfile and the database by mistake?".format(KEY_LENGTH))
-    except OSError as e:
-        log.f("Couldn't check keyfile size: {}".format(e))
-    finally:
-        key_file_stream.close()
-
-    # Check if the keyfile has the correct header
-    if keyfile[:len(KEY_HEADER)] != KEY_HEADER:
-        log.e('Invalid keyfile: Invalid header\n\tExpected:\t{}\n\tGot:\t\t{}'
-              .format(KEY_HEADER.hex(), keyfile[:len(KEY_HEADER)].hex()))
-
-    index = len(KEY_HEADER)
 
     # Check if the keyfile has a supported cipher version
-    if SUPPORTED_CIPHER_VERSION != keyfile[index:index + len(SUPPORTED_CIPHER_VERSION)]:
+    if SUPPORTED_CIPHER_VERSION != keyfile[:len(SUPPORTED_CIPHER_VERSION)]:
         log.e("Invalid keyfile: Unsupported cipher version {}"
-              .format(keyfile[len(KEY_HEADER):len(KEY_HEADER) + len(SUPPORTED_CIPHER_VERSION)].hex()))
-    index += len(SUPPORTED_CIPHER_VERSION)
+              .format(keyfile[:len(SUPPORTED_CIPHER_VERSION)].hex()))
+    index = len(SUPPORTED_CIPHER_VERSION)
 
     # Check if the keyfile has a supported key version
     version_supported = False
@@ -206,17 +197,17 @@ def get_server_salt_and_key(key_file_stream) -> tuple[bytes, bytes]:
         log.e('Invalid keyfile: Unsupported key version {}'
               .format(keyfile[index:index + len(SUPPORTED_KEY_VERSIONS[0])].hex()))
 
-    server_salt = keyfile[30:62]
+    server_salt = keyfile[3:35]
 
     # Check the SHA-256 of the salt
-    googleidsalt = keyfile[62:78]
+    googleidsalt = keyfile[35:51]
     expected_digest = sha256(googleidsalt).digest()
-    actual_digest = keyfile[78:110]
+    actual_digest = keyfile[51:83]
     if expected_digest != actual_digest:
         log.e("Invalid keyfile: Invalid SHA-256 of salt.\n\t"
               "Expected:\t{}\n\tGot:\t\t{}".format(expected_digest, actual_digest))
 
-    padding = keyfile[110:126]
+    padding = keyfile[83:99]
 
     # Check if the padding is correct
     for byte in padding:
@@ -224,7 +215,7 @@ def get_server_salt_and_key(key_file_stream) -> tuple[bytes, bytes]:
             log.e("Invalid keyfile: IV is not zeroed out but is: {}".format(padding.hex()))
             break
 
-    key = keyfile[126:]
+    key = keyfile[99:]
 
     log.v("Keyfile loaded")
 

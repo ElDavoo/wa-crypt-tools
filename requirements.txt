@@ -1,1 +1,2 @@
-pycryptodome>=3.13.0
+javaobj-py3>=0.4.3
+pycryptodome>=3.14.1
