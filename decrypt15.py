@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-This script decrypts WhatsApp's DB files encrypted with Crypt14.
+This script decrypts WhatsApp's DB files encrypted with Crypt15.
 """
 
 from __future__ import annotations
@@ -21,31 +21,18 @@ from re import findall
 from sys import exit
 
 import argparse
+import hmac
 import zlib
 
 __author__ = 'TripCode, ElDavo'
 __copyright__ = 'Copyright (C) 2022'
 __license__ = 'GPLv3'
 __status__ = 'Production'
-__version__ = '2.2'
+__version__ = '3.0'
 
-# Key file format:
-# The key file is actually a serialized byte[] object.
-# For this reason we first need to deserialize the object.
-# 1) The serialization header, that takes 28 bytes, but it might change.
-SER_HEADER_LENGTH = 28
-# 2) The cipher version (2 bytes). Known values are 0x0000 and 0x0001. So far we only support the latter.
-SUPPORTED_CIPHER_VERSION = b'\x00\x01'
-# 3) The key version (1 byte). Both of the known versions are supported.
-SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02']
 
-# 4) Server salt (32 bytes)
-# 5) googleIdSalt (unused?) (16 bytes)
-# 6) hashedGoogleID (The SHA-256 hash of googleIdSalt) (32 bytes)
-# 7) encryption IV (zeroed out, as it is read from the database) (16 bytes)
-# 8) cipherKey (32 bytes)
-# total length = 158 bytes
-KEY_LENGTH = 2 + 1 + 32 + 16 + 32 + 16 + 32
+# Why the \x01 at the end? Read the get_key() function comments...
+BACKUP_ENCRYPTION = b'backup encryption\x01'
 
 # zlib magic header is 78 01 (Low Compression).
 # The first two bytes of the decrypted data should be those.
@@ -56,10 +43,8 @@ ZIP_HEADERS = [
 # Size of header (number chosen arbitrarily, but values less than ~310 makes test_decompression fail)
 HEADER_SIZE = 512
 
-# Actual data offset = this constant + whatsapp version string length
-DEFAULT_DATA_OFFSET = 181
-
-DEFAULT_IV_OFFSET = 67
+DEFAULT_DATA_OFFSET = 122
+DEFAULT_IV_OFFSET = 8
 
 
 class Log:
@@ -141,11 +126,11 @@ def oscillate(n: int, n_min: int, n_max: int):
 
 def parsecmdline():
     """Sets up the argument parser"""
-    parser = argparse.ArgumentParser(description='Decrypts WhatsApp database backup files encrypted with Crypt14')
+    parser = argparse.ArgumentParser(description='Decrypts WhatsApp database backup files encrypted with Crypt15')
     parser.add_argument('keyfile', nargs='?', type=argparse.FileType('rb'), default="key",
-                        help='The WhatsApp keyfile. Default: key')
-    parser.add_argument('encrypted', nargs='?', type=argparse.FileType('rb'), default="msgstore.db.crypt14",
-                        help='The encrypted crypt14 database. Default: msgstore.db.crypt14')
+                        help='The WhatsApp encrypted_backup key file. Default: encrypted_backup.key')
+    parser.add_argument('encrypted', nargs='?', type=argparse.FileType('rb'), default="msgstore.db.crypt15",
+                        help='The encrypted crypt15 database. Default: msgstore.db.crypt15')
     parser.add_argument('decrypted', nargs='?', type=argparse.FileType('wb'), default="msgstore.db",
                         help='The decrypted output database file. Default: msgstore.db')
     parser.add_argument('-f', '--force', action='store_true', help='Makes errors non fatal.'
@@ -166,10 +151,12 @@ def javaintlist2bytes(barr: javaobj.beans.JavaArray) -> bytes:
     return out
 
 
-def get_server_salt_and_key(key_file_stream) -> tuple[bytes, bytes]:
-    """Extracts server salt and key from the keyfile (a file stream)."""
+def get_key(key_file_stream) -> bytes:
+    """Extracts the key from the encoded_backup.key (a file stream)."""
+    # encrypted_backup.key file format and encoding explanation:
+    # The E2E key file is actually a serialized byte[] object.
+    # For this reason we first need to deserialize the object.
 
-    # Assign variables to suppress warnings
     keyfile: bytes = b''
 
     log.v("Reading keyfile...")
@@ -183,52 +170,24 @@ def get_server_salt_and_key(key_file_stream) -> tuple[bytes, bytes]:
         log.f("Couldn't read keyfile: {}".format(e))
     except (ValueError, RuntimeError) as e:
         log.f("The keyfile is not a valid Java object: {}".format(e))
+    # After that, we will have the root key (32 bytes).
+    # The root key is further encoded with three different strings, depending on what you want to do.
+    # These three ways are "backup encryption";
+    # "metadata encryption" and "metadata authentication", for Google Drive E2E encrypted metadata.
+    # We are only interested in the local backup encryption.
 
-    # Check if the keyfile is big enough
-    if len(keyfile) != KEY_LENGTH:
-        log.f(
-            "Invalid keyfile: Smaller than expected (wanted {} bytes, got {} bytes).\n"
-                .format(KEY_LENGTH + SER_HEADER_LENGTH, len(keyfile) + SER_HEADER_LENGTH))
+    # Why the \x01 at the end?
+    # Whatsapp uses a nested encryption function to encrypt many times the same data.
+    # The iteration counter is appended to the end of the encrypted data. However,
+    # since the loop is actually executed only one time, we will only have one interaction,
+    # and thus a \x01 at the end.
 
-    # Check if the keyfile has a supported cipher version
-    if SUPPORTED_CIPHER_VERSION != keyfile[:len(SUPPORTED_CIPHER_VERSION)]:
-        log.e("Invalid keyfile: Unsupported cipher version {}"
-              .format(keyfile[:len(SUPPORTED_CIPHER_VERSION)].hex()))
-    index = len(SUPPORTED_CIPHER_VERSION)
+    # First do the HMACSHA256 hash of the file with an empty private key
+    encoded_key: bytes = hmac.new(b'\x00' * 32, keyfile, sha256).digest()
+    # Then do the HMACSHA256 using the previous result as key and ("backup encryption" + iteration count) as data
+    encoded_key = hmac.new(encoded_key, BACKUP_ENCRYPTION, sha256).digest()
 
-    # Check if the keyfile has a supported key version
-    version_supported = False
-    for version in SUPPORTED_KEY_VERSIONS:
-        if version == keyfile[index:index + len(SUPPORTED_KEY_VERSIONS[0])]:
-            version_supported = True
-            break
-    if not version_supported:
-        log.e('Invalid keyfile: Unsupported key version {}'
-              .format(keyfile[index:index + len(SUPPORTED_KEY_VERSIONS[0])].hex()))
-
-    server_salt = keyfile[3:35]
-
-    # Check the SHA-256 of the salt
-    googleidsalt = keyfile[35:51]
-    expected_digest = sha256(googleidsalt).digest()
-    actual_digest = keyfile[51:83]
-    if expected_digest != actual_digest:
-        log.e("Invalid keyfile: Invalid SHA-256 of salt.\n\t"
-              "Expected:\t{}\n\tGot:\t\t{}".format(expected_digest, actual_digest))
-
-    padding = keyfile[83:99]
-
-    # Check if the padding is correct
-    for byte in padding:
-        if byte:
-            log.e("Invalid keyfile: IV is not zeroed out but is: {}".format(padding.hex()))
-            break
-
-    key = keyfile[99:]
-
-    log.v("Keyfile loaded")
-
-    return server_salt, key
+    return encoded_key
 
 
 def test_decompression(test_data: bytes) -> bool:
@@ -279,15 +238,13 @@ def find_data_offset(header: bytes, iv_offset: int, key: bytes, starting_data_of
     return -1
 
 
-def decrypt14(server_salt: bytes, key: bytes, encrypted, decrypted, mem_approach: bool):
+def decrypt15(key: bytes, encrypted, decrypted, mem_approach: bool):
     """Decrypts an encrypted database file, given the server salt and the key."""
 
     # Assign variables to suppress warnings
     db_header, offset, iv_offset = None, None, None
 
     log.v("Parsing database header...")
-
-    # TODO actually parse the header. It is a protobuf message.
 
     try:
         db_header = encrypted.read(HEADER_SIZE)
@@ -305,12 +262,7 @@ def decrypt14(server_salt: bytes, key: bytes, encrypted, decrypted, mem_approach
     except ValueError:
         pass
 
-    result = db_header.find(server_salt)
-    if result == -1:
-        log.e("Server salt not found in header of crypt14 file.\n\t"
-              "This probably means the key does not match the encrypted database.")
-    else:
-        log.v("Server salt found at offset {}".format(result))
+    # TODO actually parse the header. It is a protobuf message.
 
     # Finding WhatsApp's version's length allows us to determine the data offset
     version = findall(b"\\d(?:\\.\\d{1,3}){3}", db_header)
@@ -383,8 +335,8 @@ def main():
     args = parsecmdline()
     global log
     log = Log(verbose=args.verbose, force=args.force)
-    server_salt, key = get_server_salt_and_key(key_file_stream=args.keyfile)
-    decrypt14(server_salt=server_salt, key=key,
+    key = get_key(key_file_stream=args.keyfile)
+    decrypt15(key=key,
               encrypted=args.encrypted, decrypted=args.decrypted, mem_approach=not args.no_mem)
 
 
