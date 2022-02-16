@@ -4,10 +4,6 @@ The output result is a SQLite database.
 This is the only thing this script does. Those who are looking for a complete suite for
 WhatsApp forensics, check out [whapa.](https://github.com/B16f00t/whapa)
 
-## Version 2.0 is here!
-Since the file format keeps changing, I decided to completely reimplement the script.  
-It should be much more efficient, and it should handle small variations of offset **automatically**.
-
 ## Requirements:
 
 Python 3.7 or more recent    

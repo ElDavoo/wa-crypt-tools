@@ -10,8 +10,12 @@ from __future__ import annotations
 
 from Crypto.Cipher import AES
 
-from hashlib import sha256
+# noinspection PyPackageRequirements
+# This is from javaobj-py3
+
 import javaobj.v2 as javaobj
+
+from hashlib import sha256
 from io import DEFAULT_BUFFER_SIZE
 from re import findall
 from sys import exit
@@ -23,9 +27,7 @@ __author__ = 'TripCode, ElDavo'
 __copyright__ = 'Copyright (C) 2022'
 __license__ = 'GPLv3'
 __status__ = 'Production'
-__version__ = '2.1'
-
-from javaobj.v2.beans import JavaArray
+__version__ = '2.2'
 
 # Key file format:
 # The key file is actually a serialized byte[] object.
@@ -140,7 +142,7 @@ def oscillate(n: int, n_min: int, n_max: int):
 def parsecmdline():
     """Sets up the argument parser"""
     parser = argparse.ArgumentParser(description='Decrypts WhatsApp encrypted database backup files')
-    parser.add_argument('keyfile', nargs='?', type=argparse.FileType('rb', bufsize=KEY_LENGTH), default="key",
+    parser.add_argument('keyfile', nargs='?', type=argparse.FileType('rb'), default="key",
                         help='The WhatsApp keyfile. Default: key')
     parser.add_argument('encrypted', nargs='?', type=argparse.FileType('rb'), default="msgstore.db.crypt14",
                         help='The encrypted crypt14 database. Default: msgstore.db.crypt14')
@@ -156,6 +158,14 @@ def parsecmdline():
     return parser.parse_args()
 
 
+def javaintlist2bytes(barr: javaobj.beans.JavaArray) -> bytes:
+    """Converts a javaobj bytearray which somehow became a list of signed integers back to a Python byte array"""
+    out: bytes = b''
+    for i in barr:
+        out += i.to_bytes(1, byteorder='big', signed=True)
+    return out
+
+
 def get_server_salt_and_key(key_file_stream) -> tuple[bytes, bytes]:
     """Extracts server salt and key from the keyfile (a file stream)."""
 
@@ -165,21 +175,20 @@ def get_server_salt_and_key(key_file_stream) -> tuple[bytes, bytes]:
     log.v("Reading keyfile...")
 
     try:
-        # TODO Handle parsing exceptions (?)
-        barr: JavaArray = javaobj.load(key_file_stream).data
+        jarr: javaobj.beans.JavaArray = javaobj.load(key_file_stream).data
         # Convert from a list of Int8 to a byte array
-        for i in range(0, KEY_LENGTH):
-            keyfile += barr[i].to_bytes(1, byteorder='big', signed=True)
+        keyfile = javaintlist2bytes(jarr)
 
     except OSError as e:
         log.f("Couldn't read keyfile: {}".format(e))
+    except (ValueError, RuntimeError) as e:
+        log.f("The keyfile is not a valid Java object: {}".format(e))
 
     # Check if the keyfile is big enough
     if len(keyfile) != KEY_LENGTH:
         log.f(
             "Invalid keyfile: Smaller than expected (wanted {} bytes, got {} bytes).\n"
                 .format(KEY_LENGTH + SER_HEADER_LENGTH, len(keyfile) + SER_HEADER_LENGTH))
-
 
     # Check if the keyfile has a supported cipher version
     if SUPPORTED_CIPHER_VERSION != keyfile[:len(SUPPORTED_CIPHER_VERSION)]:
@@ -372,8 +381,8 @@ def main():
     args = parsecmdline()
     global log
     log = Log(verbose=args.verbose, force=args.force)
-    serversalt, key = get_server_salt_and_key(key_file_stream=args.keyfile)
-    decrypt14(server_salt=serversalt, key=key,
+    server_salt, key = get_server_salt_and_key(key_file_stream=args.keyfile)
+    decrypt14(server_salt=server_salt, key=key,
               encrypted=args.encrypted, decrypted=args.decrypted, mem_approach=not args.no_mem)
 
 
