@@ -1,5 +1,7 @@
-# WhatsApp Crypt14 Database Decrypter
-Decrypts WhatsApp msgstore.db.crypt14 files, **given the key file**.  
+# WhatsApp Crypt14-15 Database Decrypter
+Decrypts WhatsApp msgstore.db.crypt14-**15** files, **given the key file**.  
+The key file is named "key" if the backup is crypt14, 
+"encrypted_backup.key" if the backup is crypt15 (encrypted E2E backups).  
 The output result is a SQLite database.  
 This is the only thing this script does. Those who are looking for a complete suite for
 WhatsApp forensics, check out [whapa.](https://github.com/B16f00t/whapa)
@@ -8,6 +10,7 @@ WhatsApp forensics, check out [whapa.](https://github.com/B16f00t/whapa)
 
 Python 3.7 or more recent    
 pycriptodome  
+javaobj-py3  
 
 Use:
  ```
@@ -15,14 +18,15 @@ Use:
  ```
   Or:
  ```
-              python -m pip install pycryptodome
+              python -m pip install pycryptodome javaobj-py3
  ```
 
 ## Usage
+### decrypt14.py
  ```
 usage: decrypt14.py [-h] [-f] [-nm] [-v] [keyfile] [encrypted] [decrypted]
 
-Decrypts WhatsApp encrypted database backup files
+Decrypts WhatsApp database backup files encrypted with Crypt14
 
 positional arguments:
   keyfile        The WhatsApp keyfile. Default: key
@@ -32,11 +36,31 @@ positional arguments:
 options:
   -h, --help     show this help message and exit
   -f, --force    Makes errors non fatal. Default: false
-  -nm, --no-mem  Does not load files in RAM,stresses the disk more. Default:
+  -nm, --no-mem  Does not load files in RAM, stresses the disk more. Default:
                  load files into RAM
   -v, --verbose  Prints all offsets and messages
- ```  
 
+ ```  
+### decrypt15.py
+ ```
+usage: decrypt15.py [-h] [-f] [-nm] [-v] [keyfile] [encrypted] [decrypted]
+
+Decrypts WhatsApp database backup files encrypted with Crypt15
+
+positional arguments:
+  keyfile        The WhatsApp encrypted_backup key file. Default:
+                 encrypted_backup.key
+  encrypted      The encrypted crypt15 database. Default: msgstore.db.crypt15
+  decrypted      The decrypted output database file. Default: msgstore.db
+
+options:
+  -h, --help     show this help message and exit
+  -f, --force    Makes errors non fatal. Default: false
+  -nm, --no-mem  Does not load files in RAM, stresses the disk more. Default:
+                 load files into RAM
+  -v, --verbose  Prints all offsets and messages
+
+ ```  
 
 ## Not working / crash / etc
 
@@ -45,13 +69,9 @@ Please open an issue and attach:
 2) Hexdump of keyfile
 3) Hexdump of first 512 bytes of encrypted DB
 
-Please also report if your offsets are too far (+-5)
-from the default ones, which are:
-1) t1 offset: 15
-2) IV offset: 67
-3) Data offset: 190 (or 191)
+### Planned / To Do
 
-Changing the defaults makes the program more efficient.
+stickers.db decryption support  
 
 ### Not planned / wontfix
 
@@ -61,11 +81,13 @@ Changing the defaults makes the program more efficient.
 ### Where do I get the keyfile?
 **Is it beyond the scope of this project to tell you how to get the key file.  
 Issues asking for this will be closed as invalid.**  
-Anyway, on rooted Android, you can just copy  `/data/data/com.whatsapp/files/key`.  
+Anyway, on rooted Android, you can just copy 
+`/data/data/com.whatsapp/files/key` 
+(or `/data/data/com.whatsapp/files/encrypted_backup.key` if backups are crypt15)
 
 ### Last tested version (don't expect this to be updated)
 Stable: 2.21.24.22  
-Beta: 2.22.1.10
+Beta: 2.22.4.14
 
 
 ### Stargazers over time

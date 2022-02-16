@@ -148,10 +148,10 @@ def parsecmdline():
                         help='The encrypted crypt14 database. Default: msgstore.db.crypt14')
     parser.add_argument('decrypted', nargs='?', type=argparse.FileType('wb'), default="msgstore.db",
                         help='The decrypted output database file. Default: msgstore.db')
-    parser.add_argument('-f', '--force', action='store_true', help='Makes errors non fatal.'
+    parser.add_argument('-f', '--force', action='store_true', help='Makes errors non fatal. '
                                                                    'Default: false')
     parser.add_argument('-nm', '--no-mem', action='store_true', help='Does not load files in RAM, '
-                                                                     'stresses the disk more.'
+                                                                     'stresses the disk more. '
                                                                      'Default: load files into RAM')
     parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
 
