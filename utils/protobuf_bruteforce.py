@@ -15,8 +15,7 @@ import argparse
 def parsecmdline() -> argparse.Namespace:
     """Sets up the argument parser"""
     parser = argparse.ArgumentParser(description='Find protocol buffers in a file.')
-    parser.add_argument('file_name', nargs='?', type=str, default="msgstore.db.crypt15",
-                        help='A file that you believe contains protobuf messages.')
+    parser.add_argument('file_name', type=str, help='A file that you believe contains protobuf messages.')
     parser.add_argument('-k', '--keep-going', action='store_true', help='Don\'t stop after the first result.')
     parser.add_argument('-r', '--range', type=int, default=512, help='The number of bytes to search. Ignored if -w is '
                                                                      'set.')
