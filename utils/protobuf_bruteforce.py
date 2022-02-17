@@ -90,55 +90,33 @@ def protoparse(stream):
     return StandardParser().parse_message(stream, "message")
 
 
-def search(whole_file: bytes, keep_going: bool, offset = 0):
+class Message:
+    last_good_i = 0
+    last_good_j = 0
+    output = ""
+
+
+def search(whole_file: bytes, keep_going: bool, offset=0):
     """ Searches for protobuf messages in the given byte array. """
-    i = 0
 
-    # We have to find the beginning of the message.
-    while i < len(whole_file):
+    for i in range(len(whole_file)):
+        message = Message()
 
-        stream = get_truncated_stream(whole_file, i, len(whole_file))
-        # If we do not have an "Unexpected end group" error, we have to restart parsing one byte later.
+        for j in range(i + 1, len(whole_file)):
+            candidate = get_truncated_stream(whole_file, i, j)
+            try:
+                message.output = protoparse(candidate)
+                message.last_good_j = j
+                message.last_good_i = i
 
-        try:
-            output = protoparse(stream)
 
-            # You are very lucky
-            print("Message found from byte {} to byte {}.".format(i+ offset, len(whole_file)+ offset))
-            print(output)
-            print("Finished")
-            if offset != 0:
+            except Exception:
+                pass
+        if message.last_good_j and message.last_good_i == i:
+            print("\n Message from byte {} to {}".format(message.last_good_i + offset, message.last_good_j + offset))
+            print(message.output)
+            if not keep_going:
                 exit(0)
-            break
-
-        except Exception as e:
-
-            if str(e) == "Unexpected end group":
-                # We found the start of the message!
-                # Now we apply the same login in reverse to find the end of the message.
-
-                for j in range(len(whole_file), i, -1):
-
-                    stream = get_truncated_stream(whole_file, i, j)
-
-                    try:
-
-                        output = protoparse(stream)
-
-                        print("Message found from byte {} to byte {}.".format(i + offset, j + offset))
-                        print(output)
-                        # Avoid getting partials of this message
-                        i = j + 1
-                        if keep_going:
-                            break
-
-                        exit(0)
-
-                    except Exception:
-                        pass
-
-            i += 1
-
 
 if __name__ == "__main__":
     main()
