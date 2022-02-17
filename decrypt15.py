@@ -78,7 +78,7 @@ class Log:
         exit(1)
 
 
-def oscillate(n: int, n_min: int, n_max: int):
+def oscillate(n: int, n_min: int, n_max: int) -> int:
     """Yields n, n-1, n+1, n-2, n+2..., with constraints:
     - n is in [min, max]
     - n is never negative
@@ -124,10 +124,10 @@ def oscillate(n: int, n_min: int, n_max: int):
             yield j
 
 
-def parsecmdline():
+def parsecmdline() -> argparse.Namespace:
     """Sets up the argument parser"""
     parser = argparse.ArgumentParser(description='Decrypts WhatsApp database backup files encrypted with Crypt15')
-    parser.add_argument('keyfile', nargs='?', type=argparse.FileType('rb'), default="key",
+    parser.add_argument('keyfile', nargs='?', type=argparse.FileType('rb'), default="encrypted_backup.key",
                         help='The WhatsApp encrypted_backup key file. Default: encrypted_backup.key')
     parser.add_argument('encrypted', nargs='?', type=argparse.FileType('rb'), default="msgstore.db.crypt15",
                         help='The encrypted crypt15 database. Default: msgstore.db.crypt15')

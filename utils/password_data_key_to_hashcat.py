@@ -47,12 +47,12 @@ def parsecmdline() -> argparse.Namespace:
 
 
 def barrtoint(barr: javaobj.beans.BlockData) -> int:
-    """Converts a javaobj bytearray which somehow became a list of signed integers back to a Python byte array"""
+    """Converts a javaobj BlockData to an int"""
     return int.from_bytes(barr.data, byteorder='big', signed=False)
 
 
 def javaintlist2bytes(barr: javaobj.beans.JavaArray) -> bytes:
-    """Converts a javaobj list of integers to a Python byte array"""
+    """Converts a javaobj bytearray which somehow became a list of signed integers back to a Python byte array"""
     out: bytes = b''
     for i in barr.data:
         out += i.to_bytes(1, byteorder='big', signed=True)
