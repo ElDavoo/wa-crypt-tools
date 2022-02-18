@@ -1,0 +1,17 @@
+syntax = "proto3";
+import "C15_IV.proto";
+import "C15_metadata.proto";
+
+/*
+This file describes the header you can find near the start of an encrypted msgstore.db.crypt15 file.
+ */
+enum Key_Type {
+    WA_PROVIDED = 0;
+    HSM_CONTROLLED = 1;
+}
+message Crypt15Prefix {
+    Key_Type key_type = 1;
+    IV iv = 3;
+    BackupVersionandInfo info = 4;
+
+}

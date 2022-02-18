@@ -1,4 +1,0 @@
-syntax = "proto3";
-message IV {
-        bytes IV = 1; // The 16-bytes long IV
-    }
