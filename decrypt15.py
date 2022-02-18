@@ -7,16 +7,18 @@ from __future__ import annotations
 
 # noinspection PyPackageRequirements
 # This is from pycryptodome
-
 from Crypto.Cipher import AES
 
 # noinspection PyPackageRequirements
 # This is from javaobj-py3
-
 import javaobj.v2 as javaobj
 
+# noinspection PyPackageRequirements
+from google.protobuf.message import DecodeError
+
+import collections
 from hashlib import sha256
-from io import DEFAULT_BUFFER_SIZE
+from io import DEFAULT_BUFFER_SIZE, BufferedReader
 from re import findall
 from sys import exit
 
@@ -28,10 +30,9 @@ __author__ = 'TripCode, ElDavo'
 __copyright__ = 'Copyright (C) 2022'
 __license__ = 'GPLv3'
 __status__ = 'Production'
-__version__ = '3.0'
+__version__ = '4.0'
 
-
-# Why the \x01 at the end? Read the get_key() function comments...
+# Why the \x01 at the end? Read the parse_protobuf() function comments...
 BACKUP_ENCRYPTION = b'backup encryption\x01'
 
 # zlib magic header is 78 01 (Low Compression).
@@ -78,7 +79,7 @@ class Log:
         exit(1)
 
 
-def oscillate(n: int, n_min: int, n_max: int) -> int:
+def oscillate(n: int, n_min: int, n_max: int) -> collections.Iterable:
     """Yields n, n-1, n+1, n-2, n+2..., with constraints:
     - n is in [min, max]
     - n is never negative
@@ -238,19 +239,18 @@ def find_data_offset(header: bytes, iv_offset: int, key: bytes, starting_data_of
     return -1
 
 
-def decrypt15(key: bytes, encrypted, decrypted, mem_approach: bool):
-    """Decrypts an encrypted database file, given the server salt and the key."""
+def guess_offsets(key: bytes, encrypted: BufferedReader):
+    """Gets the IV, shifts the stream to the beginning of the encrypted data and returns the cipher.
+    It does so by guessing the offset."""
 
     # Assign variables to suppress warnings
     db_header, offset, iv_offset = None, None, None
+    log.i("Guessing the offsets...")
 
-    log.v("Parsing database header...")
+    # Restart the file stream
+    encrypted.seek(0)
 
-    try:
-        db_header = encrypted.read(HEADER_SIZE)
-    except OSError as e:
-        log.f("Reading encrypted database failed: {}".format(e))
-
+    db_header = encrypted.read(HEADER_SIZE)
     if len(db_header) < HEADER_SIZE:
         log.f("The encrypted database is too small.\n\t"
               "Did you swap the keyfile and the encrypted database file by mistake?")
@@ -262,14 +262,13 @@ def decrypt15(key: bytes, encrypted, decrypted, mem_approach: bool):
     except ValueError:
         pass
 
-    # TODO actually parse the header. It is a protobuf message.
-
     # Finding WhatsApp's version's length allows us to determine the data offset
     version = findall(b"\\d(?:\\.\\d{1,3}){3}", db_header)
     if len(version) != 1:
         log.e('WhatsApp version not found')
     else:
         log.v("WhatsApp version: {}".format(version[0].decode('ascii')))
+
     starting_data_offset = DEFAULT_DATA_OFFSET + len(version[0])
 
     # Determine IV offset and data offset.
@@ -280,46 +279,112 @@ def decrypt15(key: bytes, encrypted, decrypted, mem_approach: bool):
             log.v("Data offset: {}".format(offset))
             break
     if offset == -1:
-        log.f("Could not find IV or data start offset")
+        return None
 
-    # Now that we have everything we can do the real job
     iv = db_header[iv_offset:iv_offset + 16]
-    cipher = AES.new(key, AES.MODE_GCM, iv)
+
     encrypted.seek(offset)
+
+    return AES.new(key, AES.MODE_GCM, iv)
+
+
+def parse_protobuf(key: bytes, encrypted: BufferedReader):
+    """Parses the database header, gets the IV,
+     shifts the stream to the beginning of the encrypted data and returns the cipher.
+    It does so by parsing the protobuf message."""
+
+    try:
+        import proto.C15_header_pb2 as Crypt15Header
+    except ImportError as e:
+        log.e("Could not import the proto classes: {}\n\t".format(e) +
+              "Please download them and put them in the \"proto\" sub folder.")
+        return None
+
+    p = Crypt15Header.Crypt15Prefix()
+
+    log.v("Parsing database header...")
+
+    try:
+
+        # The first byte is the size of the upcoming protobuf message
+        protobuf_size = int.from_bytes(encrypted.read(1), byteorder='big')
+
+        # It is my guess this is the message version. No idea if this is correct.
+        version = int.from_bytes(encrypted.read(1), byteorder='big')
+        if version != 1:
+            log.e("Unexpected protobuf message version: {}".format(version))
+
+        try:
+
+            if p.ParseFromString(encrypted.read(protobuf_size)) != protobuf_size:
+                log.e("Protobuf message not fully read. Please report a bug.")
+            else:
+
+                if p.key_type != Crypt15Header.Key_Type.HSM_CONTROLLED:
+                    log.e("Key is not controlled by HSM, but is {}".format(Crypt15Header.Key_Type.Name(p.key_type)))
+
+                log.v("WhatsApp version: {}".format(p.info.whatsapp_version))
+                log.v("Your phone number ends with {}".format(p.info.substringedUserJid))
+
+                if len(p.iv.IV) != 16:
+                    log.e("IV is not 16 bytes long but is {} bytes long".format(len(p.iv.IV)))
+
+                # We are done here
+                return AES.new(key, AES.MODE_GCM, p.iv.IV)
+
+        except DecodeError:
+            log.e("Parsing the protobuf message failed.")
+            pass
+
+    except OSError as e:
+        log.f("Reading database header failed: {}".format(e))
+
+    log.e("Could not parse the protobuf message. Please report a bug.")
+    return None
+
+
+def decrypt15(cipher, encrypted: BufferedReader, decrypted: BufferedReader, mem_approach: bool):
+    """Does the actual decryption."""
 
     z_obj = zlib.decompressobj()
 
-    log.v("Offsets found, decrypting...")
+    if cipher is None:
+        log.f("Could not create a decryption cipher")
+
+    log.v("Decrypting...")
 
     try:
 
         if mem_approach:
-            # Load the encrypted file into RAM
-            # Decrypts into RAM
-            # Decompresses into RAM
-            # Writes into disk
+            # Load the encrypted file into RAM, decrypts into RAM,
+            # decompresses into RAM, writes into disk.
             # More RAM used (x3), less I/O used
             output_file = z_obj.decompress((cipher.decrypt(encrypted.read())))
             if not z_obj.eof:
                 log.e("The encrypted database file is truncated (damaged).")
             decrypted.write(output_file)
-            decrypted.flush()
 
         else:
+
             # Does the thing above but only with DEFAULT_BUFFER_SIZE bytes at a time.
             # Less RAM used, more I/O used
             # TODO use assignment expression, which drops compatibility with 3.7
             # while chunk := encrypted.read(DEFAULT_BUFFER_SIZE):
+
             while True:
+
                 chunk = encrypted.read(DEFAULT_BUFFER_SIZE)
                 if not chunk:
                     break
                 decrypted.write(z_obj.decompress(cipher.decrypt(chunk)))
+
             if not z_obj.eof:
+
                 if not log.force:
                     decrypted.truncate(0)
                 log.e("The encrypted database file is truncated (damaged).")
-            decrypted.flush()
+
+        decrypted.flush()
 
     except OSError as e:
         log.f("I/O error: {}".format(e))
@@ -328,16 +393,23 @@ def decrypt15(key: bytes, encrypted, decrypted, mem_approach: bool):
         decrypted.close()
         encrypted.close()
 
-    log.i("Decryption successful")
-
 
 def main():
     args = parsecmdline()
     global log
     log = Log(verbose=args.verbose, force=args.force)
+    # Get the decryption key from the key file.
     key = get_key(key_file_stream=args.keyfile)
-    decrypt15(key=key,
-              encrypted=args.encrypted, decrypted=args.decrypted, mem_approach=not args.no_mem)
+
+    # Now we have to get the IV and to guess where the data starts.
+    # We have two approaches to do so.
+    # First: try parsing the protobuf message.
+    cipher = parse_protobuf(key=key, encrypted=args.encrypted)
+    if cipher is None:
+        # If parsing the protobuf message failed, we try guessing the offsets.
+        cipher = guess_offsets(key=key, encrypted=args.encrypted)
+    decrypt15(cipher, args.encrypted, args.decrypted, not args.no_mem)
+    log.i("Decryption successful")
 
 
 if __name__ == "__main__":

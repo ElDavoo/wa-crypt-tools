@@ -8,6 +8,8 @@ WhatsApp forensics, check out [whapa.](https://github.com/B16f00t/whapa)
 
 ## Requirements:
 
+**Remember to download the proto folder!**
+
 Python 3.7 or more recent    
 pycriptodome  
 javaobj-py3  
