@@ -13,6 +13,7 @@ WhatsApp forensics, check out [whapa.](https://github.com/B16f00t/whapa)
 Python 3.7 or more recent    
 pycriptodome  
 javaobj-py3  
+protobuf  
 
 Use:
  ```
@@ -20,7 +21,7 @@ Use:
  ```
   Or:
  ```
-              python -m pip install pycryptodome javaobj-py3
+              python -m pip install pycryptodome javaobj-py3 protobuf
  ```
 
 ## Usage
