@@ -3,6 +3,12 @@
 Note: this script does not follow a versioning policy. Versions number are written just for reference.
 This file may not be 100% correct: The true changelog is the git history.
 
+## Version 4.0
+- No more guessing offsets! The database header is now completely parsed.
+  The guessing logic has been left as a fallback behaviour.
+  The structure of the program has been changed accordingly.
+- The proto file for msgstore.db.crypt15 are now complete
+
 ## Version 3.0
 - crypt15 support (in a separate script, decrypt15.py)
 - added a proto file describing the header of a msgstore.db.crypt15 file
