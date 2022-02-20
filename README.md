@@ -2,7 +2,7 @@
 Decrypts WhatsApp msgstore.db.crypt14-**15** files, **given the key file**.  
 The key file is named "key" if the backup is crypt14, 
 "encrypted_backup.key" if the backup is crypt15 (encrypted E2E backups).  
-The output result is a SQLite database.  
+The output result is a SQLite database or a ZIP file (in case of wallpapers.db.crypt15 and stickers.db.crypt15).  
 This is the only thing this script does. Those who are looking for a complete suite for
 WhatsApp forensics, check out [whapa.](https://github.com/B16f00t/whapa)
 

@@ -30,7 +30,7 @@ __author__ = 'TripCode, ElDavo'
 __copyright__ = 'Copyright (C) 2022'
 __license__ = 'GPLv3'
 __status__ = 'Production'
-__version__ = '4.0'
+__version__ = '4.1'
 
 # Why the \x01 at the end? Read the parse_protobuf() function comments...
 BACKUP_ENCRYPTION = b'backup encryption\x01'
@@ -245,7 +245,8 @@ def guess_offsets(key: bytes, encrypted: BufferedReader):
 
     # Assign variables to suppress warnings
     db_header, offset, iv_offset = None, None, None
-    log.i("Guessing the offsets...")
+    log.i("Guessing the offsets...\n\t"
+          "Note: This won't work with stickers and wallpapers backup")
 
     # Restart the file stream
     encrypted.seek(0)
@@ -309,10 +310,16 @@ def parse_protobuf(key: bytes, encrypted: BufferedReader):
         # The first byte is the size of the upcoming protobuf message
         protobuf_size = int.from_bytes(encrypted.read(1), byteorder='big')
 
-        # It is my guess this is the message version. No idea if this is correct.
-        version = int.from_bytes(encrypted.read(1), byteorder='big')
-        if version != 1:
-            log.e("Unexpected protobuf message version: {}".format(version))
+        # It is my guess this is the backup type.
+        # Looks like it is 1 for msgstore and 8 for other types.
+        backup_type = int.from_bytes(encrypted.read(1), byteorder='big')
+        if backup_type != 1:
+            if backup_type == 8:
+                log.v("Not a msgstore database")
+                # For some reason we need to go backward one byte
+                encrypted.seek(-1, 1)
+            else:
+                log.e("Unexpected backup type: {}".format(backup_type))
 
         try:
 
@@ -333,7 +340,6 @@ def parse_protobuf(key: bytes, encrypted: BufferedReader):
                 return AES.new(key, AES.MODE_GCM, p.iv.IV)
 
         except DecodeError:
-            log.e("Parsing the protobuf message failed.")
             pass
 
     except OSError as e:
@@ -359,9 +365,16 @@ def decrypt15(cipher, encrypted: BufferedReader, decrypted: BufferedReader, mem_
             # Load the encrypted file into RAM, decrypts into RAM,
             # decompresses into RAM, writes into disk.
             # More RAM used (x3), less I/O used
-            output_file = z_obj.decompress((cipher.decrypt(encrypted.read())))
-            if not z_obj.eof:
-                log.e("The encrypted database file is truncated (damaged).")
+            output_decrypted = cipher.decrypt(encrypted.read())
+            try:
+                output_file = z_obj.decompress(output_decrypted)
+                if not z_obj.eof:
+                    log.e("The encrypted database file is truncated (damaged).")
+            except zlib.error:
+                log.v("Decrypted data is not a zlib stream, will not decompress automatically.\n"
+                      "The output file is probably a ZIP archive.")
+                output_file = output_decrypted
+
             decrypted.write(output_file)
 
         else:
@@ -371,14 +384,25 @@ def decrypt15(cipher, encrypted: BufferedReader, decrypted: BufferedReader, mem_
             # TODO use assignment expression, which drops compatibility with 3.7
             # while chunk := encrypted.read(DEFAULT_BUFFER_SIZE):
 
+            is_zip = True
+
             while True:
 
                 chunk = encrypted.read(DEFAULT_BUFFER_SIZE)
                 if not chunk:
                     break
-                decrypted.write(z_obj.decompress(cipher.decrypt(chunk)))
+                decrypted_chunk = cipher.decrypt(chunk)
+                if is_zip:
+                    try:
+                        decrypted.write(z_obj.decompress(decrypted_chunk))
+                    except zlib.error:
+                        log.v("Decrypted data is not a ZIP stream")
+                        is_zip = False
+                        decrypted.write(decrypted_chunk)
+                else:
+                    decrypted.write(decrypted_chunk)
 
-            if not z_obj.eof:
+            if is_zip and not z_obj.eof:
 
                 if not log.force:
                     decrypted.truncate(0)

@@ -3,8 +3,13 @@
 Note: this script does not follow a versioning policy. Versions number are written just for reference.
 This file may not be 100% correct: The true changelog is the git history.
 
+## Version 4.1
+
+- (Crypt15) Support for other DB files, like stickers, chat_settings, wallpapers...  
+Note: stickers and wallpapers are ZIP files that will not be decompressed automatically.
+
 ## Version 4.0
-- No more guessing offsets! The database header is now completely parsed.
+- (crypt15) No more guessing offsets! The database header is now completely parsed.
   The guessing logic has been left as a fallback behaviour.
   The structure of the program has been changed accordingly.
 - The proto file for msgstore.db.crypt15 are now complete
