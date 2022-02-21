@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+// This enum describes if the key is self-managed by WhatsApp of if it is stored in the HSM.
+// In other words, traditional = 0, end-to-end = 1
+enum Key_Type {
+    WA_PROVIDED = 0;
+    HSM_CONTROLLED = 1;
+}

@@ -1,0 +1,18 @@
+syntax = "proto3";
+import "C14_cipher.proto";
+import "C15_IV.proto";
+import "key_type.proto";
+import "version_features.proto";
+
+/*
+This file describes the header you can find near the start of an encrypted backup file.
+ */
+message prefix {
+    Key_Type key_type = 1; // 0 if traditional (crypt14), 1 if end-to-end (crypt15)
+    oneof cipher_info {
+        C14_cipher c14_cipher = 2; // If DB is crypt14
+        C15_IV c15_iv = 3; // If DB is crypt15
+    }
+    // Version that generated backup and other infos
+    Version_Features info = 4;
+}

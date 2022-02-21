@@ -1,9 +1,11 @@
 # WhatsApp Crypt14-15 Database Decrypter
-Decrypts WhatsApp msgstore.db.crypt14-**15** files, **given the key file**.  
-The key file is named "key" if the backup is crypt14, 
+Decrypts WhatsApp .crypt14 and .crypt15 files, **given the key file**.  
+The key file is named "key" if the backup is crypt14 or  
 "encrypted_backup.key" if the backup is crypt15 (encrypted E2E backups).  
-The output result is a SQLite database or a ZIP file (in case of wallpapers.db.crypt15 and stickers.db.crypt15).  
-This is the only thing this script does. Those who are looking for a complete suite for
+The output result is either a SQLite database 
+or a ZIP file (in case of wallpapers and stickers).  
+This is the only thing this script does. 
+Those who are looking for a complete suite for
 WhatsApp forensics, check out [whapa.](https://github.com/B16f00t/whapa)
 
 ## Requirements:
@@ -25,44 +27,22 @@ Use:
  ```
 
 ## Usage
-### decrypt14.py
+
  ```
-usage: decrypt14.py [-h] [-f] [-nm] [-v] [keyfile] [encrypted] [decrypted]
-
-Decrypts WhatsApp database backup files encrypted with Crypt14
-
-positional arguments:
-  keyfile        The WhatsApp keyfile. Default: key
-  encrypted      The encrypted crypt14 database. Default: msgstore.db.crypt14
-  decrypted      The decrypted output database file. Default: msgstore.db
-
-options:
-  -h, --help     show this help message and exit
-  -f, --force    Makes errors non fatal. Default: false
-  -nm, --no-mem  Does not load files in RAM, stresses the disk more. Default:
-                 load files into RAM
-  -v, --verbose  Prints all offsets and messages
-
- ```  
-### decrypt15.py
- ```
-usage: decrypt15.py [-h] [-f] [-nm] [-v] [keyfile] [encrypted] [decrypted]
+usage: decrypt14_15.py [-h] [-f] [-nm] [-v] [keyfile] [encrypted] [decrypted]
 
 Decrypts WhatsApp database backup files encrypted with Crypt15
 
 positional arguments:
-  keyfile        The WhatsApp encrypted_backup key file. Default:
-                 encrypted_backup.key
+  keyfile        The WhatsApp encrypted_backup key file. Default: encrypted_backup.key
   encrypted      The encrypted crypt15 database. Default: msgstore.db.crypt15
   decrypted      The decrypted output database file. Default: msgstore.db
 
 options:
   -h, --help     show this help message and exit
   -f, --force    Makes errors non fatal. Default: false
-  -nm, --no-mem  Does not load files in RAM, stresses the disk more. Default:
-                 load files into RAM
+  -nm, --no-mem  Does not load files in RAM, stresses the disk more. Default: load files into RAM
   -v, --verbose  Prints all offsets and messages
-
  ```  
 
 ## Not working / crash / etc
@@ -71,10 +51,6 @@ Please open an issue and attach:
 1) Output of the program (both with and without --force)
 2) Hexdump of keyfile
 3) Hexdump of first 512 bytes of encrypted DB
-
-### Planned / To Do
-
-stickers.db decryption support  
 
 ### Not planned / wontfix
 
@@ -89,8 +65,8 @@ Anyway, on rooted Android, you can just copy
 (or `/data/data/com.whatsapp/files/encrypted_backup.key` if backups are crypt15)
 
 ### Last tested version (don't expect this to be updated)
-Stable: 2.21.24.22  
-Beta: 2.22.4.14
+Stable: 2.22.4.74
+Beta: 2.22.5.13
 
 
 ### Stargazers over time
@@ -99,4 +75,6 @@ Beta: 2.22.4.14
 
 
 ###### Credits:
- Authors: [TripCode](https://github.com/TripCode) & [ElDavoo](https://github.com/ElDavoo) & [DjEdu28](https://github.com/DjEdu28)
+ Original implementation for crypt12: [TripCode](https://github.com/TripCode)    
+ Some help at the beginning: [DjEdu28](https://github.com/DjEdu28)  
+ Actual crypt14/15 implementation with protobuf: [ElDavoo](https://github.com/ElDavoo)

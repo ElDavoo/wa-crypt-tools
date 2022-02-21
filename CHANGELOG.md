@@ -3,6 +3,10 @@
 Note: this script does not follow a versioning policy. Versions number are written just for reference.
 This file may not be 100% correct: The true changelog is the git history.
 
+## Version 5.0
+
+- Unified the crypt14 and the crypt15 code bases.
+
 ## Version 4.1
 
 - (Crypt15) Support for other DB files, like stickers, chat_settings, wallpapers...  

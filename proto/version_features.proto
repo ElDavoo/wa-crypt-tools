@@ -1,7 +1,9 @@
 syntax = "proto3";
-message BackupVersionandInfo {
+// This describes the metadata, e.g. the version, the ph number and various features.
+message Version_Features {
     string whatsapp_version = 1; // Whatsapp version, for example "2.22.4.14"
     string substringedUserJid = 3; // The last two characters of the user's Jid (phone number)
+    // This bools are only written if the backup is a msgstore backup.
     optional bool idk = 4; // No idea what this is
     optional bool call_log = 5; // Booleans that indicate various features
     optional bool labeled_jid = 6;

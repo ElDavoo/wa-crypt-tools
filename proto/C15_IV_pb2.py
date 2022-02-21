@@ -14,21 +14,21 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x43\x31\x35_IV.proto\"\x10\n\x02IV\x12\n\n\x02IV\x18\x01 \x01(\x0c\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x43\x31\x35_IV.proto\"\x14\n\x06\x43\x31\x35_IV\x12\n\n\x02IV\x18\x01 \x01(\x0c\x62\x06proto3')
 
 
 
-_IV = DESCRIPTOR.message_types_by_name['IV']
-IV = _reflection.GeneratedProtocolMessageType('IV', (_message.Message,), {
-  'DESCRIPTOR' : _IV,
+_C15_IV = DESCRIPTOR.message_types_by_name['C15_IV']
+C15_IV = _reflection.GeneratedProtocolMessageType('C15_IV', (_message.Message,), {
+  'DESCRIPTOR' : _C15_IV,
   '__module__' : 'C15_IV_pb2'
-  # @@protoc_insertion_point(class_scope:IV)
+  # @@protoc_insertion_point(class_scope:C15_IV)
   })
-_sym_db.RegisterMessage(IV)
+_sym_db.RegisterMessage(C15_IV)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  _IV._serialized_start=16
-  _IV._serialized_end=32
+  _C15_IV._serialized_start=16
+  _C15_IV._serialized_end=36
 # @@protoc_insertion_point(module_scope)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-This script decrypts WhatsApp's DB files encrypted with Crypt15.
+This script decrypts WhatsApp's DB files encrypted with Crypt14 or Crypt15.
 """
 
 from __future__ import annotations
@@ -26,26 +26,149 @@ import argparse
 import hmac
 import zlib
 
-__author__ = 'TripCode, ElDavo'
+__author__ = 'ElDavo'
 __copyright__ = 'Copyright (C) 2022'
 __license__ = 'GPLv3'
 __status__ = 'Production'
-__version__ = '4.1'
+__version__ = '5.0'
 
-# Why the \x01 at the end? Read the parse_protobuf() function comments...
-BACKUP_ENCRYPTION = b'backup encryption\x01'
+# These constants are only used by the guessing logic.
 
 # zlib magic header is 78 01 (Low Compression).
 # The first two bytes of the decrypted data should be those.
-ZIP_HEADERS = [
+ZLIB_HEADERS = [
     b'x\x01'
 ]
-
-# Size of header (number chosen arbitrarily, but values less than ~310 makes test_decompression fail)
+# Size of bytes to test (number chosen arbitrarily, but values less than ~310 makes test_decompression fail)
 HEADER_SIZE = 512
-
 DEFAULT_DATA_OFFSET = 122
 DEFAULT_IV_OFFSET = 8
+
+
+class Key:
+    """ This class represents a key used to decrypt the DB.
+    Only the key is mandatory. The other parameters are optional, and if they are not None,
+    means that the key type is crypt14."""
+    # These constants are only used with crypt14 keys.
+    SUPPORTED_CIPHER_VERSION = b'\x00\x01'
+    SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02']
+
+    # This constant is only used with crypt15 keys.
+    BACKUP_ENCRYPTION = b'backup encryption\x01'
+
+    def __init__(self, key_file_stream: BufferedReader):
+        """Deserializes a key file into a byte array."""
+        self.key = None
+        self.serversalt = None
+        self.googleid = None
+        self.key_version = None
+        self.cipher_version = None
+
+        keyfile: bytes = b''
+
+        log.v("Reading keyfile...")
+
+        try:
+            # Deserialize the byte object written in the file
+            jarr: javaobj.beans.JavaArray = javaobj.load(key_file_stream).data
+            # Convert from a list of Int8 to a byte array
+            keyfile: bytes = javaintlist2bytes(jarr)
+
+        except OSError as e:
+            log.f("Couldn't read keyfile: {}".format(e))
+        except (ValueError, RuntimeError) as e:
+            log.f("The keyfile is not a valid Java object: {}".format(e))
+
+        # We guess the key type from its length
+        if len(keyfile) == 131:
+            self.load_crypt14(keyfile=keyfile)
+        elif len(keyfile) == 32:
+            self.load_crypt15(keyfile=keyfile)
+        else:
+            log.f("Unrecognized key file format.")
+
+    def load_crypt14(self, keyfile: bytes):
+        """Extracts the fields from a crypt14 loaded key file."""
+        # key file format and encoding explanation:
+        # The key file is actually a serialized byte[] object.
+
+        # After deserialization, we will have a byte[] object that we have to split in:
+        # 1) The cipher version (2 bytes). Known values are 0x0000 and 0x0001. So far we only support the latter.
+        # SUPPORTED_CIPHER_VERSION = b'\x00\x01'
+        # 2) The key version (1 byte). Both of the known versions are supported.
+        # SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02']
+        # 3) Server salt (32 bytes)
+        # 4) googleIdSalt (unused?) (16 bytes)
+        # 5) hashedGoogleID (The SHA-256 hash of googleIdSalt) (32 bytes)
+        # 6) encryption IV (zeroed out, as it is read from the database) (16 bytes)
+        # 7) cipherKey (The actual AES-256 decryption key) (32 bytes)
+
+        # Check if the keyfile has a supported cipher version
+        self.cipher_version = keyfile[:len(self.SUPPORTED_CIPHER_VERSION)]
+        if self.SUPPORTED_CIPHER_VERSION != self.cipher_version:
+            log.e("Invalid keyfile: Unsupported cipher version {}"
+                  .format(keyfile[:len(self.SUPPORTED_CIPHER_VERSION)].hex()))
+        index = len(self.SUPPORTED_CIPHER_VERSION)
+
+        # Check if the keyfile has a supported key version
+        version_supported = False
+        for v in self.SUPPORTED_KEY_VERSIONS:
+            if v == keyfile[index:index + len(self.SUPPORTED_KEY_VERSIONS[0])]:
+                version_supported = True
+                self.key_version = v
+                break
+        if not version_supported:
+            log.e('Invalid keyfile: Unsupported key version {}'
+                  .format(keyfile[index:index + len(self.SUPPORTED_KEY_VERSIONS[0])].hex()))
+
+        self.serversalt = keyfile[3:35]
+
+        # Check the SHA-256 of the salt
+        self.googleid = keyfile[35:51]
+        expected_digest = sha256(self.googleid).digest()
+        actual_digest = keyfile[51:83]
+        if expected_digest != actual_digest:
+            log.e("Invalid keyfile: Invalid SHA-256 of salt.\n    "
+                  "Expected: {}\n    Got:{}".format(expected_digest, actual_digest))
+
+        padding = keyfile[83:99]
+
+        # Check if IV is made of zeroes
+        for byte in padding:
+            if byte:
+                log.e("Invalid keyfile: IV is not zeroed out but is: {}".format(padding.hex()))
+                break
+
+        self.key = keyfile[99:]
+
+        log.i("Crypt14 key loaded")
+
+    def load_crypt15(self, keyfile: bytes):
+        """Extracts the key from a loaded crypt15 key file."""
+        # encrypted_backup.key file format and encoding explanation:
+        # The E2E key file is actually a serialized byte[] object.
+
+        # After deserialization, we will have the root key (32 bytes).
+        # The root key is further encoded with three different strings, depending on what you want to do.
+        # These three ways are "backup encryption";
+        # "metadata encryption" and "metadata authentication", for Google Drive E2E encrypted metadata.
+        # We are only interested in the local backup encryption.
+
+        # Why the \x01 at the end of the BACKUP_ENCRYPTION constant?
+        # Whatsapp uses a nested encryption function to encrypt many times the same data.
+        # The iteration counter is appended to the end of the encrypted data. However,
+        # since the loop is actually executed only one time, we will only have one interaction,
+        # and thus a \x01 at the end.
+
+        if len(keyfile) != 32:
+            log.f("Crypt15 loader trying to load a crypt14 key")
+
+        # First do the HMACSHA256 hash of the file with an empty private key
+        self.key: bytes = hmac.new(b'\x00' * 32, keyfile, sha256).digest()
+        # Then do the HMACSHA256 using the previous result as key and ("backup encryption" + iteration count) as data
+        self.key = hmac.new(self.key, self.BACKUP_ENCRYPTION, sha256).digest()
+
+        log.i("Crypt15 key loaded")
 
 
 class Log:
@@ -152,45 +275,6 @@ def javaintlist2bytes(barr: javaobj.beans.JavaArray) -> bytes:
     return out
 
 
-def get_key(key_file_stream) -> bytes:
-    """Extracts the key from the encoded_backup.key (a file stream)."""
-    # encrypted_backup.key file format and encoding explanation:
-    # The E2E key file is actually a serialized byte[] object.
-    # For this reason we first need to deserialize the object.
-
-    keyfile: bytes = b''
-
-    log.v("Reading keyfile...")
-
-    try:
-        jarr: javaobj.beans.JavaArray = javaobj.load(key_file_stream).data
-        # Convert from a list of Int8 to a byte array
-        keyfile = javaintlist2bytes(jarr)
-
-    except OSError as e:
-        log.f("Couldn't read keyfile: {}".format(e))
-    except (ValueError, RuntimeError) as e:
-        log.f("The keyfile is not a valid Java object: {}".format(e))
-    # After that, we will have the root key (32 bytes).
-    # The root key is further encoded with three different strings, depending on what you want to do.
-    # These three ways are "backup encryption";
-    # "metadata encryption" and "metadata authentication", for Google Drive E2E encrypted metadata.
-    # We are only interested in the local backup encryption.
-
-    # Why the \x01 at the end?
-    # Whatsapp uses a nested encryption function to encrypt many times the same data.
-    # The iteration counter is appended to the end of the encrypted data. However,
-    # since the loop is actually executed only one time, we will only have one interaction,
-    # and thus a \x01 at the end.
-
-    # First do the HMACSHA256 hash of the file with an empty private key
-    encoded_key: bytes = hmac.new(b'\x00' * 32, keyfile, sha256).digest()
-    # Then do the HMACSHA256 using the previous result as key and ("backup encryption" + iteration count) as data
-    encoded_key = hmac.new(encoded_key, BACKUP_ENCRYPTION, sha256).digest()
-
-    return encoded_key
-
-
 def test_decompression(test_data: bytes) -> bool:
     """Returns true if the SQLite header is valid.
     It is assumed that the data are valid.
@@ -213,7 +297,8 @@ def test_decompression(test_data: bytes) -> bool:
 
 def find_data_offset(header: bytes, iv_offset: int, key: bytes, starting_data_offset: int) -> int:
     """Tries to find the offset in which the encrypted data starts.
-    Returns the offset or -1 if the offset is not found."""
+    Returns the offset or -1 if the offset is not found.
+    Only works with ZLIB stream, not with ZIP file."""
 
     iv = header[iv_offset:iv_offset + 16]
 
@@ -225,7 +310,7 @@ def find_data_offset(header: bytes, iv_offset: int, key: bytes, starting_data_of
         # We only decrypt the first two bytes.
         test_bytes = cipher.decrypt(header[i:i + 2])
 
-        for zheader in ZIP_HEADERS:
+        for zheader in ZLIB_HEADERS:
 
             if test_bytes == zheader:
                 # We found a match, but this might also happen by chance.
@@ -245,7 +330,7 @@ def guess_offsets(key: bytes, encrypted: BufferedReader):
 
     # Assign variables to suppress warnings
     db_header, offset, iv_offset = None, None, None
-    log.i("Guessing the offsets...\n\t"
+    log.i("Guessing the offsets...\n    "
           "Note: This won't work with stickers and wallpapers backup")
 
     # Restart the file stream
@@ -253,12 +338,12 @@ def guess_offsets(key: bytes, encrypted: BufferedReader):
 
     db_header = encrypted.read(HEADER_SIZE)
     if len(db_header) < HEADER_SIZE:
-        log.f("The encrypted database is too small.\n\t"
+        log.f("The encrypted database is too small.\n    "
               "Did you swap the keyfile and the encrypted database file by mistake?")
 
     try:
         if db_header[:15].decode('ascii') == 'SQLite format 3':
-            log.e("The database file is not encrypted.\n\t"
+            log.e("The database file is not encrypted.\n    "
                   "Did you swap the input and the output files by mistake?")
     except ValueError:
         pass
@@ -289,19 +374,20 @@ def guess_offsets(key: bytes, encrypted: BufferedReader):
     return AES.new(key, AES.MODE_GCM, iv)
 
 
-def parse_protobuf(key: bytes, encrypted: BufferedReader):
+def parse_protobuf(key: Key, encrypted: BufferedReader):
     """Parses the database header, gets the IV,
      shifts the stream to the beginning of the encrypted data and returns the cipher.
     It does so by parsing the protobuf message."""
 
     try:
-        import proto.C15_header_pb2 as Crypt15Header
+        import proto.prefix_pb2 as prefix
+        import proto.key_type_pb2 as key_type
     except ImportError as e:
-        log.e("Could not import the proto classes: {}\n\t".format(e) +
+        log.e("Could not import the proto classes: {}\n    ".format(e) +
               "Please download them and put them in the \"proto\" sub folder.")
         return None
 
-    p = Crypt15Header.Crypt15Prefix()
+    p = prefix.prefix()
 
     log.v("Parsing database header...")
 
@@ -327,20 +413,49 @@ def parse_protobuf(key: bytes, encrypted: BufferedReader):
                 log.e("Protobuf message not fully read. Please report a bug.")
             else:
 
-                if p.key_type != Crypt15Header.Key_Type.HSM_CONTROLLED:
-                    log.e("Key is not controlled by HSM, but is {}".format(Crypt15Header.Key_Type.Name(p.key_type)))
-
                 log.v("WhatsApp version: {}".format(p.info.whatsapp_version))
                 log.v("Your phone number ends with {}".format(p.info.substringedUserJid))
 
-                if len(p.iv.IV) != 16:
-                    log.e("IV is not 16 bytes long but is {} bytes long".format(len(p.iv.IV)))
+                if len(p.c15_iv.IV) != 0:
+                    # DB Header is crypt15
+                    if key.key_version is not None:
+                        log.e("You are using a crypt14 key file with a crypt15 backup.")
+                    if len(p.c15_iv.IV) != 16:
+                        log.e("IV is not 16 bytes long but is {} bytes long".format(len(p.c15_iv.IV)))
+                    iv = p.c15_iv.IV
+
+                elif len(p.c14_cipher.IV) != 0:
+
+                    # DB Header is crypt14
+                    if key.key_version is None:
+                        log.e("You are using a crypt15 key file with a crypt14 backup.")
+
+                    # if key.cipher_version != p.c14_cipher.version.cipher_version:
+                    #    log.e("Cipher version mismatch: {} != {}"
+                    #    .format(key.cipher_version, p.c14_cipher.cipher_version))
+
+                    # Fix bytes to string encoding
+                    key.key_version = (key.key_version[0] + 48).to_bytes(1, byteorder='big')
+                    if key.key_version != p.c14_cipher.key_version:
+                        log.e("Key version mismatch: {} != {}".format(key.key_version, p.c14_cipher.key_version))
+                    if key.serversalt != p.c14_cipher.server_salt:
+                        log.e("Server salt mismatch: {} != {}".format(key.serversalt, p.c14_cipher.server_salt))
+                    if key.googleid != p.c14_cipher.google_id:
+                        log.e("Google ID mismatch: {} != {}".format(key.googleid, p.c14_cipher.google_id))
+                    if len(p.c14_cipher.IV) != 16:
+                        log.e("IV is not 16 bytes long but is {} bytes long".format(len(p.c14_cipher.IV)))
+                    iv = p.c14_cipher.IV
+
+                else:
+                    log.e("Could not parse the IV from the protobuf message. Please report a bug.")
+                    return None
 
                 # We are done here
-                return AES.new(key, AES.MODE_GCM, p.iv.IV)
+                log.i("Database header parsed")
+                return AES.new(key.key, AES.MODE_GCM, iv)
 
-        except DecodeError:
-            pass
+        except DecodeError as e:
+            print(e)
 
     except OSError as e:
         log.f("Reading database header failed: {}".format(e))
@@ -371,7 +486,7 @@ def decrypt15(cipher, encrypted: BufferedReader, decrypted: BufferedReader, mem_
                 if not z_obj.eof:
                     log.e("The encrypted database file is truncated (damaged).")
             except zlib.error:
-                log.v("Decrypted data is not a zlib stream, will not decompress automatically.\n"
+                log.i("Decrypted data is not a zlib stream, will not decompress automatically.\n    "
                       "The output file is probably a ZIP archive.")
                 output_file = output_decrypted
 
@@ -396,7 +511,8 @@ def decrypt15(cipher, encrypted: BufferedReader, decrypted: BufferedReader, mem_
                     try:
                         decrypted.write(z_obj.decompress(decrypted_chunk))
                     except zlib.error:
-                        log.v("Decrypted data is not a ZIP stream")
+                        log.i("Decrypted data is not a zlib stream, will not decompress automatically.\n    "
+                              "The output file is probably a ZIP archive.")
                         is_zip = False
                         decrypted.write(decrypted_chunk)
                 else:
@@ -423,7 +539,7 @@ def main():
     global log
     log = Log(verbose=args.verbose, force=args.force)
     # Get the decryption key from the key file.
-    key = get_key(key_file_stream=args.keyfile)
+    key = Key(args.keyfile)
 
     # Now we have to get the IV and to guess where the data starts.
     # We have two approaches to do so.
@@ -431,7 +547,7 @@ def main():
     cipher = parse_protobuf(key=key, encrypted=args.encrypted)
     if cipher is None:
         # If parsing the protobuf message failed, we try guessing the offsets.
-        cipher = guess_offsets(key=key, encrypted=args.encrypted)
+        cipher = guess_offsets(key=key.key, encrypted=args.encrypted)
     decrypt15(cipher, args.encrypted, args.decrypted, not args.no_mem)
     log.i("Decryption successful")
 
