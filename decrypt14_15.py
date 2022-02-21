@@ -56,7 +56,7 @@ class Key:
     # This constant is only used with crypt15 keys.
     BACKUP_ENCRYPTION = b'backup encryption\x01'
 
-    def __init__(self, key_file_stream: BufferedReader):
+    def __init__(self, key_file_stream):
         """Deserializes a key file into a byte array."""
         self.key = None
         self.serversalt = None
@@ -374,7 +374,7 @@ def guess_offsets(key: bytes, encrypted: BufferedReader):
     return AES.new(key, AES.MODE_GCM, iv)
 
 
-def parse_protobuf(key: Key, encrypted: BufferedReader):
+def parse_protobuf(key: Key, encrypted):
     """Parses the database header, gets the IV,
      shifts the stream to the beginning of the encrypted data and returns the cipher.
     It does so by parsing the protobuf message."""
@@ -471,7 +471,7 @@ def parse_protobuf(key: Key, encrypted: BufferedReader):
     return None
 
 
-def decrypt(cipher, encrypted: BufferedReader, decrypted: BufferedReader, mem_approach: bool):
+def decrypt(cipher, encrypted, decrypted, mem_approach: bool):
     """Does the actual decryption."""
 
     z_obj = zlib.decompressobj()
