@@ -413,7 +413,14 @@ def parse_protobuf(key: Key, encrypted: BufferedReader):
                 log.e("Protobuf message not fully read. Please report a bug.")
             else:
 
-                log.v("WhatsApp version: {}".format(p.info.whatsapp_version))
+                # Finding WhatsApp's version's length allows us to determine the data offset
+                version = findall(r"\d(?:\.\d{1,3}){3}", p.info.whatsapp_version)
+                if len(version) != 1:
+                    log.e('WhatsApp version not found')
+                else:
+                    log.v("WhatsApp version: {}".format(version[0]))
+                if len(p.info.substringedUserJid) != 2:
+                    log.e("The phone number end is not 2 characters long")
                 log.v("Your phone number ends with {}".format(p.info.substringedUserJid))
 
                 if len(p.c15_iv.IV) != 0:
@@ -428,7 +435,7 @@ def parse_protobuf(key: Key, encrypted: BufferedReader):
 
                     # DB Header is crypt14
                     if key.key_version is None:
-                        log.e("You are using a crypt15 key file with a crypt14 backup.")
+                        log.f("You are using a crypt15 key file with a crypt14 backup.")
 
                     # if key.cipher_version != p.c14_cipher.version.cipher_version:
                     #    log.e("Cipher version mismatch: {} != {}"
