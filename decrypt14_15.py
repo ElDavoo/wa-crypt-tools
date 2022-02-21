@@ -471,7 +471,7 @@ def parse_protobuf(key: Key, encrypted: BufferedReader):
     return None
 
 
-def decrypt15(cipher, encrypted: BufferedReader, decrypted: BufferedReader, mem_approach: bool):
+def decrypt(cipher, encrypted: BufferedReader, decrypted: BufferedReader, mem_approach: bool):
     """Does the actual decryption."""
 
     z_obj = zlib.decompressobj()
@@ -555,7 +555,7 @@ def main():
     if cipher is None:
         # If parsing the protobuf message failed, we try guessing the offsets.
         cipher = guess_offsets(key=key.key, encrypted=args.encrypted)
-    decrypt15(cipher, args.encrypted, args.decrypted, not args.no_mem)
+    decrypt(cipher, args.encrypted, args.decrypted, not args.no_mem)
     log.i("Decryption successful")
 
 
