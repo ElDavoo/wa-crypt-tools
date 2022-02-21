@@ -250,18 +250,18 @@ def oscillate(n: int, n_min: int, n_max: int) -> collections.Iterable:
 
 def parsecmdline() -> argparse.Namespace:
     """Sets up the argument parser"""
-    parser = argparse.ArgumentParser(description='Decrypts WhatsApp database backup files encrypted with Crypt15')
+    parser = argparse.ArgumentParser(description='Decrypts WhatsApp database backup files'
+                                                 ' encrypted with Crypt14 or Crypt15')
     parser.add_argument('keyfile', nargs='?', type=argparse.FileType('rb'), default="encrypted_backup.key",
                         help='The WhatsApp encrypted_backup key file. Default: encrypted_backup.key')
     parser.add_argument('encrypted', nargs='?', type=argparse.FileType('rb'), default="msgstore.db.crypt15",
                         help='The encrypted crypt15 database. Default: msgstore.db.crypt15')
     parser.add_argument('decrypted', nargs='?', type=argparse.FileType('wb'), default="msgstore.db",
                         help='The decrypted output database file. Default: msgstore.db')
-    parser.add_argument('-f', '--force', action='store_true', help='Makes errors non fatal. '
-                                                                   'Default: false')
-    parser.add_argument('-nm', '--no-mem', action='store_true', help='Does not load files in RAM, '
-                                                                     'stresses the disk more. '
-                                                                     'Default: load files into RAM')
+    parser.add_argument('-f', '--force', action='store_true',
+                        help='Makes errors non fatal. Default: false')
+    parser.add_argument('-nm', '--no-mem', action='store_true',
+                        help='Does not load files in RAM, stresses the disk more. Default: load files into RAM')
     parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
 
     return parser.parse_args()

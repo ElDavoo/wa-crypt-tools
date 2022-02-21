@@ -31,7 +31,7 @@ Use:
  ```
 usage: decrypt14_15.py [-h] [-f] [-nm] [-v] [keyfile] [encrypted] [decrypted]
 
-Decrypts WhatsApp database backup files encrypted with Crypt15
+Decrypts WhatsApp database backup files encrypted with Crypt14 or Crypt15
 
 positional arguments:
   keyfile        The WhatsApp encrypted_backup key file. Default: encrypted_backup.key
@@ -65,7 +65,7 @@ Anyway, on rooted Android, you can just copy
 (or `/data/data/com.whatsapp/files/encrypted_backup.key` if backups are crypt15)
 
 ### Last tested version (don't expect this to be updated)
-Stable: 2.22.4.74
+Stable: 2.22.4.74  
 Beta: 2.22.5.13
 
 
