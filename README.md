@@ -35,7 +35,7 @@ Decrypts WhatsApp database backup files encrypted with Crypt14 or Crypt15
 
 positional arguments:
   keyfile        The WhatsApp encrypted_backup key file. Default: encrypted_backup.key
-  encrypted      The encrypted crypt15 database. Default: msgstore.db.crypt15
+  encrypted      The encrypted crypt15 or crypt14 database. Default: msgstore.db.crypt15
   decrypted      The decrypted output database file. Default: msgstore.db
 
 options:
