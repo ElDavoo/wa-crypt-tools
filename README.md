@@ -55,7 +55,7 @@ Please open an issue and attach:
 ### Not planned / wontfix
 
 1) Support for encrypting
-2) supporting older encryption formats
+2) supporting older encryption formats (you can decrypt crypt12 files using `--force` )
 
 ### Where do I get the keyfile?
 **Is it beyond the scope of this project to tell you how to get the key file.  

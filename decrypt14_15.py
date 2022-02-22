@@ -350,12 +350,12 @@ def guess_offsets(key: bytes, encrypted: BufferedReader):
 
     # Finding WhatsApp's version's length allows us to determine the data offset
     version = findall(b"\\d(?:\\.\\d{1,3}){3}", db_header)
+    starting_data_offset = DEFAULT_DATA_OFFSET
     if len(version) != 1:
         log.e('WhatsApp version not found')
     else:
         log.v("WhatsApp version: {}".format(version[0].decode('ascii')))
-
-    starting_data_offset = DEFAULT_DATA_OFFSET + len(version[0])
+        starting_data_offset += len(version[0])
 
     # Determine IV offset and data offset.
     for iv_offset in oscillate(n=DEFAULT_IV_OFFSET, n_min=0, n_max=HEADER_SIZE - 128):
