@@ -35,14 +35,68 @@ __version__ = '5.0'
 # These constants are only used by the guessing logic.
 
 # zlib magic header is 78 01 (Low Compression).
-# The first two bytes of the decrypted data should be those.
+# The first two bytes of the decrypted data should be those,
+# in case of single file backup, or PK\x03\x04 in case of multi file.
 ZLIB_HEADERS = [
-    b'x\x01'
+    b'x\x01',
+    b'PK'
 ]
+ZIP_HEADER = b'PK\x03\x04'
+
 # Size of bytes to test (number chosen arbitrarily, but values less than ~310 makes test_decompression fail)
-HEADER_SIZE = 512
+HEADER_SIZE = 384
 DEFAULT_DATA_OFFSET = 122
 DEFAULT_IV_OFFSET = 8
+
+
+class Log:
+    """Simple logger class. Supports 4 verbosity levels."""
+
+    def __init__(self, verbose: bool, force: bool):
+        self.verbose = verbose
+        self.force = force
+
+    def v(self, msg: str):
+        """Will only print message if verbose mode is enabled."""
+        if self.verbose:
+            print('[V] {}'.format(msg))
+
+    @staticmethod
+    def i(msg: str):
+        """Always prints message."""
+        print('[I] {}'.format(msg))
+
+    def e(self, msg: str):
+        """Prints message and exit, unless force is enabled."""
+        print('[E] {}'.format(msg))
+        if not self.force:
+            print("To bypass checks, use the \"--force\" parameter")
+            exit(1)
+
+    @staticmethod
+    def f(msg: str):
+        """Always prints message and exit."""
+        print('[F] {}'.format(msg))
+        exit(1)
+
+
+def parsecmdline() -> argparse.Namespace:
+    """Sets up the argument parser"""
+    parser = argparse.ArgumentParser(description='Decrypts WhatsApp database backup files'
+                                                 ' encrypted with Crypt14 or Crypt15')
+    parser.add_argument('keyfile', nargs='?', type=argparse.FileType('rb'), default="encrypted_backup.key",
+                        help='The WhatsApp encrypted_backup key file. Default: encrypted_backup.key')
+    parser.add_argument('encrypted', nargs='?', type=argparse.FileType('rb'), default="msgstore.db.crypt15",
+                        help='The encrypted crypt15 or crypt14 database. Default: msgstore.db.crypt15')
+    parser.add_argument('decrypted', nargs='?', type=argparse.FileType('wb'), default="msgstore.db",
+                        help='The decrypted output database file. Default: msgstore.db')
+    parser.add_argument('-f', '--force', action='store_true',
+                        help='Makes errors non fatal. Default: false')
+    parser.add_argument('-nm', '--no-mem', action='store_true',
+                        help='Does not load files in RAM, stresses the disk more. Default: load files into RAM')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
+
+    return parser.parse_args()
 
 
 class Key:
@@ -171,37 +225,6 @@ class Key:
         log.i("Crypt15 key loaded")
 
 
-class Log:
-    """Simple logger class. Supports 4 verbosity levels."""
-
-    def __init__(self, verbose: bool, force: bool):
-        self.verbose = verbose
-        self.force = force
-
-    def v(self, msg: str):
-        """Will only print message if verbose mode is enabled."""
-        if self.verbose:
-            print('[V] {}'.format(msg))
-
-    @staticmethod
-    def i(msg: str):
-        """Always prints message."""
-        print('[I] {}'.format(msg))
-
-    def e(self, msg: str):
-        """Prints message and exit, unless force is enabled."""
-        print('[E] {}'.format(msg))
-        if not self.force:
-            print("To bypass checks, use the \"--force\" parameter")
-            exit(1)
-
-    @staticmethod
-    def f(msg: str):
-        """Always prints message and exit."""
-        print('[F] {}'.format(msg))
-        exit(1)
-
-
 def oscillate(n: int, n_min: int, n_max: int) -> collections.Iterable:
     """Yields n, n-1, n+1, n-2, n+2..., with constraints:
     - n is in [min, max]
@@ -248,37 +271,14 @@ def oscillate(n: int, n_min: int, n_max: int) -> collections.Iterable:
             yield j
 
 
-def parsecmdline() -> argparse.Namespace:
-    """Sets up the argument parser"""
-    parser = argparse.ArgumentParser(description='Decrypts WhatsApp database backup files'
-                                                 ' encrypted with Crypt14 or Crypt15')
-    parser.add_argument('keyfile', nargs='?', type=argparse.FileType('rb'), default="encrypted_backup.key",
-                        help='The WhatsApp encrypted_backup key file. Default: encrypted_backup.key')
-    parser.add_argument('encrypted', nargs='?', type=argparse.FileType('rb'), default="msgstore.db.crypt15",
-                        help='The encrypted crypt15 or crypt14 database. Default: msgstore.db.crypt15')
-    parser.add_argument('decrypted', nargs='?', type=argparse.FileType('wb'), default="msgstore.db",
-                        help='The decrypted output database file. Default: msgstore.db')
-    parser.add_argument('-f', '--force', action='store_true',
-                        help='Makes errors non fatal. Default: false')
-    parser.add_argument('-nm', '--no-mem', action='store_true',
-                        help='Does not load files in RAM, stresses the disk more. Default: load files into RAM')
-    parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
-
-    return parser.parse_args()
-
-
-def javaintlist2bytes(barr: javaobj.beans.JavaArray) -> bytes:
-    """Converts a javaobj bytearray which somehow became a list of signed integers back to a Python byte array"""
-    out: bytes = b''
-    for i in barr:
-        out += i.to_bytes(1, byteorder='big', signed=True)
-    return out
-
-
 def test_decompression(test_data: bytes) -> bool:
     """Returns true if the SQLite header is valid.
     It is assumed that the data are valid.
     (If it is valid, it also means the decryption and decompression were successful.)"""
+
+    # If we get a ZIP file header, return true
+    if test_data[:4] == ZIP_HEADER:
+        return True
 
     try:
         zlib_obj = zlib.decompressobj().decompress(test_data)
@@ -330,8 +330,7 @@ def guess_offsets(key: bytes, encrypted: BufferedReader):
 
     # Assign variables to suppress warnings
     db_header, offset, iv_offset = None, None, None
-    log.i("Guessing the offsets...\n    "
-          "Note: This won't work with stickers and wallpapers backup")
+    log.i("Guessing the offsets...")
 
     # Restart the file stream
     encrypted.seek(0)
@@ -372,6 +371,14 @@ def guess_offsets(key: bytes, encrypted: BufferedReader):
     encrypted.seek(offset)
 
     return AES.new(key, AES.MODE_GCM, iv)
+
+
+def javaintlist2bytes(barr: javaobj.beans.JavaArray) -> bytes:
+    """Converts a javaobj bytearray which somehow became a list of signed integers back to a Python byte array"""
+    out: bytes = b''
+    for i in barr:
+        out += i.to_bytes(1, byteorder='big', signed=True)
+    return out
 
 
 def parse_protobuf(key: Key, encrypted):
