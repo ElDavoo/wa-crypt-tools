@@ -3,6 +3,11 @@
 Note: this script does not follow a versioning policy. Versions number are written just for reference.
 This file may not be 100% correct: The true changelog is the git history.
 
+## Version 5.1
+
+- More command line switches 
+(you can choose the approach and the default offsets for guessing mode)
+
 ## Version 5.0
 
 - Unified the crypt14 and the crypt15 code bases.

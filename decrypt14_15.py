@@ -30,13 +30,13 @@ __author__ = 'ElDavo'
 __copyright__ = 'Copyright (C) 2022'
 __license__ = 'GPLv3'
 __status__ = 'Production'
-__version__ = '5.0'
+__version__ = '5.1'
 
 # These constants are only used by the guessing logic.
 
 # zlib magic header is 78 01 (Low Compression).
 # The first two bytes of the decrypted data should be those,
-# in case of single file backup, or PK\x03\x04 in case of multi file.
+# in case of single file backup, or PK in case of multi file.
 ZLIB_HEADERS = [
     b'x\x01',
     b'PK'
@@ -82,18 +82,31 @@ class Log:
 
 def parsecmdline() -> argparse.Namespace:
     """Sets up the argument parser"""
-    parser = argparse.ArgumentParser(description='Decrypts WhatsApp database backup files'
+    parser = argparse.ArgumentParser(description='Decrypts WhatsApp backup files'
                                                  ' encrypted with Crypt14 or Crypt15')
     parser.add_argument('keyfile', nargs='?', type=argparse.FileType('rb'), default="encrypted_backup.key",
                         help='The WhatsApp encrypted_backup key file. Default: encrypted_backup.key')
     parser.add_argument('encrypted', nargs='?', type=argparse.FileType('rb'), default="msgstore.db.crypt15",
-                        help='The encrypted crypt15 or crypt14 database. Default: msgstore.db.crypt15')
+                        help='The encrypted crypt15 or crypt14 file. Default: msgstore.db.crypt15')
     parser.add_argument('decrypted', nargs='?', type=argparse.FileType('wb'), default="msgstore.db",
-                        help='The decrypted output database file. Default: msgstore.db')
+                        help='The decrypted output file. Default: msgstore.db')
     parser.add_argument('-f', '--force', action='store_true',
                         help='Makes errors non fatal. Default: false')
     parser.add_argument('-nm', '--no-mem', action='store_true',
-                        help='Does not load files in RAM, stresses the disk more. Default: load files into RAM')
+                        help='Does not load files in RAM, stresses the disk more. '
+                             'Default: load files into RAM')
+    parser.add_argument('-ng', '--no-guess', action='store_true',
+                        help='Does not try to guess the offsets, only protobuf parsing.')
+    parser.add_argument('-np', '--no-protobuf', action='store_true',
+                        help='Does not try to parse the protobuf message, only offset guessing.')
+    parser.add_argument('-ivo', '--iv-offset', type=int, default=DEFAULT_IV_OFFSET,
+                        help='The default offset of the IV in the encrypted file. '
+                             'Only relevant in offset guessing mode. '
+                             'Default: {}'.format(DEFAULT_IV_OFFSET))
+    parser.add_argument('-do', '--data-offset', type=int, default=DEFAULT_DATA_OFFSET,
+                        help='The default offset of the encrypted data in the encrypted file. '
+                             'Only relevant in offset guessing mode. '
+                             'Default: {}'.format(DEFAULT_DATA_OFFSET))
     parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
 
     return parser.parse_args()
@@ -195,7 +208,7 @@ class Key:
 
         self.key = keyfile[99:]
 
-        log.i("Crypt14 key loaded")
+        log.i("Crypt12/14 key loaded")
 
     def load_crypt15(self, keyfile: bytes):
         """Extracts the key from a loaded crypt15 key file."""
@@ -324,13 +337,12 @@ def find_data_offset(header: bytes, iv_offset: int, key: bytes, starting_data_of
     return -1
 
 
-def guess_offsets(key: bytes, encrypted: BufferedReader):
+def guess_offsets(key: bytes, encrypted: BufferedReader, def_iv_offset: int, def_data_offset: int):
     """Gets the IV, shifts the stream to the beginning of the encrypted data and returns the cipher.
     It does so by guessing the offset."""
 
     # Assign variables to suppress warnings
-    db_header, offset, iv_offset = None, None, None
-    log.i("Guessing the offsets...")
+    db_header, data_offset, iv_offset = None, None, None
 
     # Restart the file stream
     encrypted.seek(0)
@@ -347,28 +359,27 @@ def guess_offsets(key: bytes, encrypted: BufferedReader):
     except ValueError:
         pass
 
-    # Finding WhatsApp's version's length allows us to determine the data offset
+    # Finding WhatsApp's version is nice
     version = findall(b"\\d(?:\\.\\d{1,3}){3}", db_header)
-    starting_data_offset = DEFAULT_DATA_OFFSET
     if len(version) != 1:
-        log.e('WhatsApp version not found')
+        log.i('WhatsApp version not found (Crypt12?)')
     else:
         log.v("WhatsApp version: {}".format(version[0].decode('ascii')))
-        starting_data_offset += len(version[0])
 
     # Determine IV offset and data offset.
-    for iv_offset in oscillate(n=DEFAULT_IV_OFFSET, n_min=0, n_max=HEADER_SIZE - 128):
-        offset = find_data_offset(db_header, iv_offset, key, starting_data_offset)
-        if offset != -1:
-            log.v("IV offset: {}".format(iv_offset))
-            log.v("Data offset: {}".format(offset))
+    for iv_offset in oscillate(n=def_iv_offset, n_min=0, n_max=HEADER_SIZE - 128):
+        data_offset = find_data_offset(db_header, iv_offset, key, def_data_offset)
+        if data_offset != -1:
+            log.i("Offsets guessed (IV: {}, data: {}).".format(iv_offset, data_offset))
+            if iv_offset != def_iv_offset or data_offset != def_data_offset:
+                log.i("Next time, use -ivo {} -do {} for guess-free decryption".format(iv_offset, data_offset))
             break
-    if offset == -1:
+    if data_offset == -1:
         return None
 
     iv = db_header[iv_offset:iv_offset + 16]
 
-    encrypted.seek(offset)
+    encrypted.seek(data_offset)
 
     return AES.new(key, AES.MODE_GCM, iv)
 
@@ -408,7 +419,7 @@ def parse_protobuf(key: Key, encrypted):
         backup_type = int.from_bytes(encrypted.read(1), byteorder='big')
         if backup_type != 1:
             if backup_type == 8:
-                log.v("Not a msgstore database")
+                log.v("Not a (recent) msgstore database")
                 # For some reason we need to go backward one byte
                 encrypted.seek(-1, 1)
             else:
@@ -552,16 +563,24 @@ def main():
     args = parsecmdline()
     global log
     log = Log(verbose=args.verbose, force=args.force)
+    if not (0 < args.data_offset < HEADER_SIZE - 128):
+        log.f("The data offset must be between 1 and {}".format(HEADER_SIZE - 129))
+    if not (0 < args.iv_offset < HEADER_SIZE - 128):
+        log.f("The IV offset must be between 1 and {}".format(HEADER_SIZE - 129))
     # Get the decryption key from the key file.
     key = Key(args.keyfile)
 
+    cipher = None
     # Now we have to get the IV and to guess where the data starts.
     # We have two approaches to do so.
     # First: try parsing the protobuf message.
-    cipher = parse_protobuf(key=key, encrypted=args.encrypted)
-    if cipher is None:
+    if not args.no_protobuf:
+        cipher = parse_protobuf(key=key, encrypted=args.encrypted)
+
+    if cipher is None and not args.no_guess:
         # If parsing the protobuf message failed, we try guessing the offsets.
-        cipher = guess_offsets(key=key.key, encrypted=args.encrypted)
+        cipher = guess_offsets(key=key.key, encrypted=args.encrypted,
+                               def_iv_offset=args.iv_offset, def_data_offset=args.data_offset)
     decrypt(cipher, args.encrypted, args.decrypted, not args.no_mem)
     log.i("Decryption successful")
 
