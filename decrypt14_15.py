@@ -80,12 +80,31 @@ class Log:
         exit(1)
 
 
+def from_hex(string: str) -> bytes:
+    """Converts a hex string into a bytes array"""
+    if len(string) != 64:
+        log.f("The key file specified does not exist.\n    "
+              "If you tried to specify the key directly, note it should be "
+              "64 characters long and not {} characters long".format(len(string)))
+
+    barr = None
+    try:
+        barr = bytes.fromhex(string)
+    except ValueError as e:
+        log.f("Couldn't convert the hex string.\n    "
+              "Exception: {}".format(e))
+    if len(barr) != 32:
+        log.f("The key is not 32 bytes long but {} bytes long".format(len(barr)))
+    return barr
+
+
 def parsecmdline() -> argparse.Namespace:
     """Sets up the argument parser"""
     parser = argparse.ArgumentParser(description='Decrypts WhatsApp backup files'
                                                  ' encrypted with Crypt14 or Crypt15')
-    parser.add_argument('keyfile', nargs='?', type=argparse.FileType('rb'), default="encrypted_backup.key",
-                        help='The WhatsApp encrypted_backup key file. Default: encrypted_backup.key')
+    parser.add_argument('keyfile', nargs='?', type=str, default="encrypted_backup.key",
+                        help='The WhatsApp encrypted_backup key file or the hex encoded key. '
+                             'Default: encrypted_backup.key')
     parser.add_argument('encrypted', nargs='?', type=argparse.FileType('rb'), default="msgstore.db.crypt15",
                         help='The encrypted crypt15 or crypt14 file. Default: msgstore.db.crypt15')
     parser.add_argument('decrypted', nargs='?', type=argparse.FileType('wb'), default="msgstore.db",
@@ -123,7 +142,7 @@ class Key:
     # This constant is only used with crypt15 keys.
     BACKUP_ENCRYPTION = b'backup encryption\x01'
 
-    def __init__(self, key_file_stream):
+    def __init__(self, key_file_name):
         """Deserializes a key file into a byte array."""
         self.key = None
         self.serversalt = None
@@ -135,16 +154,21 @@ class Key:
 
         log.v("Reading keyfile...")
 
+        # Try to open the keyfile.
         try:
-            # Deserialize the byte object written in the file
-            jarr: javaobj.beans.JavaArray = javaobj.load(key_file_stream).data
-            # Convert from a list of Int8 to a byte array
-            keyfile: bytes = javaintlist2bytes(jarr)
+            key_file_stream = open(key_file_name, 'rb')
+            try:
+                # Deserialize the byte object written in the file
+                jarr: javaobj.beans.JavaArray = javaobj.load(key_file_stream).data
+                # Convert from a list of Int8 to a byte array
+                keyfile: bytes = javaintlist2bytes(jarr)
 
-        except OSError as e:
-            log.f("Couldn't read keyfile: {}".format(e))
-        except (ValueError, RuntimeError) as e:
-            log.f("The keyfile is not a valid Java object: {}".format(e))
+            except (ValueError, RuntimeError) as e:
+                log.f("The keyfile is not a valid Java object: {}".format(e))
+
+        except OSError:
+            # Try to see if it is a hex-encoded key.
+            keyfile = from_hex(key_file_name)
 
         # We guess the key type from its length
         if len(keyfile) == 131:
@@ -235,7 +259,7 @@ class Key:
         # Then do the HMACSHA256 using the previous result as key and ("backup encryption" + iteration count) as data
         self.key = hmac.new(self.key, self.BACKUP_ENCRYPTION, sha256).digest()
 
-        log.i("Crypt15 key loaded")
+        log.i("Crypt15 / Raw key loaded")
 
 
 def oscillate(n: int, n_min: int, n_max: int) -> collections.Iterable:
@@ -511,9 +535,12 @@ def decrypt(cipher, encrypted, decrypted, mem_approach: bool):
                 if not z_obj.eof:
                     log.e("The encrypted database file is truncated (damaged).")
             except zlib.error:
-                log.i("Decrypted data is not a zlib stream, will not decompress automatically.\n    "
-                      "The output file is probably a ZIP archive.")
                 output_file = output_decrypted
+                if test_decompression(output_file[:DEFAULT_BUFFER_SIZE]):
+                    log.i("Decrypted data is a ZIP file that I will not decompress automatically.")
+                else:
+                    log.e("I can't recognize decrypted data. Decryption not successful.\n    "
+                          "The key probably does not match with the encrypted file.")
 
             decrypted.write(output_file)
 
@@ -536,8 +563,11 @@ def decrypt(cipher, encrypted, decrypted, mem_approach: bool):
                     try:
                         decrypted.write(z_obj.decompress(decrypted_chunk))
                     except zlib.error:
-                        log.i("Decrypted data is not a zlib stream, will not decompress automatically.\n    "
-                              "The output file is probably a ZIP archive.")
+                        if test_decompression(decrypted_chunk):
+                            log.i("Decrypted data is a ZIP file that I will not decompress automatically.")
+                        else:
+                            log.e("I can't recognize decrypted data. Decryption not successful.\n    "
+                                  "The key probably does not match with the encrypted file.")
                         is_zip = False
                         decrypted.write(decrypted_chunk)
                 else:
@@ -567,7 +597,7 @@ def main():
         log.f("The data offset must be between 1 and {}".format(HEADER_SIZE - 129))
     if not (0 < args.iv_offset < HEADER_SIZE - 128):
         log.f("The IV offset must be between 1 and {}".format(HEADER_SIZE - 129))
-    # Get the decryption key from the key file.
+    # Get the decryption key from the key file or the hex encoded string.
     key = Key(args.keyfile)
 
     cipher = None
@@ -582,7 +612,7 @@ def main():
         cipher = guess_offsets(key=key.key, encrypted=args.encrypted,
                                def_iv_offset=args.iv_offset, def_data_offset=args.data_offset)
     decrypt(cipher, args.encrypted, args.decrypted, not args.no_mem)
-    log.i("Decryption successful")
+    log.i("Done")
 
 
 if __name__ == "__main__":

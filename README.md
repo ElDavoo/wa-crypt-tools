@@ -1,5 +1,5 @@
 # WhatsApp Crypt14-15 Database Decrypter
-Decrypts WhatsApp .crypt14 and .crypt15 files, **given the key file**.  
+Decrypts WhatsApp .crypt14 and .crypt15 files, **given the key file** or the 64-characters long key.  
 The key file is named "key" if the backup is crypt14 or  
 "encrypted_backup.key" if the backup is crypt15 (encrypted E2E backups).  
 The output result is either a SQLite database 
@@ -29,28 +29,35 @@ Use:
 ## Usage
 
  ```
-usage: decrypt14_15.py [-h] [-f] [-nm] [-ng] [-np] [-ivo IV_OFFSET] [-do DATA_OFFSET] [-v]
+usage: decrypt14_15.py [-h] [-f] [-nm] [-ng] [-np] [-ivo IV_OFFSET]
+                       [-do DATA_OFFSET] [-v]
                        [keyfile] [encrypted] [decrypted]
 
 Decrypts WhatsApp backup files encrypted with Crypt14 or Crypt15
 
 positional arguments:
-  keyfile               The WhatsApp encrypted_backup key file. Default: encrypted_backup.key
-  encrypted             The encrypted crypt15 or crypt14 file. Default: msgstore.db.crypt15
+  keyfile               The WhatsApp encrypted_backup key file or the hex
+                        encoded key. Default: encrypted_backup.key
+  encrypted             The encrypted crypt15 or crypt14 file. Default:
+                        msgstore.db.crypt15
   decrypted             The decrypted output file. Default: msgstore.db
 
 options:
   -h, --help            show this help message and exit
   -f, --force           Makes errors non fatal. Default: false
-  -nm, --no-mem         Does not load files in RAM, stresses the disk more. Default: load files into RAM
-  -ng, --no-guess       Does not try to guess the offsets, only protobuf parsing.
-  -np, --no-protobuf    Does not try to parse the protobuf message, only offset guessing.
+  -nm, --no-mem         Does not load files in RAM, stresses the disk more.
+                        Default: load files into RAM
+  -ng, --no-guess       Does not try to guess the offsets, only protobuf
+                        parsing.
+  -np, --no-protobuf    Does not try to parse the protobuf message, only
+                        offset guessing.
   -ivo IV_OFFSET, --iv-offset IV_OFFSET
-                        The default offset of the IV in the encrypted file. Only relevant in offset guessing mode.
-                        Default: 8
+                        The default offset of the IV in the encrypted file.
+                        Only relevant in offset guessing mode. Default: 8
   -do DATA_OFFSET, --data-offset DATA_OFFSET
-                        The default offset of the encrypted data in the encrypted file. Only relevant in offset
-                        guessing mode. Default: 122
+                        The default offset of the encrypted data in the
+                        encrypted file. Only relevant in offset guessing mode.
+                        Default: 122
   -v, --verbose         Prints all offsets and messages
  ```  
 
