@@ -8,7 +8,7 @@ This is the only thing this script does.
 Those who are looking for a complete suite for
 WhatsApp forensics, check out [whapa.](https://github.com/B16f00t/whapa)
 
-## Requirements:
+## Requirements
 
 **Remember to download the proto folder!**
 
@@ -71,7 +71,7 @@ python ./decrypt14_15.py ./key ./msgstore.db.crypt14 ./msgstore.db
 ```  
 #### Crypt12 (unofficial)
 ```  
-python ./decrypt14_15.py ./key ./msgstore.db.crypt14 ./msgstore.db -np -ivo 51 -do 67 
+python ./decrypt14_15.py ./key ./msgstore.db.crypt12 ./msgstore.db -np -ivo 51 -do 67 
 [I] Crypt12/14 key loaded
 [I] WhatsApp version not found
 [I] Offsets guessed (IV: 51, data: 67).
