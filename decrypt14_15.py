@@ -20,7 +20,7 @@ import collections
 from hashlib import sha256
 from io import DEFAULT_BUFFER_SIZE, BufferedReader
 from re import findall
-from sys import exit
+from sys import exit, maxsize
 
 import argparse
 import hmac
@@ -30,7 +30,7 @@ __author__ = 'ElDavo'
 __copyright__ = 'Copyright (C) 2022'
 __license__ = 'GPLv3'
 __status__ = 'Production'
-__version__ = '5.1'
+__version__ = '5.3'
 
 # These constants are only used by the guessing logic.
 
@@ -85,7 +85,7 @@ def from_hex(string: str) -> bytes:
     if len(string) != 64:
         log.f("The key file specified does not exist.\n    "
               "If you tried to specify the key directly, note it should be "
-              "64 characters long and not {} characters long".format(len(string)))
+              "64 characters long and not {} characters long.".format(len(string)))
 
     barr = None
     try:
@@ -94,7 +94,7 @@ def from_hex(string: str) -> bytes:
         log.f("Couldn't convert the hex string.\n    "
               "Exception: {}".format(e))
     if len(barr) != 32:
-        log.f("The key is not 32 bytes long but {} bytes long".format(len(barr)))
+        log.e("The key is not 32 bytes long but {} bytes long.".format(len(barr)))
     return barr
 
 
@@ -114,6 +114,8 @@ def parsecmdline() -> argparse.Namespace:
     parser.add_argument('-nm', '--no-mem', action='store_true',
                         help='Does not load files in RAM, stresses the disk more. '
                              'Default: load files into RAM')
+    parser.add_argument('-bs', '--buffer-size', type=int, help='How many bytes of data to process at a time. '
+                                                               'Implies -nm. Default: {}'.format(DEFAULT_BUFFER_SIZE))
     parser.add_argument('-ng', '--no-guess', action='store_true',
                         help='Does not try to guess the offsets, only protobuf parsing.')
     parser.add_argument('-np', '--no-protobuf', action='store_true',
@@ -250,6 +252,7 @@ class Key:
         # The iteration counter is appended to the end of the encrypted data. However,
         # since the loop is actually executed only one time, we will only have one interaction,
         # and thus a \x01 at the end.
+        # Take a look at utils/wa_hmacsha256_loop.java that is the original code.
 
         if len(keyfile) != 32:
             log.f("Crypt15 loader trying to load a crypt14 key")
@@ -513,7 +516,7 @@ def parse_protobuf(key: Key, encrypted):
     return None
 
 
-def decrypt(cipher, encrypted, decrypted, mem_approach: bool):
+def decrypt(cipher, encrypted, decrypted, buffer_size: int = 0):
     """Does the actual decryption."""
 
     z_obj = zlib.decompressobj()
@@ -525,7 +528,7 @@ def decrypt(cipher, encrypted, decrypted, mem_approach: bool):
 
     try:
 
-        if mem_approach:
+        if buffer_size == 0:
             # Load the encrypted file into RAM, decrypts into RAM,
             # decompresses into RAM, writes into disk.
             # More RAM used (x3), less I/O used
@@ -546,6 +549,10 @@ def decrypt(cipher, encrypted, decrypted, mem_approach: bool):
 
         else:
 
+            if buffer_size < 0:
+                log.i("Invalid buffer size, will use default of {}".format(DEFAULT_BUFFER_SIZE))
+                buffer_size = DEFAULT_BUFFER_SIZE
+
             # Does the thing above but only with DEFAULT_BUFFER_SIZE bytes at a time.
             # Less RAM used, more I/O used
             # TODO use assignment expression, which drops compatibility with 3.7
@@ -555,7 +562,10 @@ def decrypt(cipher, encrypted, decrypted, mem_approach: bool):
 
             while True:
 
-                chunk = encrypted.read(DEFAULT_BUFFER_SIZE)
+                try:
+                    chunk = encrypted.read(buffer_size)
+                except MemoryError:
+                    log.f("Out of RAM, please use a smaller buffer size.")
                 if not chunk:
                     break
                 decrypted_chunk = cipher.decrypt(chunk)
@@ -597,6 +607,9 @@ def main():
         log.f("The data offset must be between 1 and {}".format(HEADER_SIZE - 129))
     if not (0 < args.iv_offset < HEADER_SIZE - 128):
         log.f("The IV offset must be between 1 and {}".format(HEADER_SIZE - 129))
+    if args.buffer_size is not None:
+        if not 1 < args.buffer_size < maxsize:
+            log.f("Invalid buffer size")
     # Get the decryption key from the key file or the hex encoded string.
     key = Key(args.keyfile)
 
@@ -611,7 +624,14 @@ def main():
         # If parsing the protobuf message failed, we try guessing the offsets.
         cipher = guess_offsets(key=key.key, encrypted=args.encrypted,
                                def_iv_offset=args.iv_offset, def_data_offset=args.data_offset)
-    decrypt(cipher, args.encrypted, args.decrypted, not args.no_mem)
+
+    if args.buffer_size is not None:
+        decrypt(cipher, args.encrypted, args.decrypted, args.buffer_size)
+    elif args.no_mem:
+        decrypt(cipher, args.encrypted, args.decrypted, DEFAULT_BUFFER_SIZE)
+    else:
+        decrypt(cipher, args.encrypted, args.decrypted)
+
     log.i("Done")
 
 

@@ -3,6 +3,10 @@
 Note: this script does not follow a versioning policy. Versions number are written just for reference.
 This file may not be 100% correct: The true changelog is the git history.
 
+## Version 5.3
+
+- You can now specify a custom buffer size to be used.
+
 ## Version 5.2
 
 - You can write the hex encoded key (crypt15) directly instead of specifying the key file.
