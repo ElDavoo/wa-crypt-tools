@@ -17,6 +17,7 @@ import javaobj.v2 as javaobj
 from google.protobuf.message import DecodeError
 
 import collections
+from binascii import hexlify
 from hashlib import sha256
 from io import DEFAULT_BUFFER_SIZE, BufferedReader
 from re import findall
@@ -143,6 +144,17 @@ class Key:
 
     # This constant is only used with crypt15 keys.
     BACKUP_ENCRYPTION = b'backup encryption\x01'
+
+    def __str__(self):
+        """Returns a string representation of the key"""
+        if self.key is None:
+            return "[I] Key()"
+        elif self.googleid is None:
+            return "[I] Key(key={})".format(self.key.hex())
+        else:
+            return "[I] Key(key={}, serversalt={}, cipher_version={}, key_version={}, googleid={})".format(
+                hexlify(self.key), hexlify(self.serversalt), hexlify(self.cipher_version),
+                hexlify(self.key_version), hexlify(self.googleid))
 
     def __init__(self, key_file_name):
         """Deserializes a key file into a byte array."""
@@ -562,6 +574,7 @@ def decrypt(cipher, encrypted, decrypted, buffer_size: int = 0):
 
             while True:
 
+                chunk = None
                 try:
                     chunk = encrypted.read(buffer_size)
                 except MemoryError:
