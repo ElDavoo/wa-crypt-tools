@@ -17,7 +17,6 @@ import javaobj.v2 as javaobj
 from google.protobuf.message import DecodeError
 
 import collections
-from binascii import hexlify
 from hashlib import sha256
 from io import DEFAULT_BUFFER_SIZE, BufferedReader
 from re import findall
@@ -153,8 +152,8 @@ class Key:
             return "[I] Key(key={})".format(self.key.hex())
         else:
             return "[I] Key(key={}, serversalt={}, cipher_version={}, key_version={}, googleid={})".format(
-                hexlify(self.key), hexlify(self.serversalt), hexlify(self.cipher_version),
-                hexlify(self.key_version), hexlify(self.googleid))
+                self.key.hex(), self.serversalt.hex(), self.cipher_version.hex(),
+                self.key_version.hex(), self.googleid.hex())
 
     def __init__(self, key_file_name):
         """Deserializes a key file into a byte array."""
@@ -625,7 +624,8 @@ def main():
             log.f("Invalid buffer size")
     # Get the decryption key from the key file or the hex encoded string.
     key = Key(args.keyfile)
-
+    print(key)
+    exit()
     cipher = None
     # Now we have to get the IV and to guess where the data starts.
     # We have two approaches to do so.
