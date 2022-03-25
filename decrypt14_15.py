@@ -5,24 +5,27 @@ This script decrypts WhatsApp's DB files encrypted with Crypt14 or Crypt15.
 
 from __future__ import annotations
 
-# pycryptodome or pycryptodomex
+# AES import party!
+# pycryptodome and PyCryptodomex's implementations of AES are compatible
+# with each other, so we try to import one of these twos.
 try:
-    #pycryptodomex
+    # pycryptodomex
     from Cryptodome.Cipher import AES
 except ModuleNotFoundError:
     try:
-        #pycryptodome
+        # pycryptodome
         from Crypto.Cipher import AES
+
         if not hasattr(AES, 'MODE_GCM'):
-            #pycrypto
+            # pycrypto
             print("You installed pycrypto and not pycryptodome(x).")
             print("Pycrypto is old, deprecated and not supported.")
             print("Run: python -m pip uninstall pycrypto")
-            print("And: python -m pip install pycryptodomex")
+            print("And: python -m pip install pycryptodome")
             print("Or:  python -m pip install pycryptodomex")
             exit(1)
     except ModuleNotFoundError:
-        #crypto or nothing
+        # crypto (or nothing)
         print("You need pycryptodome(x) to run this script")
         print("python -m pip install pycryptodome")
         print("Or: python -m pip install pycryptodomex")
@@ -652,7 +655,7 @@ def main():
             log.f("Invalid buffer size")
     # Get the decryption key from the key file or the hex encoded string.
     key = Key(args.keyfile)
-    #log.v(key)
+    # log.v(key)
     cipher = None
     # Now we have to get the IV and to guess where the data starts.
     # We have two approaches to do so.
