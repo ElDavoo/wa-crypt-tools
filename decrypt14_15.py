@@ -146,14 +146,21 @@ class Key:
 
     def __str__(self):
         """Returns a string representation of the key"""
-        if self.key is None:
-            return "[I] Key()"
-        elif self.googleid is None:
-            return "[I] Key(key={})".format(self.key.hex())
-        else:
-            return "[I] Key(key={}, serversalt={}, cipher_version={}, key_version={}, googleid={})".format(
-                self.key.hex(), self.serversalt.hex(), self.cipher_version.hex(),
-                self.key_version.hex(), self.googleid.hex())
+        try:
+            string: str = "[I] Key("
+            if self.key is not None:
+                string += "key: {}".format(self.key.hex())
+            if self.serversalt is not None:
+                string += " , serversalt: {}".format(self.serversalt.hex())
+            if self.googleid is not None:
+                string += " , googleid: {}".format(self.googleid.hex())
+            if self.key_version is not None:
+                string += " , key_version: {}".format(self.key_version.hex())
+            if self.cipher_version is not None:
+                string += " , cipher_version: {}".format(self.cipher_version.hex())
+            return string + ")"
+        except Exception as e:
+            return "[I] Exception printing key: {}".format(e)
 
     def __init__(self, key_file_name):
         """Deserializes a key file into a byte array."""
