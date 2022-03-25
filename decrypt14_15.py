@@ -30,7 +30,7 @@ __author__ = 'ElDavo'
 __copyright__ = 'Copyright (C) 2022'
 __license__ = 'GPLv3'
 __status__ = 'Production'
-__version__ = '5.3'
+__version__ = '5.4'
 
 # These constants are only used by the guessing logic.
 
@@ -139,7 +139,7 @@ class Key:
     means that the key type is crypt14."""
     # These constants are only used with crypt14 keys.
     SUPPORTED_CIPHER_VERSION = b'\x00\x01'
-    SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02']
+    SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02', b'\x03']
 
     # This constant is only used with crypt15 keys.
     BACKUP_ENCRYPTION = b'backup encryption\x01'
@@ -147,7 +147,7 @@ class Key:
     def __str__(self):
         """Returns a string representation of the key"""
         try:
-            string: str = "[I] Key("
+            string: str = "Key("
             if self.key is not None:
                 string += "key: {}".format(self.key.hex())
             if self.serversalt is not None:
@@ -160,7 +160,7 @@ class Key:
                 string += " , cipher_version: {}".format(self.cipher_version.hex())
             return string + ")"
         except Exception as e:
-            return "[I] Exception printing key: {}".format(e)
+            return "Exception printing key: {}".format(e)
 
     def __init__(self, key_file_name):
         """Deserializes a key file into a byte array."""
@@ -631,6 +631,7 @@ def main():
             log.f("Invalid buffer size")
     # Get the decryption key from the key file or the hex encoded string.
     key = Key(args.keyfile)
+    #log.v(key)
     cipher = None
     # Now we have to get the IV and to guess where the data starts.
     # We have two approaches to do so.
