@@ -5,9 +5,30 @@ This script decrypts WhatsApp's DB files encrypted with Crypt14 or Crypt15.
 
 from __future__ import annotations
 
-# noinspection PyPackageRequirements
-# This is from pycryptodome
-from Crypto.Cipher import AES
+# pycryptodome or pycryptodomex
+try:
+    #pycryptodomex
+    from Cryptodome.Cipher import AES
+except ModuleNotFoundError:
+    try:
+        #pycryptodome
+        from Crypto.Cipher import AES
+        if not hasattr(AES, 'MODE_GCM'):
+            #pycrypto
+            print("You installed pycrypto and not pycryptodome(x).")
+            print("Pycrypto is old, deprecated and not supported.")
+            print("Run: python -m pip uninstall pycrypto")
+            print("And: python -m pip install pycryptodomex")
+            print("Or:  python -m pip install pycryptodomex")
+            exit(1)
+    except ModuleNotFoundError:
+        #crypto or nothing
+        print("You need pycryptodome(x) to run this script")
+        print("python -m pip install pycryptodome")
+        print("Or: python -m pip install pycryptodomex")
+        print("You can also remove \"crypto\" if you have it installed")
+        print("python -m pip uninstall crypto")
+        exit(1)
 
 # noinspection PyPackageRequirements
 # This is from javaobj-py3
