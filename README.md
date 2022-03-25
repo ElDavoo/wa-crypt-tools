@@ -8,12 +8,26 @@ This is the only thing this script does.
 Those who are looking for a complete suite for
 WhatsApp forensics, check out [whapa.](https://github.com/B16f00t/whapa)
 
+# Quickstart
+Just copy-paste this block into your terminal  
+(should be multi-platform)
+```
+git clone https://github.com/ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter.git
+cd WhatsApp-Crypt14-Crypt15-Decrypter
+python -m venv venv
+source venv/bin/activate
+.\venv\Scripts\activate.bat
+.\venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
 ## Requirements
 
 **Remember to download the proto folder!**
 
 Python 3.7 or more recent    
-pycriptodome  
+pycriptodome or pycryptodomex  
 javaobj-py3  
 protobuf  
 
