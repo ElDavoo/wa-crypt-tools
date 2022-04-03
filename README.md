@@ -27,7 +27,7 @@ python -m pip install -r requirements.txt
 **Remember to download the proto folder!**
 
 Python 3.7 or more recent    
-pycriptodome or pycryptodomex  
+pycriptodomex or pycryptodome  
 javaobj-py3  
 protobuf  
 
@@ -37,7 +37,7 @@ Use:
  ```
   Or:
  ```
-              python -m pip install pycryptodome javaobj-py3 protobuf
+              python -m pip install pycryptodomex javaobj-py3 protobuf
  ```
 
 ## Usage
