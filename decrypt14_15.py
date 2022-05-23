@@ -473,6 +473,12 @@ def parse_protobuf(key: Key, encrypted):
         log.e("Could not import the proto classes: {}\n    ".format(e) +
               "Please download them and put them in the \"proto\" sub folder.")
         return None
+    except AttributeError as e:
+        log.e("Could not import the proto classes: {}\n    ".format(e) +
+              "Your protobuf library is probably too old.\n    "
+              "Please upgrade to at least version 3.19.0 , by running:\n    "
+              "python -m pip install --upgrade protobuf")
+        return None
 
     p = prefix.prefix()
 
