@@ -26,10 +26,13 @@ python -m pip install -r requirements.txt
 
 **Remember to download the proto folder!**
 
-Python 3.7 or more recent    
+Python 3.7 or more recent   
+
 pycriptodomex or pycryptodome  
 javaobj-py3  
-protobuf  
+protobuf 3.20 or more recent  
+
+... or just install the `requirements.txt` file
 
 Use:
  ```
