@@ -470,13 +470,17 @@ def parse_protobuf(key: Key, encrypted):
         import proto.prefix_pb2 as prefix
         import proto.key_type_pb2 as key_type
     except ImportError as e:
-        log.e("Could not import the proto classes: {}\n    ".format(e) +
-              "Please download them and put them in the \"proto\" sub folder.")
+        log.e("Could not import the proto classes: {}".format(e))
+        if str(e).startswith("cannot import name 'builder' from 'google.protobuf.internal'"):
+            log.e("You need to upgrade the protobuf library to at least 3.20.0.\n"
+                  "    python -m pip install --upgrade protobuf")
+        elif str(e).startswith("no module named"):
+            log.e("Please download them and put them in the \"proto\" sub folder.")
         return None
     except AttributeError as e:
         log.e("Could not import the proto classes: {}\n    ".format(e) +
               "Your protobuf library is probably too old.\n    "
-              "Please upgrade to at least version 3.19.0 , by running:\n    "
+              "Please upgrade to at least version 3.20.0 , by running:\n    "
               "python -m pip install --upgrade protobuf")
         return None
 

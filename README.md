@@ -141,6 +141,21 @@ Beta: 2.22.5.13
 
 [![Stargazers over time](https://starchart.cc/ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter.svg)](https://starchart.cc/ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter)
 
+#### Protobuf classes generation
+
+You can replace the provided generated protobuf classes with your own.  
+In order to do that, download the protoc 21.0 from
+[here](https://github.com/protocolbuffers/protobuf/releases).
+After that put protoc in the proto folder and run:  
+`./protoc *.proto --python_out=.`   
+**We then need to manually patch the generated classes to fix import errors.**  
+Open `prefix_pb2.py` and `C14_cipher_pb2.py`  
+Add `proto.` after any `import` keyword.  
+For example:  
+`import C14_cipher_version_pb2 as C14__cipher__version__pb2`  
+becomes  
+`import proto.C14_cipher_version_pb2 as C14__cipher__version__pb2`
+
 
 ###### Credits:
  Original implementation for crypt12: [TripCode](https://github.com/TripCode)    
