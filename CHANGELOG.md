@@ -42,7 +42,7 @@ Note: stickers and wallpapers are ZIP files that will not be decompressed automa
 ## Version 2.2
 - The Java object from the "key" file is now correctly deserialized, instead of just ignoring the header.
 - The SHA256 of the googleIdSalt in the "key" file is now actually checked.
-- Added an utility to read "password_data.key" and give a hashcat representation of the file.
+- Added a utility to read "password_data.key" and give a hashcat representation of the file.
 - Moved the changelog to a separate file.
 
 ## Version 2.1

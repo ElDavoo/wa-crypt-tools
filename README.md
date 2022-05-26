@@ -128,7 +128,7 @@ Please open an issue and attach:
 On a rooted Android device, you can just copy 
 `/data/data/com.whatsapp/files/key` 
 (or `/data/data/com.whatsapp/files/encrypted_backup.key` if backups are crypt15).  
-If you enabled E2E backups and you did not use a password 
+If you enabled E2E backups, and you did not use a password 
 (you have a copy of the 64-digit key, for example a screenshot), 
 you can just transcribe and use it in lieu of the key file parameter.  
 **There are other ways, but it is not in the scope of this project 

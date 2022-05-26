@@ -109,7 +109,6 @@ def search(whole_file: bytes, keep_going: bool, offset=0):
                 message.last_good_j = j
                 message.last_good_i = i
 
-
             except Exception:
                 pass
         if message.last_good_j and message.last_good_i == i:
@@ -117,6 +116,7 @@ def search(whole_file: bytes, keep_going: bool, offset=0):
             print(message.output)
             if not keep_going:
                 exit(0)
+
 
 if __name__ == "__main__":
     main()
