@@ -142,7 +142,7 @@ Beta: 2.22.5.13
 
 ### Stargazers over time
 
-[![Stargazers over time](https://starchart.cc/ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter.svg)](https://starchart.cc/ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter)
+[![Star History Chart](https://api.star-history.com/svg?repos=ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter&type=Date)](https://star-history.com/#ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter&Date)
 
 #### Protobuf classes generation
 
