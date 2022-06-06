@@ -1,0 +1,22 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: WhatsApp Crypt14 - Crypt15 Decryper
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Davide
+    family-names: Palma
+    email: github@davidepalma.it
+repository-code: >-
+  https://github.com/ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter
+abstract: Decrypts WhatsApp .crypt14 and .crypt15 files
+keywords:
+  - WhatsApp
+  - crypt14
+  - crypt15
+license: GPL-3.0-only
+date-released: '2022-06-01'
