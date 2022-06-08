@@ -10,7 +10,7 @@ WhatsApp forensics, check out [whapa.](https://github.com/B16f00t/whapa)
 
 # Quickstart
 Just copy-paste this block into your terminal  
-(should be multi-platform)
+(should be multi-platform - ignore errors during "activate" lines, as one is for Linux/macOS, one is for Windows (Batch) and one is for Windows PowerShell)
 ```
 git clone https://github.com/ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter.git
 cd WhatsApp-Crypt14-Crypt15-Decrypter
