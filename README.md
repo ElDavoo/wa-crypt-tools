@@ -136,8 +136,8 @@ to tell you.
 Issues asking for this will be closed as invalid.**  
 
 ### Last tested version (don't expect this to be updated)
-Stable: 2.22.4.74  
-Beta: 2.22.5.13
+Stable: 2.22.15.74 
+Beta: 2.22.16.16
 
 
 ### Stargazers over time
