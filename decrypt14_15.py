@@ -542,7 +542,19 @@ def parse_protobuf(logger, key: Key, encrypted):
                     # Fix bytes to string encoding
                     key.key_version = (key.key_version[0] + 48).to_bytes(1, byteorder='big')
                     if key.key_version != p.c14_cipher.key_version:
-                        logger.e("Key version mismatch: {} != {}".format(key.key_version, p.c14_cipher.key_version))
+                        if key.key_version > p.c14_cipher.key_version:
+                            logger.e("Key version mismatch: {} != {} .\n    "
+                                     .format(key.key_version, p.c14_cipher.key_version) +
+                                     "Your backup is too old for this key file.\n    " +
+                                     "Please try using a newer backup.")
+                        elif key.key_version < p.c14_cipher.key_version:
+                            logger.e("Key version mismatch: {} != {} .\n    "
+                                     .format(key.key_version, p.c14_cipher.key_version) +
+                                     "Your backup is too new for this key file.\n    " +
+                                     "Please try using an older backup, or getting the new key.")
+                        else:
+                            logger.e("Key version mismatch: {} != {} (?)"
+                                     .format(key.key_version, p.c14_cipher.key_version))
                     if key.serversalt != p.c14_cipher.server_salt:
                         logger.e("Server salt mismatch: {} != {}".format(key.serversalt, p.c14_cipher.server_salt))
                     if key.googleid != p.c14_cipher.google_id:
