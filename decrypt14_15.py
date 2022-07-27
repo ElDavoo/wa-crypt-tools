@@ -231,8 +231,9 @@ class Key:
         # After deserialization, we will have a byte[] object that we have to split in:
         # 1) The cipher version (2 bytes). Known values are 0x0000 and 0x0001. So far we only support the latter.
         # SUPPORTED_CIPHER_VERSION = b'\x00\x01'
-        # 2) The key version (1 byte). Both of the known versions are supported.
-        # SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02']
+        # 2) The key version (1 byte). All of the known versions are supported.
+        # SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02', b'\x03']
+        # Looks like nothing actually changes between the versions.
         # 3) Server salt (32 bytes)
         # 4) googleIdSalt (unused?) (16 bytes)
         # 5) hashedGoogleID (The SHA-256 hash of googleIdSalt) (32 bytes)
