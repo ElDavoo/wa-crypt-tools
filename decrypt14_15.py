@@ -511,7 +511,7 @@ def parse_protobuf(logger, key: Key, encrypted):
                 logger.e("Protobuf message not fully read. Please report a bug.")
             else:
 
-                # Finding WhatsApp's version's length allows us to determine the data offset
+                # Checking and printing WA version and phone number
                 version = findall(r"\d(?:\.\d{1,3}){3}", p.info.whatsapp_version)
                 if len(version) != 1:
                     logger.e('WhatsApp version not found')
@@ -596,8 +596,11 @@ def decrypt(logger, cipher, encrypted, decrypted, buffer_size: int = 0):
         if buffer_size == 0:
             # Load the encrypted file into RAM, decrypts into RAM,
             # decompresses into RAM, writes into disk.
-            # More RAM used (x3), less I/O used
-            output_decrypted = cipher.decrypt(encrypted.read())
+            # More RAM used (~x3), less I/O used
+            try:
+                output_decrypted = cipher.decrypt(encrypted.read())
+            except MemoryError:
+                logger.f("Out of RAM, please use -nm.")
             try:
                 output_file = z_obj.decompress(output_decrypted)
                 if not z_obj.eof:
