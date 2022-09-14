@@ -680,7 +680,7 @@ def main():
             logger.f("Invalid buffer size")
     # Get the decryption key from the key file or the hex encoded string.
     key = Key(logger, args.keyfile)
-    # logger.v(key)
+    logger.v(key)
     cipher = None
     # Now we have to get the IV and to guess where the data starts.
     # We have two approaches to do so.
