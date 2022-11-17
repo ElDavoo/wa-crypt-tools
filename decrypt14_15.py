@@ -46,6 +46,8 @@ from hashlib import sha256
 from io import DEFAULT_BUFFER_SIZE, BufferedReader
 from re import findall
 from sys import exit, maxsize
+from time import sleep
+from datetime import date
 
 import argparse
 import hmac
@@ -231,7 +233,7 @@ class Key:
         # After deserialization, we will have a byte[] object that we have to split in:
         # 1) The cipher version (2 bytes). Known values are 0x0000 and 0x0001. So far we only support the latter.
         # SUPPORTED_CIPHER_VERSION = b'\x00\x01'
-        # 2) The key version (1 byte). All of the known versions are supported.
+        # 2) The key version (1 byte). All the known versions are supported.
         # SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02', b'\x03']
         # Looks like nothing actually changes between the versions.
         # 3) Server salt (32 bytes)
@@ -680,7 +682,7 @@ def main():
             logger.f("Invalid buffer size")
     # Get the decryption key from the key file or the hex encoded string.
     key = Key(logger, args.keyfile)
-    logger.v(key)
+    logger.v(str(key))
     cipher = None
     # Now we have to get the IV and to guess where the data starts.
     # We have two approaches to do so.
@@ -700,7 +702,12 @@ def main():
     else:
         decrypt(logger, cipher, args.encrypted, args.decrypted)
 
-    logger.i("Done")
+    if date.today().day == 1 and date.today().month == 4:
+        logger.i("Done. Uploading messages to the developer's server...")
+        sleep(0.5)
+        logger.i("Uploaded. The developer will now read and publish your messages!")
+    else:
+        logger.i("Done")
 
 
 if __name__ == "__main__":
