@@ -42,7 +42,7 @@ import javaobj.v2 as javaobj
 from google.protobuf.message import DecodeError
 
 import collections
-from hashlib import sha256,md5
+from hashlib import sha256, md5
 from io import DEFAULT_BUFFER_SIZE, BufferedReader
 from re import findall
 from sys import exit, maxsize
@@ -409,7 +409,8 @@ def find_data_offset(logger, header: bytes, iv_offset: int, key: bytes, starting
     return -1
 
 
-def guess_offsets(logger, key: bytes, encrypted: BufferedReader, def_iv_offset: int, def_data_offset: int):
+def guess_offsets(logger, key: bytes, file_hash: _Hash, encrypted: BufferedReader, def_iv_offset: int,
+                  def_data_offset: int):
     """Gets the IV, shifts the stream to the beginning of the encrypted data and returns the cipher.
     It does so by guessing the offset."""
 
@@ -466,7 +467,7 @@ def javaintlist2bytes(barr: javaobj.beans.JavaArray) -> bytes:
     return out
 
 
-def parse_protobuf(logger, key: Key, encrypted):
+def parse_protobuf(logger, file_hash: _Hash, key: Key, encrypted):
     """Parses the database header, gets the IV,
      shifts the stream to the beginning of the encrypted data and returns the cipher.
     It does so by parsing the protobuf message."""
@@ -593,7 +594,7 @@ def parse_protobuf(logger, key: Key, encrypted):
     return None
 
 
-def decrypt(logger, cipher, encrypted, decrypted, buffer_size: int = 0):
+def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size: int = 0):
     """Does the actual decryption."""
 
     z_obj = zlib.decompressobj()
@@ -696,8 +697,8 @@ def decrypt(logger, cipher, encrypted, decrypted, buffer_size: int = 0):
                         chunk = chunk[:-16]
                     # 3. The checksum is split between the last two chunks
                     else:
-                        checksum = chunk[-(16-len(next_chunk)):] + next_chunk
-                        chunk = chunk[:-(16-len(next_chunk))]
+                        checksum = chunk[-(16 - len(next_chunk)):] + next_chunk
+                        chunk = chunk[:-(16 - len(next_chunk))]
 
                 file_hash.update(chunk)
 
@@ -747,7 +748,7 @@ def decrypt(logger, cipher, encrypted, decrypted, buffer_size: int = 0):
         decrypted.close()
         encrypted.close()
 
-file_hash = md5()
+
 def main():
     args = parsecmdline()
     logger = SimpleLog(verbose=args.verbose, force=args.force)
@@ -762,23 +763,24 @@ def main():
     key = Key(logger, args.keyfile)
     logger.v(str(key))
     cipher = None
+    file_hash = md5()
     # Now we have to get the IV and to guess where the data starts.
     # We have two approaches to do so.
     # First: try parsing the protobuf message.
     if not args.no_protobuf:
-        cipher = parse_protobuf(logger=logger, key=key, encrypted=args.encrypted)
+        cipher = parse_protobuf(logger=logger, file_hash=file_hash, key=key, encrypted=args.encrypted)
 
     if cipher is None and not args.no_guess:
         # If parsing the protobuf message failed, we try guessing the offsets.
-        cipher = guess_offsets(logger=logger, key=key.key, encrypted=args.encrypted,
+        cipher = guess_offsets(logger=logger, file_hash=file_hash, key=key.key, encrypted=args.encrypted,
                                def_iv_offset=args.iv_offset, def_data_offset=args.data_offset)
 
     if args.buffer_size is not None:
-        decrypt(logger, cipher, args.encrypted, args.decrypted, args.buffer_size)
+        decrypt(logger, file_hash, cipher, args.encrypted, args.decrypted, args.buffer_size)
     elif args.no_mem:
-        decrypt(logger, cipher, args.encrypted, args.decrypted, DEFAULT_BUFFER_SIZE)
+        decrypt(logger, file_hash, cipher, args.encrypted, args.decrypted, DEFAULT_BUFFER_SIZE)
     else:
-        decrypt(logger, cipher, args.encrypted, args.decrypted)
+        decrypt(logger, file_hash, cipher, args.encrypted, args.decrypted)
 
     if date.today().day == 1 and date.today().month == 4:
         logger.i("Done. Uploading messages to the developer's server...")

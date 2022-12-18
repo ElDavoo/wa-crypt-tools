@@ -139,7 +139,7 @@ Issues asking for this will be closed as invalid.**
 Stable: 
 2.22.15.74  
 Beta: 
-2.22.25.11
+2.23.1.11
 
 ### Stargazers over time
 
