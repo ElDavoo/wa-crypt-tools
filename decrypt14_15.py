@@ -618,6 +618,8 @@ def decrypt(logger, cipher, encrypted, decrypted, buffer_size: int = 0):
                     logger.i("Checksum mismatch: Expected {} , got {}.\n"
                              "    If you're not decrypting stickers or wallpapers, your backup is damaged."
                              .format(file_hash.hexdigest(), checksum.hex()))
+                    # Re add the truncated bytes
+                    encrypted_data += checksum
                 else:
                     logger.v("Checksum OK ({}). Decrypting...".format(file_hash.hexdigest()))
 
@@ -722,6 +724,8 @@ def decrypt(logger, cipher, encrypted, decrypted, buffer_size: int = 0):
                         logger.i("Checksum mismatch: Expected {} , got {}.\n"
                                  "    If you're not decrypting stickers or wallpapers, your backup is damaged."
                                  .format(file_hash.hexdigest(), checksum.hex()))
+                        # Decrypt the checksum too, so that the file is not truncated
+                        decrypted.write(cipher.decrypt(checksum))
                     else:
                         logger.v("Checksum OK ({})!".format(file_hash.hexdigest()))
                     break
