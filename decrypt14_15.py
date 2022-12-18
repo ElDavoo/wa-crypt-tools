@@ -615,8 +615,8 @@ def decrypt(logger, cipher, encrypted, decrypted, buffer_size: int = 0):
                 file_hash.update(encrypted_data)
 
                 if file_hash.digest() != checksum:
-                    logger.e("Checksum mismatch: Expected {} , got {}.\n"
-                             "    Your backup is damaged."
+                    logger.i("Checksum mismatch: Expected {} , got {}.\n"
+                             "    If you're not decrypting stickers or wallpapers, your backup is damaged."
                              .format(file_hash.hexdigest(), checksum.hex()))
                 else:
                     logger.v("Checksum OK ({}). Decrypting...".format(file_hash.hexdigest()))
@@ -719,8 +719,8 @@ def decrypt(logger, cipher, encrypted, decrypted, buffer_size: int = 0):
                     if file_hash.digest() != checksum:
                         if not logger.force:
                             decrypted.truncate(0)
-                        logger.e("Checksum mismatch: Expected {} , got {}.\n"
-                                 "    Your backup is damaged."
+                        logger.i("Checksum mismatch: Expected {} , got {}.\n"
+                                 "    If you're not decrypting stickers or wallpapers, your backup is damaged."
                                  .format(file_hash.hexdigest(), checksum.hex()))
                     else:
                         logger.v("Checksum OK ({})!".format(file_hash.hexdigest()))
