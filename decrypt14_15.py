@@ -642,7 +642,7 @@ def decrypt(logger, cipher, encrypted, decrypted, buffer_size: int = 0):
 
         else:
 
-            if buffer_size < 0:
+            if buffer_size < 17:
                 logger.i("Invalid buffer size, will use default of {}".format(DEFAULT_BUFFER_SIZE))
                 buffer_size = DEFAULT_BUFFER_SIZE
 
@@ -653,15 +653,52 @@ def decrypt(logger, cipher, encrypted, decrypted, buffer_size: int = 0):
 
             is_zip = True
 
+            chunk = None
+
+            logger.v("Reading and decrypting...")
+
             while True:
 
-                chunk = None
+                # We will need to manage two chunks at a time, because we might have
+                # the checksum in both the last chunk and the chunk before that.
+                # This makes the logic more complicated, but it's the only way to.
+
+                next_chunk = None
+                checksum = None
+
+                if chunk is None:
+                    # First read
+                    try:
+                        chunk = encrypted.read(buffer_size)
+                    except MemoryError:
+                        logger.f("Out of RAM, please use a smaller buffer size.")
+                    if len(chunk) < buffer_size:
+                        # Just error out, handling this case is too complicated.
+                        # If the file is so small, the user can just load the whole thing into RAM.
+                        logger.f("Buffer size too large, use a smaller buffer size or don't use a buffer.")
+                    continue
+
                 try:
-                    chunk = encrypted.read(buffer_size)
+                    next_chunk = encrypted.read(buffer_size)
                 except MemoryError:
                     logger.f("Out of RAM, please use a smaller buffer size.")
-                if not chunk:
-                    break
+
+                if len(next_chunk) <= 16:
+                    # Last bytes read. Three cases:
+                    # 1. The checksum is entirely in the last chunk
+                    if len(next_chunk) == 16:
+                        checksum = next_chunk
+                    # 2. The checksum is entirely in the chunk before the last
+                    elif len(next_chunk) == 0:
+                        checksum = chunk[-16:]
+                        chunk = chunk[:-16]
+                    # 3. The checksum is split between the last two chunks
+                    else:
+                        checksum = chunk[-(16-len(next_chunk)):] + next_chunk
+                        chunk = chunk[:-(16-len(next_chunk))]
+
+                file_hash.update(chunk)
+
                 decrypted_chunk = cipher.decrypt(chunk)
                 if is_zip:
                     try:
@@ -676,6 +713,20 @@ def decrypt(logger, cipher, encrypted, decrypted, buffer_size: int = 0):
                         decrypted.write(decrypted_chunk)
                 else:
                     decrypted.write(decrypted_chunk)
+
+                # The presence of the checksum tells us it's the last chunk
+                if checksum is not None:
+                    if file_hash.digest() != checksum:
+                        if not logger.force:
+                            decrypted.truncate(0)
+                        logger.e("Checksum mismatch: Expected {} , got {}.\n"
+                                 "    Your backup is damaged."
+                                 .format(file_hash.hexdigest(), checksum.hex()))
+                    else:
+                        logger.v("Checksum OK ({})!".format(file_hash.hexdigest()))
+                    break
+
+                chunk = next_chunk
 
             if is_zip and not z_obj.eof:
 
