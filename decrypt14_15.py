@@ -42,7 +42,7 @@ import javaobj.v2 as javaobj
 from google.protobuf.message import DecodeError
 
 import collections
-from hashlib import sha256
+from hashlib import sha256,md5
 from io import DEFAULT_BUFFER_SIZE, BufferedReader
 from re import findall
 from sys import exit, maxsize
@@ -453,6 +453,8 @@ def guess_offsets(logger, key: bytes, encrypted: BufferedReader, def_iv_offset: 
 
     encrypted.seek(data_offset)
 
+    file_hash.update(db_header[:data_offset])
+
     return AES.new(key, AES.MODE_GCM, iv)
 
 
@@ -494,11 +496,14 @@ def parse_protobuf(logger, key: Key, encrypted):
     try:
 
         # The first byte is the size of the upcoming protobuf message
-        protobuf_size = int.from_bytes(encrypted.read(1), byteorder='big')
+        protobuf_size = encrypted.read(1)
+        file_hash.update(protobuf_size)
+        protobuf_size = int.from_bytes(protobuf_size, byteorder='big')
 
         # It is my guess this is the backup type.
         # Looks like it is 1 for msgstore and 8 for other types.
-        backup_type = int.from_bytes(encrypted.read(1), byteorder='big')
+        backup_type_raw = encrypted.read(1)
+        backup_type = int.from_bytes(backup_type_raw, byteorder='big')
         if backup_type != 1:
             if backup_type == 8:
                 logger.v("Not a (recent) msgstore database")
@@ -506,10 +511,15 @@ def parse_protobuf(logger, key: Key, encrypted):
                 encrypted.seek(-1, 1)
             else:
                 logger.e("Unexpected backup type: {}".format(backup_type))
+        else:
+            file_hash.update(backup_type_raw)
 
         try:
 
-            if p.ParseFromString(encrypted.read(protobuf_size)) != protobuf_size:
+            protobuf_raw = encrypted.read(protobuf_size)
+            file_hash.update(protobuf_raw)
+
+            if p.ParseFromString(protobuf_raw) != protobuf_size:
                 logger.e("Protobuf message not fully read. Please report a bug.")
             else:
 
@@ -591,8 +601,6 @@ def decrypt(logger, cipher, encrypted, decrypted, buffer_size: int = 0):
     if cipher is None:
         logger.f("Could not create a decryption cipher")
 
-    logger.v("Decrypting...")
-
     try:
 
         if buffer_size == 0:
@@ -600,22 +608,37 @@ def decrypt(logger, cipher, encrypted, decrypted, buffer_size: int = 0):
             # decompresses into RAM, writes into disk.
             # More RAM used (~x3), less I/O used
             try:
-                output_decrypted = cipher.decrypt(encrypted.read())
+                encrypted_data = encrypted.read()
+                checksum = encrypted_data[-16:]
+                encrypted_data = encrypted_data[:-16]
+
+                file_hash.update(encrypted_data)
+
+                if file_hash.digest() != checksum:
+                    logger.e("Checksum mismatch: Expected {} , got {}.\n"
+                             "    Your backup is damaged."
+                             .format(file_hash.hexdigest(), checksum.hex()))
+                else:
+                    logger.v("Checksum OK ({}). Decrypting...".format(file_hash.hexdigest()))
+
+                output_decrypted = cipher.decrypt(encrypted_data)
+
+                try:
+                    output_file = z_obj.decompress(output_decrypted)
+                    if not z_obj.eof:
+                        logger.e("The encrypted database file is truncated (damaged).")
+                except zlib.error:
+                    output_file = output_decrypted
+                    if test_decompression(logger, output_file[:DEFAULT_BUFFER_SIZE]):
+                        logger.i("Decrypted data is a ZIP file that I will not decompress automatically.")
+                    else:
+                        logger.e("I can't recognize decrypted data. Decryption not successful.\n    "
+                                 "The key probably does not match with the encrypted file.")
+
+                decrypted.write(output_file)
+
             except MemoryError:
                 logger.f("Out of RAM, please use -nm.")
-            try:
-                output_file = z_obj.decompress(output_decrypted)
-                if not z_obj.eof:
-                    logger.e("The encrypted database file is truncated (damaged).")
-            except zlib.error:
-                output_file = output_decrypted
-                if test_decompression(logger, output_file[:DEFAULT_BUFFER_SIZE]):
-                    logger.i("Decrypted data is a ZIP file that I will not decompress automatically.")
-                else:
-                    logger.e("I can't recognize decrypted data. Decryption not successful.\n    "
-                             "The key probably does not match with the encrypted file.")
-
-            decrypted.write(output_file)
 
         else:
 
@@ -669,7 +692,7 @@ def decrypt(logger, cipher, encrypted, decrypted, buffer_size: int = 0):
         decrypted.close()
         encrypted.close()
 
-
+file_hash = md5()
 def main():
     args = parsecmdline()
     logger = SimpleLog(verbose=args.verbose, force=args.force)
