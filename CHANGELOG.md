@@ -3,6 +3,10 @@
 Note: this script does not follow a versioning policy. Versions number are written just for reference.
 This file may not be 100% correct: The true changelog is the git history.
 
+## Version 6.0
+
+- The MD5 checksum at the end of the file is now checked.
+
 ## Version 5.4
 
 - Support for key version 3

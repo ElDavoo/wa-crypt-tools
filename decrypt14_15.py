@@ -57,7 +57,7 @@ __author__ = 'ElDavo'
 __copyright__ = 'Copyright (C) 2022'
 __license__ = 'GPLv3'
 __status__ = 'Production'
-__version__ = '5.4'
+__version__ = '6.0'
 
 # These constants are only used by the guessing logic.
 
