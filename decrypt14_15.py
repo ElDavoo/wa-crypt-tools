@@ -720,8 +720,6 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                 # The presence of the checksum tells us it's the last chunk
                 if checksum is not None:
                     if file_hash.digest() != checksum:
-                        if not logger.force:
-                            decrypted.truncate(0)
                         logger.i("Checksum mismatch: Expected {} , got {}.\n"
                                  "    If you're not decrypting stickers or wallpapers, your backup is damaged."
                                  .format(file_hash.hexdigest(), checksum.hex()))
