@@ -43,7 +43,7 @@ from google.protobuf.message import DecodeError
 
 import collections
 from hashlib import sha256, md5
-from io import DEFAULT_BUFFER_SIZE, BufferedReader
+import io
 from re import findall
 from sys import exit, maxsize
 from time import sleep
@@ -142,7 +142,7 @@ def parsecmdline() -> argparse.Namespace:
                         help='Does not load files in RAM, stresses the disk more. '
                              'Default: load files into RAM')
     parser.add_argument('-bs', '--buffer-size', type=int, help='How many bytes of data to process at a time. '
-                                                               'Implies -nm. Default: {}'.format(DEFAULT_BUFFER_SIZE))
+                                                               'Implies -nm. Default: {}'.format(io.DEFAULT_BUFFER_SIZE))
     parser.add_argument('-ng', '--no-guess', action='store_true',
                         help='Does not try to guess the offsets, only protobuf parsing.')
     parser.add_argument('-np', '--no-protobuf', action='store_true',
@@ -628,10 +628,12 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                     logger.v("Checksum OK ({}). Decrypting...".format(file_hash.hexdigest()))
 
                 try:
-                    output_decrypted = cipher.decrypt(encrypted_data)
+                    output_decrypted: bytearray = cipher.decrypt(encrypted_data)
                 except ValueError as e:
-                    logger.e("Decryption failed: {}."
+                    logger.f("Decryption failed: {}."
                              "\n    This probably means your backup is corrupted.".format(e))
+                    # Dead code to make pycharm warning go away
+                    exit(1)
 
                 # Verify the authentication tag
                 try:
@@ -646,7 +648,7 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                         logger.e("The encrypted database file is truncated (damaged).")
                 except zlib.error:
                     output_file = output_decrypted
-                    if test_decompression(logger, output_file[:DEFAULT_BUFFER_SIZE]):
+                    if test_decompression(logger, output_file[:io.DEFAULT_BUFFER_SIZE]):
                         logger.i("Decrypted data is a ZIP file that I will not decompress automatically.")
                     else:
                         logger.e("I can't recognize decrypted data. Decryption not successful.\n    "
@@ -660,8 +662,8 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
         else:
 
             if buffer_size < 17:
-                logger.i("Invalid buffer size, will use default of {}".format(DEFAULT_BUFFER_SIZE))
-                buffer_size = DEFAULT_BUFFER_SIZE
+                logger.i("Invalid buffer size, will use default of {}".format(io.DEFAULT_BUFFER_SIZE))
+                buffer_size = io.DEFAULT_BUFFER_SIZE
 
             # Does the thing above but only with DEFAULT_BUFFER_SIZE bytes at a time.
             # Less RAM used, more I/O used
@@ -790,7 +792,7 @@ def main():
     if args.buffer_size is not None:
         decrypt(logger, file_hash, cipher, args.encrypted, args.decrypted, args.buffer_size)
     elif args.no_mem:
-        decrypt(logger, file_hash, cipher, args.encrypted, args.decrypted, DEFAULT_BUFFER_SIZE)
+        decrypt(logger, file_hash, cipher, args.encrypted, args.decrypted, io.DEFAULT_BUFFER_SIZE)
     else:
         decrypt(logger, file_hash, cipher, args.encrypted, args.decrypted)
 
