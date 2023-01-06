@@ -611,9 +611,12 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
             try:
                 encrypted_data = encrypted.read()
                 checksum = encrypted_data[-16:]
-                encrypted_data = encrypted_data[:-16]
+                authentication_tag = encrypted_data[-32:-16]
+                encrypted_data = encrypted_data[:-32]
+
 
                 file_hash.update(encrypted_data)
+                file_hash.update(authentication_tag)
 
                 if file_hash.digest() != checksum:
                     logger.i("Checksum mismatch: Expected {} , got {}.\n"
@@ -624,7 +627,18 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                 else:
                     logger.v("Checksum OK ({}). Decrypting...".format(file_hash.hexdigest()))
 
-                output_decrypted = cipher.decrypt(encrypted_data)
+                try:
+                    output_decrypted = cipher.decrypt(encrypted_data)
+                except ValueError as e:
+                    logger.e("Decryption failed: {}."
+                             "\n    This probably means your backup is corrupted.".format(e))
+
+                # Verify the authentication tag
+                try:
+                    cipher.verify(authentication_tag)
+                except ValueError as e:
+                    logger.e("Authentication tag mismatch: {}."
+                             "\n    This probably means your backup is corrupted.".format(e))
 
                 try:
                     output_file = z_obj.decompress(output_decrypted)
