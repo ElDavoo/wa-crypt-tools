@@ -619,8 +619,8 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                 file_hash.update(authentication_tag)
 
                 if file_hash.digest() != checksum:
-                    logger.i("Checksum mismatch: Expected {} , got {}.\n"
-                             "    If you're not decrypting stickers or wallpapers, your backup is damaged."
+                    logger.e("Checksum mismatch: Expected {} , got {}.\n"
+                             "    Your backup is damaged."
                              .format(file_hash.hexdigest(), checksum.hex()))
                     # Re add the truncated bytes
                     encrypted_data += checksum
@@ -742,8 +742,8 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                         logger.e("Authentication tag mismatch: {}."
                                  "\n    This probably means your backup is corrupted.".format(e))
                     if file_hash.digest() != checksum[16:]:
-                        logger.i("Checksum mismatch: Expected {} , got {}.\n"
-                                 "    If you're not decrypting stickers or wallpapers, your backup is damaged."
+                        logger.e("Checksum mismatch: Expected {} , got {}.\n"
+                                 "    Your backup is damaged."
                                  .format(file_hash.hexdigest(), checksum[16:].hex()))
                         # Decrypt the checksum too, so that the file is not truncated
                         decrypted.write(cipher.decrypt(checksum))
