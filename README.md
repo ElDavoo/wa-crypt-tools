@@ -139,7 +139,7 @@ Issues asking for this will be closed as invalid.**
 Stable: 
 2.22.15.74  
 Beta: 
-2.23.1.11
+2.23.1.26
 
 ### Stargazers over time
 
@@ -164,4 +164,5 @@ becomes
 ###### Credits:
  Original implementation for crypt12: [TripCode](https://github.com/TripCode)    
  Some help at the beginning: [DjEdu28](https://github.com/DjEdu28)  
- Actual crypt14/15 implementation with protobuf: [ElDavoo](https://github.com/ElDavoo)
+ Actual crypt14/15 implementation with protobuf: [ElDavoo](https://github.com/ElDavoo)  
+ Help with crypt14/15 footer: [george-lam](https://github.com/georg-lam)

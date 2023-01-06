@@ -54,10 +54,10 @@ import hmac
 import zlib
 
 __author__ = 'ElDavo'
-__copyright__ = 'Copyright (C) 2022'
+__copyright__ = 'Copyright (C) 2023'
 __license__ = 'GPLv3'
 __status__ = 'Production'
-__version__ = '6.0'
+__version__ = '6.1'
 
 # These constants are only used by the guessing logic.
 
@@ -659,7 +659,8 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                         logger.i("Decrypted data is a ZIP file that I will not decompress automatically.")
                     else:
                         logger.e("I can't recognize decrypted data. Decryption not successful.\n    "
-                                 "The key probably does not match with the encrypted file.")
+                                 "The key probably does not match with the encrypted file.\n    "
+                                 "Or the backup is simply empty. (check with --force)")
 
                 decrypted.write(output_file)
 
