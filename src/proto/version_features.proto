@@ -4,7 +4,7 @@ message Version_Features {
     string whatsapp_version = 1; // Whatsapp version, for example "2.22.4.14"
     string substringedUserJid = 3; // The last two characters of the user's Jid (phone number)
     // This bools are only written if the backup is a msgstore backup.
-    optional bool idk = 4; // No idea what this is
+    optional bool feature_4 = 4; // No idea what this is
     optional bool call_log = 5; // Booleans that indicate various features
     optional bool labeled_jid = 6;
     optional bool message_fts = 7;
@@ -37,5 +37,6 @@ message Version_Features {
     optional bool message_main_verification = 34;
     optional bool quoted_ui_elements_reply_message = 35;
     optional bool alter_message_ephemeral_to_message_ephemeral_remove_column = 36;
-    optional bool alter_message_ephemeral_setting_to_message_ephemeral_setting_remove_column = 37;
+    optional bool feature_37 = 37;
+    optional bool feature_39 = 39;
 }
