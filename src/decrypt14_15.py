@@ -9,34 +9,8 @@ from src.lib.common_utils import SimpleLog
 from src.lib.key import Key
 from src.lib.common_utils import oscillate, test_decompression
 
-# AES import party!
-# pycryptodome and PyCryptodomex's implementations of AES are the same,
-# so we try to import one of these twos.
-try:
-    # pycryptodomex
-    from Cryptodome.Cipher import AES
-except ModuleNotFoundError:
-    try:
-        # pycryptodome
-        # noinspection PyUnresolvedReferences
-        from Crypto.Cipher import AES
-
-        if not hasattr(AES, 'MODE_GCM'):
-            # pycrypto
-            print("You installed pycrypto and not pycryptodome(x).")
-            print("Pycrypto is old, deprecated and not supported.")
-            print("Run: python -m pip uninstall pycrypto")
-            print("And: python -m pip install pycryptodomex")
-            print("Or:  python -m pip install pycryptodome")
-            exit(1)
-    except ModuleNotFoundError:
-        # crypto (or nothing)
-        print("You need pycryptodome(x) to run this script")
-        print("python -m pip install pycryptodomex")
-        print("Or: python -m pip install pycryptodome")
-        print("You can also remove \"crypto\" if you have it installed")
-        print("python -m pip uninstall crypto")
-        exit(1)
+from src.lib.common_utils import import_aes
+AES = import_aes()
 
 # noinspection PyPackageRequirements
 from google.protobuf.message import DecodeError

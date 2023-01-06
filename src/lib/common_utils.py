@@ -135,3 +135,35 @@ def javaintlist2bytes(barr: javaobj.beans.JavaArray) -> bytes:
     for i in barr:
         out += i.to_bytes(1, byteorder='big', signed=True)
     return out
+
+def import_aes():
+    # AES import party!
+    # pycryptodome and PyCryptodomex's implementations of AES are the same,
+    # so we try to import one of these twos.
+    try:
+        # pycryptodomex
+        from Cryptodome.Cipher import AES
+        return AES
+    except ModuleNotFoundError:
+        try:
+            # pycryptodome
+            # noinspection PyUnresolvedReferences
+            from Crypto.Cipher import AES
+
+            if not hasattr(AES, 'MODE_GCM'):
+                # pycrypto
+                print("You installed pycrypto and not pycryptodome(x).")
+                print("Pycrypto is old, deprecated and not supported.")
+                print("Run: python -m pip uninstall pycrypto")
+                print("And: python -m pip install pycryptodomex")
+                print("Or:  python -m pip install pycryptodome")
+                exit(1)
+            return AES
+        except ModuleNotFoundError:
+            # crypto (or nothing)
+            print("You need pycryptodome(x) to run this script")
+            print("python -m pip install pycryptodomex")
+            print("Or: python -m pip install pycryptodome")
+            print("You can also remove \"crypto\" if you have it installed")
+            print("python -m pip uninstall crypto")
+            exit(1)
