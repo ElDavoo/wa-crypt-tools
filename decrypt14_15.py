@@ -613,15 +613,15 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                 checksum = encrypted_data[-16:]
                 authentication_tag = encrypted_data[-32:-16]
                 encrypted_data = encrypted_data[:-32]
+                is_multifile_backup = False
 
 
                 file_hash.update(encrypted_data)
                 file_hash.update(authentication_tag)
 
                 if file_hash.digest() != checksum:
-                    logger.e("Checksum mismatch: Expected {} , got {}.\n"
-                             "    Your backup is damaged."
-                             .format(file_hash.hexdigest(), checksum.hex()))
+                    # We are probably in a multifile backup, which does not have a checksum.
+                    is_multifile_backup = True
                 else:
                     logger.v("Checksum OK ({}). Decrypting...".format(file_hash.hexdigest()))
 
@@ -635,7 +635,16 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
 
                 # Verify the authentication tag
                 try:
-                    cipher.verify(authentication_tag)
+                    if is_multifile_backup:
+                        # In multifile backups, there is no checksum.
+                        # This means, the last 16 bytes of the files are not the checksum,
+                        # despite being called "checksum", but are the authentication tag.
+                        # Same way, "authentication tag" is not the tag, but the last
+                        # 16 bytes of the encrypted file.
+                        output_decrypted += cipher.decrypt(authentication_tag)
+                        cipher.verify(checksum)
+                    else:
+                        cipher.verify(authentication_tag)
                 except ValueError as e:
                     logger.e("Authentication tag mismatch: {}."
                              "\n    This probably means your backup is corrupted.".format(e))
@@ -733,18 +742,21 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
 
                 # The presence of the checksum tells us it's the last chunk
                 if checksum is not None:
+                    is_multifile_backup = False
                     file_hash.update(checksum[:16])
+                    if file_hash.digest() != checksum[16:]:
+                        is_multifile_backup = True
+                    else:
+                        logger.v("Checksum OK ({})!".format(file_hash.hexdigest()))
                     try:
-                        cipher.verify(checksum[:16])
+                        if is_multifile_backup:
+                            decrypted.write(cipher.decrypt(checksum[:16]))
+                            cipher.verify(checksum[16:])
+                        else:
+                            cipher.verify(checksum[:16])
                     except ValueError as e:
                         logger.e("Authentication tag mismatch: {}."
                                  "\n    This probably means your backup is corrupted.".format(e))
-                    if file_hash.digest() != checksum[16:]:
-                        logger.e("Checksum mismatch: Expected {} , got {}.\n"
-                                 "    Your backup is damaged."
-                                 .format(file_hash.hexdigest(), checksum[16:].hex()))
-                    else:
-                        logger.v("Checksum OK ({})!".format(file_hash.hexdigest()))
                     break
 
                 chunk = next_chunk
