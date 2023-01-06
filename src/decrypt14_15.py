@@ -5,6 +5,10 @@ This script decrypts WhatsApp's DB files encrypted with Crypt14 or Crypt15.
 
 from __future__ import annotations
 
+from src.lib.common_utils import SimpleLog
+from src.lib.key import Key
+from src.lib.common_utils import oscillate, test_decompression
+
 # AES import party!
 # pycryptodome and PyCryptodomex's implementations of AES are the same,
 # so we try to import one of these twos.
@@ -35,22 +39,16 @@ except ModuleNotFoundError:
         exit(1)
 
 # noinspection PyPackageRequirements
-# This is from javaobj-py3
-import javaobj.v2 as javaobj
-
-# noinspection PyPackageRequirements
 from google.protobuf.message import DecodeError
 
-import collections
-from hashlib import sha256, md5
+from hashlib import md5
 import io
 from re import findall
 from sys import exit, maxsize
 from time import sleep
 from datetime import date
-
+from src.lib.constants import DEFAULT_IV_OFFSET, DEFAULT_DATA_OFFSET, HEADER_SIZE, ZLIB_HEADERS
 import argparse
-import hmac
 import zlib
 
 __author__ = 'ElDavo'
@@ -58,72 +56,6 @@ __copyright__ = 'Copyright (C) 2023'
 __license__ = 'GPLv3'
 __status__ = 'Production'
 __version__ = '6.1'
-
-# These constants are only used by the guessing logic.
-
-# zlib magic header is 78 01 (Low Compression).
-# The first two bytes of the decrypted data should be those,
-# in case of single file backup, or PK in case of multi file.
-ZLIB_HEADERS = [
-    b'x\x01',
-    b'PK'
-]
-ZIP_HEADER = b'PK\x03\x04'
-
-# Size of bytes to test (number chosen arbitrarily, but values less than ~310 makes test_decompression fail)
-HEADER_SIZE = 384
-DEFAULT_DATA_OFFSET = 122
-DEFAULT_IV_OFFSET = 8
-
-
-class SimpleLog:
-    """Simple logger class. Supports 4 verbosity levels."""
-
-    def __init__(self, verbose: bool, force: bool):
-        self.verbose = verbose
-        self.force = force
-
-    def v(self, msg: str):
-        """Will only print message if verbose mode is enabled."""
-        if self.verbose:
-            print('[V] {}'.format(msg))
-
-    @staticmethod
-    def i(msg: str):
-        """Always prints message."""
-        print('[I] {}'.format(msg))
-
-    def e(self, msg: str):
-        """Prints message and exit, unless force is enabled."""
-        print('[E] {}'.format(msg))
-        if not self.force:
-            print("To bypass checks, use the \"--force\" parameter")
-            exit(1)
-
-    @staticmethod
-    def f(msg: str):
-        """Always prints message and exit."""
-        print('[F] {}'.format(msg))
-        exit(1)
-
-
-def from_hex(logger, string: str) -> bytes:
-    """Converts a hex string into a bytes array"""
-    if len(string) != 64:
-        logger.f("The key file specified does not exist.\n    "
-                 "If you tried to specify the key directly, note it should be "
-                 "64 characters long and not {} characters long.".format(len(string)))
-
-    barr = None
-    try:
-        barr = bytes.fromhex(string)
-    except ValueError as e:
-        logger.f("Couldn't convert the hex string.\n    "
-                 "Exception: {}".format(e))
-    if len(barr) != 32:
-        logger.e("The key is not 32 bytes long but {} bytes long.".format(len(barr)))
-    return barr
-
 
 def parsecmdline() -> argparse.Namespace:
     """Sets up the argument parser"""
@@ -160,227 +92,6 @@ def parsecmdline() -> argparse.Namespace:
     return parser.parse_args()
 
 
-class Key:
-    """ This class represents a key used to decrypt the DB.
-    Only the key is mandatory. The other parameters are optional, and if they are not None,
-    means that the key type is crypt14."""
-    # These constants are only used with crypt14 keys.
-    SUPPORTED_CIPHER_VERSION = b'\x00\x01'
-    SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02', b'\x03']
-
-    # This constant is only used with crypt15 keys.
-    BACKUP_ENCRYPTION = b'backup encryption\x01'
-
-    def __str__(self):
-        """Returns a string representation of the key"""
-        try:
-            string: str = "Key("
-            if self.key is not None:
-                string += "key: {}".format(self.key.hex())
-            if self.serversalt is not None:
-                string += " , serversalt: {}".format(self.serversalt.hex())
-            if self.googleid is not None:
-                string += " , googleid: {}".format(self.googleid.hex())
-            if self.key_version is not None:
-                string += " , key_version: {}".format(self.key_version.hex())
-            if self.cipher_version is not None:
-                string += " , cipher_version: {}".format(self.cipher_version.hex())
-            return string + ")"
-        except Exception as e:
-            return "Exception printing key: {}".format(e)
-
-    def __init__(self, logger, key_file_name):
-        """Deserializes a key file into a byte array."""
-        self.key = None
-        self.serversalt = None
-        self.googleid = None
-        self.key_version = None
-        self.cipher_version = None
-
-        keyfile: bytes = b''
-
-        logger.v("Reading keyfile...")
-
-        # Try to open the keyfile.
-        try:
-            key_file_stream = open(key_file_name, 'rb')
-            try:
-                # Deserialize the byte object written in the file
-                jarr: javaobj.beans.JavaArray = javaobj.load(key_file_stream).data
-                # Convert from a list of Int8 to a byte array
-                keyfile: bytes = javaintlist2bytes(jarr)
-
-            except (ValueError, RuntimeError) as e:
-                logger.f("The keyfile is not a valid Java object: {}".format(e))
-
-        except OSError:
-            # Try to see if it is a hex-encoded key.
-            keyfile = from_hex(logger, key_file_name)
-
-        # We guess the key type from its length
-        if len(keyfile) == 131:
-            self.load_crypt14(logger, keyfile=keyfile)
-        elif len(keyfile) == 32:
-            self.load_crypt15(logger, keyfile=keyfile)
-        else:
-            logger.f("Unrecognized key file format.")
-
-    def load_crypt14(self, logger, keyfile: bytes):
-        """Extracts the fields from a crypt14 loaded key file."""
-        # key file format and encoding explanation:
-        # The key file is actually a serialized byte[] object.
-
-        # After deserialization, we will have a byte[] object that we have to split in:
-        # 1) The cipher version (2 bytes). Known values are 0x0000 and 0x0001. So far we only support the latter.
-        # SUPPORTED_CIPHER_VERSION = b'\x00\x01'
-        # 2) The key version (1 byte). All the known versions are supported.
-        # SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02', b'\x03']
-        # Looks like nothing actually changes between the versions.
-        # 3) Server salt (32 bytes)
-        # 4) googleIdSalt (unused?) (16 bytes)
-        # 5) hashedGoogleID (The SHA-256 hash of googleIdSalt) (32 bytes)
-        # 6) encryption IV (zeroed out, as it is read from the database) (16 bytes)
-        # 7) cipherKey (The actual AES-256 decryption key) (32 bytes)
-
-        # Check if the keyfile has a supported cipher version
-        self.cipher_version = keyfile[:len(self.SUPPORTED_CIPHER_VERSION)]
-        if self.SUPPORTED_CIPHER_VERSION != self.cipher_version:
-            logger.e("Invalid keyfile: Unsupported cipher version {}"
-                     .format(keyfile[:len(self.SUPPORTED_CIPHER_VERSION)].hex()))
-        index = len(self.SUPPORTED_CIPHER_VERSION)
-
-        # Check if the keyfile has a supported key version
-        version_supported = False
-        for v in self.SUPPORTED_KEY_VERSIONS:
-            if v == keyfile[index:index + len(self.SUPPORTED_KEY_VERSIONS[0])]:
-                version_supported = True
-                self.key_version = v
-                break
-        if not version_supported:
-            logger.e('Invalid keyfile: Unsupported key version {}'
-                     .format(keyfile[index:index + len(self.SUPPORTED_KEY_VERSIONS[0])].hex()))
-
-        self.serversalt = keyfile[3:35]
-
-        # Check the SHA-256 of the salt
-        self.googleid = keyfile[35:51]
-        expected_digest = sha256(self.googleid).digest()
-        actual_digest = keyfile[51:83]
-        if expected_digest != actual_digest:
-            logger.e("Invalid keyfile: Invalid SHA-256 of salt.\n    "
-                     "Expected: {}\n    Got:{}".format(expected_digest, actual_digest))
-
-        padding = keyfile[83:99]
-
-        # Check if IV is made of zeroes
-        for byte in padding:
-            if byte:
-                logger.e("Invalid keyfile: IV is not zeroed out but is: {}".format(padding.hex()))
-                break
-
-        self.key = keyfile[99:]
-
-        logger.i("Crypt12/14 key loaded")
-
-    def load_crypt15(self, logger, keyfile: bytes):
-        """Extracts the key from a loaded crypt15 key file."""
-        # encrypted_backup.key file format and encoding explanation:
-        # The E2E key file is actually a serialized byte[] object.
-
-        # After deserialization, we will have the root key (32 bytes).
-        # The root key is further encoded with three different strings, depending on what you want to do.
-        # These three ways are "backup encryption";
-        # "metadata encryption" and "metadata authentication", for Google Drive E2E encrypted metadata.
-        # We are only interested in the local backup encryption.
-
-        # Why the \x01 at the end of the BACKUP_ENCRYPTION constant?
-        # Whatsapp uses a nested encryption function to encrypt many times the same data.
-        # The iteration counter is appended to the end of the encrypted data. However,
-        # since the loop is actually executed only one time, we will only have one interaction,
-        # and thus a \x01 at the end.
-        # Take a look at utils/wa_hmacsha256_loop.java that is the original code.
-
-        if len(keyfile) != 32:
-            logger.f("Crypt15 loader trying to load a crypt14 key")
-
-        # First do the HMACSHA256 hash of the file with an empty private key
-        self.key: bytes = hmac.new(b'\x00' * 32, keyfile, sha256).digest()
-        # Then do the HMACSHA256 using the previous result as key and ("backup encryption" + iteration count) as data
-        self.key = hmac.new(self.key, self.BACKUP_ENCRYPTION, sha256).digest()
-
-        logger.i("Crypt15 / Raw key loaded")
-
-
-def oscillate(n: int, n_min: int, n_max: int) -> collections.Iterable:
-    """Yields n, n-1, n+1, n-2, n+2..., with constraints:
-    - n is in [min, max]
-    - n is never negative
-    Reverts to range() when n touches min or max. Example:
-    oscillate(8, 2, 10) => 8, 7, 9, 6, 10, 5, 4, 3, 2
-    """
-
-    if n_min < 0:
-        n_min = 0
-
-    i = n
-    c = 1
-
-    # First phase (n, n-1, n+1...)
-    while True:
-
-        if i == n_max:
-            break
-        yield i
-        i = i - c
-        c = c + 1
-
-        if i == 0 or i == n_min:
-            break
-        yield i
-        i = i + c
-        c = c + 1
-
-    # Second phase (range of remaining numbers)
-    # n != i/2 fixes a bug where we would yield min and max two times if n == (max-min)/2
-    if i == n_min and n != i / 2:
-
-        yield i
-        i = i + c
-        for j in range(i, n_max + 1):
-            yield j
-
-    if i == n_max and n != i / 2:
-
-        yield n_max
-        i = i - c
-        for j in range(i, n_min - 1, -1):
-            yield j
-
-
-def test_decompression(logger, test_data: bytes) -> bool:
-    """Returns true if the SQLite header is valid.
-    It is assumed that the data are valid.
-    (If it is valid, it also means the decryption and decompression were successful.)"""
-
-    # If we get a ZIP file header, return true
-    if test_data[:4] == ZIP_HEADER:
-        return True
-
-    try:
-        zlib_obj = zlib.decompressobj().decompress(test_data)
-        # These two errors should never happen
-        if len(zlib_obj) < 16:
-            logger.e("Test decompression: chunk too small")
-            return False
-        if zlib_obj[:15].decode('ascii') != 'SQLite format 3':
-            logger.e("Test decompression: Decryption and decompression ok but not a valid SQLite database")
-            return logger.force
-        else:
-            return True
-    except zlib.error:
-        return False
-
-
 def find_data_offset(logger, header: bytes, iv_offset: int, key: bytes, starting_data_offset: int) -> int:
     """Tries to find the offset in which the encrypted data starts.
     Returns the offset or -1 if the offset is not found.
@@ -409,7 +120,7 @@ def find_data_offset(logger, header: bytes, iv_offset: int, key: bytes, starting
     return -1
 
 
-def guess_offsets(logger, key: bytes, file_hash: _Hash, encrypted: BufferedReader, def_iv_offset: int,
+def guess_offsets(logger, key: bytes, file_hash, encrypted: io.BufferedReader, def_iv_offset: int,
                   def_data_offset: int):
     """Gets the IV, shifts the stream to the beginning of the encrypted data and returns the cipher.
     It does so by guessing the offset."""
@@ -459,22 +170,14 @@ def guess_offsets(logger, key: bytes, file_hash: _Hash, encrypted: BufferedReade
     return AES.new(key, AES.MODE_GCM, iv)
 
 
-def javaintlist2bytes(barr: javaobj.beans.JavaArray) -> bytes:
-    """Converts a javaobj bytearray which somehow became a list of signed integers back to a Python byte array"""
-    out: bytes = b''
-    for i in barr:
-        out += i.to_bytes(1, byteorder='big', signed=True)
-    return out
-
-
-def parse_protobuf(logger, file_hash: _Hash, key: Key, encrypted):
+def parse_protobuf(logger, file_hash, key: Key, encrypted):
     """Parses the database header, gets the IV,
      shifts the stream to the beginning of the encrypted data and returns the cipher.
     It does so by parsing the protobuf message."""
 
     try:
-        import proto.prefix_pb2 as prefix
-        import proto.key_type_pb2 as key_type
+        import src.proto.prefix_pb2 as prefix
+        import src.proto.key_type_pb2 as key_type
     except ImportError as e:
         logger.e("Could not import the proto classes: {}".format(e))
         if str(e).startswith("cannot import name 'builder' from 'google.protobuf.internal'"):
@@ -594,7 +297,7 @@ def parse_protobuf(logger, file_hash: _Hash, key: Key, encrypted):
     return None
 
 
-def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size: int = 0):
+def decrypt(logger, file_hash, cipher, encrypted, decrypted, buffer_size: int = 0):
     """Does the actual decryption."""
 
     z_obj = zlib.decompressobj()
