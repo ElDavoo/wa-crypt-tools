@@ -702,19 +702,19 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                 except MemoryError:
                     logger.f("Out of RAM, please use a smaller buffer size.")
 
-                if len(next_chunk) <= 16:
+                if len(next_chunk) <= 32:
                     # Last bytes read. Three cases:
                     # 1. The checksum is entirely in the last chunk
-                    if len(next_chunk) == 16:
+                    if len(next_chunk) == 32:
                         checksum = next_chunk
                     # 2. The checksum is entirely in the chunk before the last
                     elif len(next_chunk) == 0:
-                        checksum = chunk[-16:]
-                        chunk = chunk[:-16]
+                        checksum = chunk[-32:]
+                        chunk = chunk[:-32]
                     # 3. The checksum is split between the last two chunks
                     else:
-                        checksum = chunk[-(16 - len(next_chunk)):] + next_chunk
-                        chunk = chunk[:-(16 - len(next_chunk))]
+                        checksum = chunk[-(32 - len(next_chunk)):] + next_chunk
+                        chunk = chunk[:-(32 - len(next_chunk))]
 
                 file_hash.update(chunk)
 
@@ -735,10 +735,16 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
 
                 # The presence of the checksum tells us it's the last chunk
                 if checksum is not None:
-                    if file_hash.digest() != checksum:
+                    file_hash.update(checksum[:16])
+                    try:
+                        cipher.verify(checksum[:16])
+                    except ValueError as e:
+                        logger.e("Authentication tag mismatch: {}."
+                                 "\n    This probably means your backup is corrupted.".format(e))
+                    if file_hash.digest() != checksum[16:]:
                         logger.i("Checksum mismatch: Expected {} , got {}.\n"
                                  "    If you're not decrypting stickers or wallpapers, your backup is damaged."
-                                 .format(file_hash.hexdigest(), checksum.hex()))
+                                 .format(file_hash.hexdigest(), checksum[16:].hex()))
                         # Decrypt the checksum too, so that the file is not truncated
                         decrypted.write(cipher.decrypt(checksum))
                     else:
