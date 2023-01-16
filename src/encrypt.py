@@ -135,7 +135,10 @@ def main():
         # Parse the header to get the IV
         prefix = prefix_p.prefix()
         prefix.ParseFromString(raw_haeder)
-        iv = prefix.c15_iv.IV
+        if args.type == 15:
+            iv = prefix.c15_iv.IV
+        elif args.type == 14:
+            iv = prefix.c14_cipher.IV
     else:
         from_scratch(args, md5, iv)
     # Create a new AES cipher
