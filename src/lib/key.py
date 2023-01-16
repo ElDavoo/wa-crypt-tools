@@ -13,13 +13,16 @@ class Key:
     """ This class represents a key used to decrypt the DB.
     Only the key is mandatory. The other parameters are optional, and if they are not None,
     means that the key type is crypt14."""
-    # These constants are only used with crypt14 keys.
+    # These constants are only used with crypt12/14 keys.
     SUPPORTED_CIPHER_VERSION = b'\x00\x01'
     SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02', b'\x03']
 
     # This constant is only used with crypt15 keys.
     BACKUP_ENCRYPTION = b'backup encryption\x01'
 
+    def is_crypt15(self):
+        """Returns True if the key is crypt15, False if it is crypt12/14"""
+        return self.key_version is None
     def __str__(self):
         """Returns a string representation of the key"""
         try:

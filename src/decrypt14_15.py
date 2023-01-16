@@ -65,7 +65,6 @@ def parsecmdline() -> argparse.Namespace:
 
     return parser.parse_args()
 
-
 def find_data_offset(logger, header: bytes, iv_offset: int, key: bytes, starting_data_offset: int) -> int:
     """Tries to find the offset in which the encrypted data starts.
     Returns the offset or -1 if the offset is not found.
@@ -143,6 +142,59 @@ def guess_offsets(logger, key: bytes, file_hash, encrypted: io.BufferedReader, d
 
     return AES.new(key, AES.MODE_GCM, iv)
 
+def check_crypt12(logger, file_hash, key, encrypted):
+    """Checks if the file is a Crypt12 file.
+    Returns the cipher if it is, None otherwise."""
+
+    """
+    The crypt12 file format is similar to the crypt14 file format.
+    It is a "raw" header, which means it's not a protobuf message,
+    nor a serialized java object.
+    Structure:
+    Cipher version (2 bytes)
+    Key version (1 byte)
+    Server salt (32 bytes)
+    Google ID (16 bytes)
+    IV (16 bytes)
+    ( so we finally understood why the IV is at offset 51 ... )
+    """
+    def quit_12():
+        encrypted.seek(0)
+        logger.v("Not a Crypt12 file, or corrupted")
+        raise ValueError
+
+    if key.is_crypt15():
+        quit_12()
+
+    # We can read and discard the bytes, because the information
+    # are already in the keyfile.
+
+    test_bytes = encrypted.read(2)
+    if test_bytes != key.cipher_version:
+        quit_12()
+    file_hash.update(test_bytes)
+
+    test_bytes = encrypted.read(1)
+    if test_bytes != key.key_version:
+        quit_12()
+    file_hash.update(test_bytes)
+
+    test_bytes = encrypted.read(32)
+    if test_bytes != key.serversalt:
+        quit_12()
+    file_hash.update(test_bytes)
+
+    test_bytes = encrypted.read(16)
+    if test_bytes != key.googleid:
+        quit_12()
+    file_hash.update(test_bytes)
+
+    iv = encrypted.read(16)
+    file_hash.update(iv)
+
+    # We are done here
+    logger.i("Database header parsed")
+    return AES.new(key.key, AES.MODE_GCM, iv)
 
 def parse_protobuf(logger, file_hash, key: Key, encrypted):
     """Parses the database header, gets the IV,
@@ -213,7 +265,7 @@ def parse_protobuf(logger, file_hash, key: Key, encrypted):
 
                 if len(p.c15_iv.IV) != 0:
                     # DB Header is crypt15
-                    if key.key_version is not None:
+                    if not key.is_crypt15():
                         logger.e("You are using a crypt14 key file with a crypt15 backup.")
                     if len(p.c15_iv.IV) != 16:
                         logger.e("IV is not 16 bytes long but is {} bytes long".format(len(p.c15_iv.IV)))
@@ -222,7 +274,7 @@ def parse_protobuf(logger, file_hash, key: Key, encrypted):
                 elif len(p.c14_cipher.IV) != 0:
 
                     # DB Header is crypt14
-                    if key.key_version is None:
+                    if key.is_crypt15():
                         logger.f("You are using a crypt15 key file with a crypt14 backup.")
 
                     # if key.cipher_version != p.c14_cipher.version.cipher_version:
@@ -287,6 +339,17 @@ def decrypt(logger, file_hash, cipher, encrypted, decrypted, buffer_size: int = 
             # More RAM used (~x3), less I/O used
             try:
                 encrypted_data = encrypted.read()
+                # Crypt12 moment: the last 4 bytes are --xx, where xx
+                # are the last 2 numbers of the jid (user's phone number).
+                # We need to remove them.
+                crypt12_footer = str(encrypted_data[-4:])
+                # Looks like a complicated regex, but it's just
+                # "if it's --xx or xxxx"
+                jid = findall(r"(?:-|\d)(?:-|\d)(\d\d)", crypt12_footer)
+                if len(jid) == 1:
+                    # Confirmed to be crypt12
+                    encrypted_data = encrypted_data[:-4]
+                    logger.v("Your phone number ends with {}".format(jid[0]))
                 checksum = encrypted_data[-16:]
                 authentication_tag = encrypted_data[-32:-16]
                 encrypted_data = encrypted_data[:-32]
@@ -474,7 +537,11 @@ def main():
     # We have two approaches to do so.
     # First: try parsing the protobuf message.
     if not args.no_protobuf:
-        cipher = parse_protobuf(logger=logger, file_hash=file_hash, key=key, encrypted=args.encrypted)
+        # Check if the backup is crypt12 first.
+        try:
+            cipher = check_crypt12(logger, file_hash, key, args.encrypted)
+        except ValueError:
+            cipher = parse_protobuf(logger=logger, file_hash=file_hash, key=key, encrypted=args.encrypted)
 
     if cipher is None and not args.no_guess:
         # If parsing the protobuf message failed, we try guessing the offsets.
