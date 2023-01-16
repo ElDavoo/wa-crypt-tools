@@ -105,7 +105,7 @@ python ./decrypt14_15.py ./key ./msgstore.db.crypt14 ./msgstore.db
 ```  
 #### Crypt12
 ```  
-python ./decrypt14_15.py ./key ./msgstore.db.crypt12 ./msgstore.db -np -ivo 51 -do 67 
+python ./decrypt14_15.py ./key ./msgstore.db.crypt12 ./msgstore.db
 [I] Crypt12/14 key loaded
 [I] Database header parsed
 [I] Done
