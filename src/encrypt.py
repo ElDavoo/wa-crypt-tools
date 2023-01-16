@@ -30,7 +30,7 @@ def parsecmdline() -> argparse.Namespace:
     parser.add_argument('--msgstore', action='store_true', help='Encrypts a msgstore.db file')
     parser.add_argument('--multi-file', action='store_true', help='Encrypts a multi-file backup (either stickers or wallpapers)')
     # Add an argument "type" that can be either 14 or 15
-    parser.add_argument('--type', type=int, choices=[14, 15], default=15, help='The type of encryption to use. Default: 15')
+    parser.add_argument('--type', type=int, choices=[12, 14, 15], default=15, help='The type of encryption to use. Default: 15')
     parser.add_argument('--iv', type=str, help='The IV to use for crypt15 encryption. Default: random')
     parser.add_argument('--reference', type=argparse.FileType('rb'), help='The reference file to use for crypt15 encryption. Highly recommended.')
     parser.add_argument('--noparse', action='store_true', help='Do not parse the header of the reference file. Default: false')
@@ -125,22 +125,37 @@ def main():
     # Generate a random IV
     iv = os.urandom(16)
     # If specified, use the IV from the command line
+
+    if args.reference is not None:
+        if args.type == 12:
+            iv = args.reference.read(67)[51:67]
+            md5.update(key.cipher_version)
+            args.encrypted.write(key.cipher_version)
+            md5.update(key.key_version)
+            args.encrypted.write(key.key_version)
+            md5.update(key.serversalt)
+            args.encrypted.write(key.serversalt)
+            md5.update(key.googleid)
+            args.encrypted.write(key.googleid)
+            md5.update(iv)
+            args.encrypted.write(iv)
+
+        else:
+            raw_haeder = from_reference_no_parse(logger, args, key, md5)
+            # Parse the header to get the IV
+            prefix = prefix_p.prefix()
+            prefix.ParseFromString(raw_haeder)
+            if args.type == 15:
+                iv = prefix.c15_iv.IV
+            elif args.type == 14:
+                iv = prefix.c14_cipher.IV
+    else:
+        from_scratch(args, md5, iv)
     if args.iv:
         if args.reference is not None:
             #TODO for now we do not support this
             logger.e("Cannot specify both --iv and --reference")
         iv = bytes.fromhex(args.iv)
-    if args.reference is not None:
-        raw_haeder = from_reference_no_parse(logger, args, key, md5)
-        # Parse the header to get the IV
-        prefix = prefix_p.prefix()
-        prefix.ParseFromString(raw_haeder)
-        if args.type == 15:
-            iv = prefix.c15_iv.IV
-        elif args.type == 14:
-            iv = prefix.c14_cipher.IV
-    else:
-        from_scratch(args, md5, iv)
     # Create a new AES cipher
     cipher = AES.new(key.key, AES.MODE_GCM, iv)
     # Read the first 16 bytes of the decrypted file
@@ -148,11 +163,12 @@ def main():
     # Compress the data
     # TODO make the compression as close as possible to the original
     # Currently it is not 100% the same
-    compressed = zlib.compress(data, 1)
+
     # Encrypt the data
     if args.no_compress:
         encrypted = cipher.encrypt(data)
     else:
+        compressed = zlib.compress(data, 1)
         encrypted = cipher.encrypt(compressed)
     # Update the MD5 with the encrypted data
     md5.update(encrypted)
@@ -166,6 +182,14 @@ def main():
     md5.update(tag)
     # Write the MD5
     args.encrypted.write(md5.digest())
+    if args.type == 12:
+        if not args.jid:
+
+            jid = args.reference.read()[-4:]
+            args.encrypted.write(jid)
+        else:
+            args.encryped.write('--')
+            args.encryped.write(args.jid[2:])
     # Close the files
     logger.i("Done!")
     args.decrypted.close()
