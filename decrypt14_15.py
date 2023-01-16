@@ -781,19 +781,19 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                 except MemoryError:
                     logger.f("Out of RAM, please use a smaller buffer size.")
 
-                if len(next_chunk) <= 32:
+                if len(next_chunk) <= 36:
                     # Last bytes read. Three cases:
                     # 1. The checksum is entirely in the last chunk
-                    if len(next_chunk) == 32:
+                    if len(next_chunk) == 36:
                         checksum = next_chunk
                     # 2. The checksum is entirely in the chunk before the last
                     elif len(next_chunk) == 0:
-                        checksum = chunk[-32:]
-                        chunk = chunk[:-32]
+                        checksum = chunk[-36:]
+                        chunk = chunk[:-36]
                     # 3. The checksum is split between the last two chunks
                     else:
-                        checksum = chunk[-(32 - len(next_chunk)):] + next_chunk
-                        chunk = chunk[:-(32 - len(next_chunk))]
+                        checksum = chunk[-(36 - len(next_chunk)):] + next_chunk
+                        chunk = chunk[:-(36 - len(next_chunk))]
 
                 file_hash.update(chunk)
 
@@ -815,6 +815,28 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                 # The presence of the checksum tells us it's the last chunk
                 if checksum is not None:
                     is_multifile_backup = False
+
+                    crypt12_footer = str(checksum[-4:])
+                    jid = findall(r"(?:-|\d)(?:-|\d)(\d\d)", crypt12_footer)
+                    if len(jid) == 1:
+                        # Confirmed to be crypt12
+                        checksum = checksum[:-4]
+                        logger.v("Your phone number ends with {}".format(jid[0]))
+                    else:
+                        # Shift everything forward by 4 bytes
+                        chunk = checksum[:4]
+                        file_hash.update(chunk)
+                        decrypted_chunk = cipher.decrypt(chunk)
+                        if is_zip:
+                            try:
+                                decrypted.write(z_obj.decompress(decrypted_chunk))
+                            except zlib.error:
+                                logger.e("Backup is corrupted.")
+                                decrypted.write(decrypted_chunk)
+                        else:
+                            decrypted.write(decrypted_chunk)
+                        checksum = checksum[4:]
+
                     file_hash.update(checksum[:16])
                     if file_hash.digest() != checksum[16:]:
                         is_multifile_backup = True
