@@ -1,5 +1,5 @@
 # WhatsApp Crypt14-15 Backup Decrypter
-Decrypts WhatsApp .crypt14 and .crypt15 files, **given the key file** or the 64-characters long key.  
+Decrypts WhatsApp .crypt12, .crypt14 and .crypt15 files, **given the key file** or the 64-characters long key.  
 The key file is named "key" if the backup is crypt14 or  
 "encrypted_backup.key" if the backup is crypt15 (encrypted E2E backups).  
 The output result is either a SQLite database 
