@@ -5,11 +5,11 @@ This script decrypts WhatsApp's DB files encrypted with Crypt14 or Crypt15.
 
 from __future__ import annotations
 
-from src.lib.common_utils import SimpleLog
-from src.lib.key import Key
-from src.lib.common_utils import oscillate, test_decompression
+from lib.common_utils import SimpleLog
+from lib.key import Key
+from lib.common_utils import oscillate, test_decompression
 
-from src.lib.common_utils import import_aes
+from lib.common_utils import import_aes
 AES = import_aes()
 
 # noinspection PyPackageRequirements
@@ -21,7 +21,7 @@ from re import findall
 from sys import exit, maxsize
 from time import sleep
 from datetime import date
-from src.lib.constants import DEFAULT_IV_OFFSET, DEFAULT_DATA_OFFSET, HEADER_SIZE, ZLIB_HEADERS
+from lib.constants import DEFAULT_IV_OFFSET, DEFAULT_DATA_OFFSET, HEADER_SIZE, ZLIB_HEADERS
 import argparse
 import zlib
 

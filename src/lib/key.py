@@ -6,7 +6,7 @@ from hashlib import sha256
 # This is from javaobj-py3
 from javaobj import v2 as javaobj
 
-from src.lib.common_utils import from_hex, javaintlist2bytes
+from .common_utils import from_hex, javaintlist2bytes
 
 
 class Key:
