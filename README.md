@@ -50,12 +50,12 @@ usage: decrypt14_15.py [-h] [-f] [-nm] [-bs BUFFER_SIZE] [-ng] [-np]
                        [-ivo IV_OFFSET] [-do DATA_OFFSET] [-v]
                        [keyfile] [encrypted] [decrypted]
 
-Decrypts WhatsApp backup files encrypted with Crypt14 or Crypt15
+Decrypts WhatsApp backup files encrypted with crypt12, 14 or 15
 
 positional arguments:
   keyfile               The WhatsApp encrypted_backup key file or the hex
                         encoded key. Default: encrypted_backup.key
-  encrypted             The encrypted crypt15 or crypt14 file. Default:
+  encrypted             The encrypted crypt12, 14 or 15 file. Default:
                         msgstore.db.crypt15
   decrypted             The decrypted output file. Default: msgstore.db
 
@@ -103,12 +103,11 @@ python ./decrypt14_15.py ./key ./msgstore.db.crypt14 ./msgstore.db
 [I] Database header parsed
 [I] Done
 ```  
-#### Crypt12 (unofficial)
+#### Crypt12
 ```  
 python ./decrypt14_15.py ./key ./msgstore.db.crypt12 ./msgstore.db -np -ivo 51 -do 67 
 [I] Crypt12/14 key loaded
-[I] WhatsApp version not found
-[I] Offsets guessed (IV: 51, data: 67).
+[I] Database header parsed
 [I] Done
 ```
 
@@ -139,7 +138,7 @@ Issues asking for this will be closed as invalid.**
 Stable: 
 2.22.15.74  
 Beta: 
-2.23.1.26
+2.23.2.6
 
 ### Stargazers over time
 

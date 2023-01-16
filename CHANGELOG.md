@@ -3,6 +3,10 @@
 Note: this script does not follow a versioning policy. Versions number are written just for reference.
 This file may not be 100% correct: The true changelog is the git history.
 
+## Version 7.0
+
+- Support for crypt12 files (only msgstore tested)
+
 ## Version 6.1
 
 - The AES authentication tag is now checked.  

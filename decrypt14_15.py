@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-This script decrypts WhatsApp's DB files encrypted with Crypt14 or Crypt15.
+This script decrypts WhatsApp's DB files encrypted with Crypt12, Crypt14 or Crypt15.
 """
 
 from __future__ import annotations
@@ -128,12 +128,12 @@ def from_hex(logger, string: str) -> bytes:
 def parsecmdline() -> argparse.Namespace:
     """Sets up the argument parser"""
     parser = argparse.ArgumentParser(description='Decrypts WhatsApp backup files'
-                                                 ' encrypted with Crypt14 or Crypt15')
+                                                 ' encrypted with crypt12, 14 or 15')
     parser.add_argument('keyfile', nargs='?', type=str, default="encrypted_backup.key",
                         help='The WhatsApp encrypted_backup key file or the hex encoded key. '
                              'Default: encrypted_backup.key')
     parser.add_argument('encrypted', nargs='?', type=argparse.FileType('rb'), default="msgstore.db.crypt15",
-                        help='The encrypted crypt15 or crypt14 file. Default: msgstore.db.crypt15')
+                        help='The encrypted crypt12, 14 or 15 file. Default: msgstore.db.crypt15')
     parser.add_argument('decrypted', nargs='?', type=argparse.FileType('wb'), default="msgstore.db",
                         help='The decrypted output file. Default: msgstore.db')
     parser.add_argument('-f', '--force', action='store_true',
