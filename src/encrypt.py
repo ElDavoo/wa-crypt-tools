@@ -32,6 +32,11 @@ def parsecmdline() -> argparse.Namespace:
     # Add an argument "type" that can be either 14 or 15
     parser.add_argument('--type', type=int, choices=[14, 15], default=15, help='The type of encryption to use. Default: 15')
     parser.add_argument('--iv', type=str, help='The IV to use for crypt15 encryption. Default: random')
+    parser.add_argument('--reference', type=argparse.FileType('rb'), help='The reference file to use for crypt15 encryption. Highly recommended.')
+    parser.add_argument('--noparse', action='store_true', help='Do not parse the header of the reference file. Default: false')
+    parser.add_argument('--wa-version', type=str, help='The WhatsApp version to use for crypt15 encryption. Default:')
+    parser.add_argument('--jid', type=str, help='The last 4 numbers of your phone number. Default: 0000')
+    parser.add_argument('--no-compress', action='store_true', help='Do not compress the file. This will make the backup not working. Only used in develpiomente. Default: false')
     return parser.parse_args()
 
 def populate_info(info, is_crypt15 = True):
@@ -71,9 +76,40 @@ def build_header(type, iv) -> bytes:
         # TODO
         raise NotImplementedError("Crypt14 is not implemented yet")
 
-
-
     return prefix.SerializeToString()
+
+
+def from_reference_no_parse(logger, args, key, md5):
+    # Read the first byte of the reference file
+    protobuf_size = args.reference.read(1)
+    md5.update(protobuf_size)
+    args.encrypted.write(protobuf_size)
+    protobuf_size = int.from_bytes(protobuf_size, byteorder='big')
+
+
+
+    # It is my guess this is the backup type.
+    # Looks like it is 1 for msgstore and 8 for other types.
+    backup_type_raw = args.reference.read(1)
+    backup_type = int.from_bytes(backup_type_raw, byteorder='big')
+    if backup_type != 1:
+        if backup_type == 8:
+            logger.v("Not a (recent) msgstore database")
+            # For some reason we need to go backward one byte
+            args.reference.read.seek(-1, 1)
+        else:
+            logger.e("Unexpected backup type: {}".format(backup_type))
+    else:
+        if args.multi_file:
+            logger.e("Reference file is a msgstore, but --multi-file is set")
+        args.encrypted.write(backup_type_raw)
+        md5.update(backup_type_raw)
+    protobuf_raw = args.reference.read(protobuf_size)
+    md5.update(protobuf_raw)
+    args.encrypted.write(protobuf_raw)
+    # We need the header to get the IV
+    return protobuf_raw
+
 
 def main():
     """Main function"""
@@ -84,30 +120,24 @@ def main():
     logger.i("This is still a work in progress, that will be completed in the future.")
     # Read the key file
     key = Key(logger, args.keyfile)
+    # Start computing the MD5
+    md5 = hashlib.md5()
     # Generate a random IV
     iv = os.urandom(16)
     # If specified, use the IV from the command line
     if args.iv:
+        if args.reference is not None:
+            #TODO for now we do not support this
+            logger.e("Cannot specify both --iv and --reference")
         iv = bytes.fromhex(args.iv)
-    # Create a new header
-    header = build_header(args.type, iv)
-    # Get the length of the header
-    header_length = len(header).to_bytes(1)
-    # Start computing the MD5
-    md5 = hashlib.md5()
-    # Update the MD5 with the header length
-    md5.update(header_length)
-    # Write the header length
-    args.encrypted.write(header_length)
-    if args.msgstore:
-        # Mistery byte
-        args.encrypted.write(b'\x01')
-        # Update the MD5 with the mistery byte
-        md5.update(b'\x01')
-    # Write the header
-    args.encrypted.write(header)
-    # Update the MD5 with the header
-    md5.update(header)
+    if args.reference is not None:
+        raw_haeder = from_reference_no_parse(logger, args, key, md5)
+        # Parse the header to get the IV
+        prefix = prefix_p.prefix()
+        prefix.ParseFromString(raw_haeder)
+        iv = prefix.c15_iv.IV
+    else:
+        from_scratch(args, md5, iv)
     # Create a new AES cipher
     cipher = AES.new(key.key, AES.MODE_GCM, iv)
     # Read the first 16 bytes of the decrypted file
@@ -117,7 +147,10 @@ def main():
     # Currently it is not 100% the same
     compressed = zlib.compress(data, 1)
     # Encrypt the data
-    encrypted = cipher.encrypt(data)
+    if args.no_compress:
+        encrypted = cipher.encrypt(data)
+    else:
+        encrypted = cipher.encrypt(compressed)
     # Update the MD5 with the encrypted data
     md5.update(encrypted)
     # Write the encrypted data
@@ -134,6 +167,27 @@ def main():
     logger.i("Done!")
     args.decrypted.close()
     args.encrypted.close()
+
+
+def from_scratch(args, md5, iv):
+    # Create a new header
+    header = build_header(args.type, iv)
+    # Get the length of the header
+    header_length = len(header).to_bytes(1)
+    # Update the MD5 with the header length
+    md5.update(header_length)
+    # Write the header length
+    args.encrypted.write(header_length)
+    if args.msgstore:
+        # Mistery byte
+        args.encrypted.write(b'\x01')
+        # Update the MD5 with the mistery byte
+        md5.update(b'\x01')
+    # Write the header
+    args.encrypted.write(header)
+    # Update the MD5 with the header
+    md5.update(header)
+
 
 if __name__ == '__main__':
     main()
