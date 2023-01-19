@@ -160,7 +160,7 @@ becomes
 ## Donations
 
 Thank you so much to each one of you!
-- **🎉🎉🎉 [curious875](https://github.com/curious875) 🎉🎉🎉** 
+- **🎉🎉🎉 [courious875](https://github.com/courious875) 🎉🎉🎉** 
 
 ---
 
