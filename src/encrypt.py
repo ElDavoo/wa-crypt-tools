@@ -125,20 +125,15 @@ def main():
     # Generate a random IV
     iv = os.urandom(16)
     # If specified, use the IV from the command line
-
+    if args.iv:
+        if args.reference is not None:
+            #TODO for now we do not support this
+            logger.e("Cannot specify both --iv and --reference")
+        iv = bytes.fromhex(args.iv)
     if args.reference is not None:
         if args.type == 12:
             iv = args.reference.read(67)[51:67]
-            md5.update(key.cipher_version)
-            args.encrypted.write(key.cipher_version)
-            md5.update(key.key_version)
-            args.encrypted.write(key.key_version)
-            md5.update(key.serversalt)
-            args.encrypted.write(key.serversalt)
-            md5.update(key.googleid)
-            args.encrypted.write(key.googleid)
-            md5.update(iv)
-            args.encrypted.write(iv)
+            write_crypt12_header(args, iv, key, md5)
 
         else:
             raw_haeder = from_reference_no_parse(logger, args, key, md5)
@@ -150,12 +145,11 @@ def main():
             elif args.type == 14:
                 iv = prefix.c14_cipher.IV
     else:
-        from_scratch(args, md5, iv)
-    if args.iv:
-        if args.reference is not None:
-            #TODO for now we do not support this
-            logger.e("Cannot specify both --iv and --reference")
-        iv = bytes.fromhex(args.iv)
+        if args.type == 12:
+            write_crypt12_header(args, iv, key, md5)
+        else:
+            from_scratch(args, md5, iv)
+
     # Create a new AES cipher
     cipher = AES.new(key.key, AES.MODE_GCM, iv)
     # Read the first 16 bytes of the decrypted file
@@ -184,16 +178,30 @@ def main():
     args.encrypted.write(md5.digest())
     if args.type == 12:
         if not args.jid:
-
+            if args.reference is None:
+                logger.e("You must specify a jid with --jid")
             jid = args.reference.read()[-4:]
             args.encrypted.write(jid)
         else:
-            args.encryped.write('--')
-            args.encryped.write(args.jid[2:])
+            args.encrypted.write('--'.encode())
+            args.encrypted.write(args.jid[2:].encode())
     # Close the files
     logger.i("Done!")
     args.decrypted.close()
     args.encrypted.close()
+
+
+def write_crypt12_header(args, iv, key, md5):
+    md5.update(key.cipher_version)
+    args.encrypted.write(key.cipher_version)
+    md5.update(key.key_version)
+    args.encrypted.write(key.key_version)
+    md5.update(key.serversalt)
+    args.encrypted.write(key.serversalt)
+    md5.update(key.googleid)
+    args.encrypted.write(key.googleid)
+    md5.update(iv)
+    args.encrypted.write(iv)
 
 
 def from_scratch(args, md5, iv):
