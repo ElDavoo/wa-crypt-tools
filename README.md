@@ -140,10 +140,6 @@ Stable:
 Beta: 
 2.23.2.6
 
-### Stargazers over time
-
-[![Star History Chart](https://api.star-history.com/svg?repos=ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter&type=Date)](https://star-history.com/#ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter&Date)
-
 #### Protobuf classes generation
 
 You can replace the provided generated protobuf classes with your own.  
@@ -159,9 +155,22 @@ For example:
 becomes  
 `import proto.C14_cipher_version_pb2 as C14__cipher__version__pb2`
 
+---
 
-###### Credits:
+## Donations
+
+Thank you so much to each one of you!
+- **🎉🎉🎉 [curious875](https://github.com/curious875) 🎉🎉🎉** 
+
+---
+
+#### Credits:
  Original implementation for crypt12: [TripCode](https://github.com/TripCode)    
  Some help at the beginning: [DjEdu28](https://github.com/DjEdu28)  
  Actual crypt14/15 implementation with protobuf: [ElDavoo](https://github.com/ElDavoo)  
  Help with crypt14/15 footer: [george-lam](https://github.com/georg-lam)
+
+
+### Stargazers over time
+
+[![Star History Chart](https://api.star-history.com/svg?repos=ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter&type=Date)](https://star-history.com/#ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter&Date)
