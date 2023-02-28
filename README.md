@@ -9,6 +9,23 @@ Those who are looking for a complete suite for
 WhatsApp forensics, check out [whapa.](https://github.com/B16f00t/whapa)
 
 # Quickstart
+
+## Cloud - Google Colab
+
+If you do not want to install programs in your computer, you can run this program
+[in Google Colab](https://colab.research.google.com/drive/1PxMrEiM0RVjF7roSlSs1bsvqAt9ITpQo?usp=sharing)
+. (This version is not controlled by me.) 
+
+## Local - Jupyter
+
+If you are familiar with Jupyter (read 
+[here](https://www.earthdatascience.org/courses/intro-to-earth-data-science/open-reproducible-science/jupyter-python/get-started-with-jupyter-notebook-for-python)
+if you're not), you can use the
+[notebook version](notebook.ipynb)
+of the program.
+
+
+## Local - Traditional
 Just copy-paste this block into your terminal  
 (should be multi-platform - ignore errors during "activate" lines, as one is for Linux/macOS, one is for Windows (Batch) and one is for Windows PowerShell)
 ```
@@ -80,8 +97,6 @@ options:
                         Default: 122
   -v, --verbose         Prints all offsets and messages
  ```  
-
-If you don't have a computer with python installed or if you have problems with dependencies on your operating system you can run it in [this notebook in Google Colab](https://colab.research.google.com/drive/1PxMrEiM0RVjF7roSlSs1bsvqAt9ITpQo?usp=sharing) or in the .ipynb file in this repo 
 
 ### Examples, with output
 #### Crypt15
