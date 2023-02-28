@@ -81,6 +81,8 @@ options:
   -v, --verbose         Prints all offsets and messages
  ```  
 
+If you don't have a computer with python installed or if you have problems with dependencies on your operating system you can run it in [this notebook in Google Colab](https://colab.research.google.com/drive/1PxMrEiM0RVjF7roSlSs1bsvqAt9ITpQo?usp=sharing) or in the .ipynb file in this repo 
+
 ### Examples, with output
 #### Crypt15
 ```  
