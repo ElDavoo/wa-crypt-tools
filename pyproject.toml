@@ -15,4 +15,4 @@ dependencies = [
 ]
 
 [project.scripts]
-decrypt14-15 = "whatsapp_decrypter.decrypt14_15:main"
+decrypt14_15 = "whatsapp_decrypter.decrypt14_15:main"
