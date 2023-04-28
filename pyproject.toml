@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "whatsapp-decrypter"
+version = "7.0"
+description = "Decrypts WhatsApp .crypt12, .crypt14 and .crypt15 files, **given the key file** or the 64-characters long key."
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+    "javaobj-py3",
+    "pycryptodomex",
+    "protobuf"
+]
+
+[project.scripts]
+decrypt14-15 = "whatsapp_decrypter.decrypt14_15:main"
