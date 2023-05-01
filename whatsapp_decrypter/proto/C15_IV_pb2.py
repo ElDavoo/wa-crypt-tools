@@ -15,11 +15,12 @@ _sym_db = _symbol_database.Default()
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x43\x31\x35_IV.proto\"\x14\n\x06\x43\x31\x35_IV\x12\n\n\x02IV\x18\x01 \x01(\x0c\x62\x06proto3')
 
-_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
-_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'C15_IV_pb2', globals())
+_globals = globals()
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'C15_IV_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  _C15_IV._serialized_start=16
-  _C15_IV._serialized_end=36
+  _globals['_C15_IV']._serialized_start=16
+  _globals['_C15_IV']._serialized_end=36
 # @@protoc_insertion_point(module_scope)
