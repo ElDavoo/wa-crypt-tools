@@ -13,8 +13,8 @@ WhatsApp forensics, check out [whapa.](https://github.com/B16f00t/whapa)
 ## Cloud - Google Colab
 
 If you do not want to install programs in your computer, you can run this program
-[in Google Colab](https://colab.research.google.com/drive/1PxMrEiM0RVjF7roSlSs1bsvqAt9ITpQo?usp=sharing)
-. (This version is not controlled by me.) 
+[in Google Colab](https://colab.research.google.com/drive/17z5UWE9dBbyvVfOG-KzRWCmTqFA3j82u?usp=sharing)
+.  
 
 ## Local - Jupyter
 
@@ -24,7 +24,7 @@ if you're not), you can use the
 [notebook version](notebook.ipynb)
 of the program.
 
-## Local
+## Local - pip
 
 You can install this script as a package through pip. Just use:
 ```
