@@ -163,7 +163,7 @@ Issues asking for this will be closed as invalid.**
 Stable: 
 2.22.15.74  
 Beta: 
-2.23.2.6
+2.23.8.25
 
 #### Protobuf classes generation
 

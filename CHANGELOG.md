@@ -1,6 +1,15 @@
 # Changelog
 
-Note: this script does not follow a versioning policy. Versions number are written just for reference.
+## Version 0.0.8
+
+As I uploaded the package to PyPI, the versioning scheme changed. It was too ugly to start from version 7.0.  
+
+- Uploaded package to PyPI
+
+## Old changelogs
+---
+
+Note: this script did not use to follow a versioning policy. Versions number were written just for reference.
 This file may not be 100% correct: The true changelog is the git history.
 
 ## Version 7.0
