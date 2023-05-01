@@ -57,7 +57,6 @@ __author__ = 'ElDavo'
 __copyright__ = 'Copyright (C) 2023'
 __license__ = 'GPLv3'
 __status__ = 'Production'
-__version__ = '6.1'
 
 # These constants are only used by the guessing logic.
 
@@ -533,8 +532,8 @@ def parse_protobuf(logger, file_hash: _Hash, key: Key, encrypted):
     It does so by parsing the protobuf message."""
 
     try:
-        from whatsapp_decrypter.proto import prefix_pb2 as prefix
-        from whatsapp_decrypter.proto import key_type_pb2 as key_type
+        from wa_crypt_tools.proto import prefix_pb2 as prefix
+        from wa_crypt_tools.proto import key_type_pb2 as key_type
     except ImportError as e:
         logger.e("Could not import the proto classes: {}".format(e))
         if str(e).startswith("cannot import name 'builder' from 'google.protobuf.internal'"):
