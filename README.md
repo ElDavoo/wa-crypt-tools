@@ -1,4 +1,4 @@
-# WhatsApp Crypt14-15 Backup Decrypter
+# WhatsApp Crypt Tools
 Decrypts WhatsApp .crypt12, .crypt14 and .crypt15 files, **given the key file** or the 64-characters long key.  
 The key file is named "key" if the backup is crypt14 or  
 "encrypted_backup.key" if the backup is crypt15 (encrypted E2E backups).  
@@ -24,47 +24,12 @@ if you're not), you can use the
 [notebook version](notebook.ipynb)
 of the program.
 
-## Local - Install as package
+## Local
 
 You can install this script as a package through pip. Just use:
 ```
-pip install git+https://github.com/ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter.git
+python -m pip install wa-crypt-tools
 ```
-
-## Local - Traditional
-Just copy-paste this block into your terminal  
-(should be multi-platform - ignore errors during "activate" lines, as one is for Linux/macOS, one is for Windows (Batch) and one is for Windows PowerShell)
-```
-git clone https://github.com/ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter.git
-cd WhatsApp-Crypt14-Crypt15-Decrypter
-python -m venv venv
-source venv/bin/activate
-.\venv\Scripts\activate.bat
-.\venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-## Requirements
-
-**Remember to download the proto folder!**
-
-Python 3.7 or more recent   
-
-pycriptodomex or pycryptodome  
-javaobj-py3  
-protobuf 3.20 or more recent  
-
-... or just install the `requirements.txt` file
-
-Use:
- ```
-              python -m pip install -r requirements.txt
- ```
-  Or:
- ```
-              python -m pip install pycryptodomex javaobj-py3 protobuf
- ```
 
 ## Usage
 
@@ -104,33 +69,31 @@ options:
   -v, --verbose         Prints all offsets and messages
  ```
 
- If installed as package, you may use ```decrypt14_15``` without the .py extension.
-
 ### Examples, with output
 #### Crypt15
 ```  
-python ./decrypt14_15.py ./encrypted_backup.key ./msgstore.db.crypt15 ./msgstore.db
+decrypt14_15 ./encrypted_backup.key ./msgstore.db.crypt15 ./msgstore.db
 [I] Crypt15 key loaded
 [I] Database header parsed
 [I] Done
 ```  
 or
 ```  
-python ./decrypt14_15.py b1ef5568c31686d3339bcae4600c56cf7f0cb1ae982157060879828325257c11 ./msgstore.db.crypt15 ./msgstore.db
+decrypt14_15 b1ef5568c31686d3339bcae4600c56cf7f0cb1ae982157060879828325257c11 ./msgstore.db.crypt15 ./msgstore.db
 [I] Crypt15 key loaded
 [I] Database header parsed
 [I] Done
 ``` 
 #### Crypt14
 ```  
-python ./decrypt14_15.py ./key ./msgstore.db.crypt14 ./msgstore.db
+decrypt14_15 ./key ./msgstore.db.crypt14 ./msgstore.db
 [I] Crypt12/14 key loaded
 [I] Database header parsed
 [I] Done
 ```  
 #### Crypt12
 ```  
-python ./decrypt14_15.py ./key ./msgstore.db.crypt12 ./msgstore.db
+decrypt14_15 ./key ./msgstore.db.crypt12 ./msgstore.db
 [I] Crypt12/14 key loaded
 [I] Database header parsed
 [I] Done
