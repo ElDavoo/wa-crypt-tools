@@ -13,9 +13,10 @@ authors:
     email: github@davidepalma.it
 repository-code: >-
   https://github.com/ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter
-abstract: Decrypts WhatsApp .crypt14 and .crypt15 files
+abstract: Decrypts WhatsApp .crypt12, .crypt14 and .crypt15 files
 keywords:
   - WhatsApp
+  - crypt12
   - crypt14
   - crypt15
 license: GPL-3.0-only

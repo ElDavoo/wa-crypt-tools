@@ -2,7 +2,7 @@
 
 ## Test
 
-Test the program with your own databases, both crypt14 and crypt15. Report any errors.
+Test the program with your own databases, both crypt 12, crypt14 and crypt15. Report any errors.
 
 ## Work on issues
 
