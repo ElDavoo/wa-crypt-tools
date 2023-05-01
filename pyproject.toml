@@ -29,6 +29,3 @@ classifiers = [
 
 [project.scripts]
 decrypt14_15 = "wa_crypt_tools.decrypt14_15:main"
-
-[tool.setuptools]
-py-modules = ["wa_crypt_tools"]
