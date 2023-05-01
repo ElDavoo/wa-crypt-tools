@@ -24,6 +24,12 @@ if you're not), you can use the
 [notebook version](notebook.ipynb)
 of the program.
 
+## Local - Install as package
+
+You can install this script as a package through pip. Just use:
+```
+pip install git+https://github.com/ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter.git
+```
 
 ## Local - Traditional
 Just copy-paste this block into your terminal  
@@ -96,7 +102,9 @@ options:
                         encrypted file. Only relevant in offset guessing mode.
                         Default: 122
   -v, --verbose         Prints all offsets and messages
- ```  
+ ```
+
+ If installed as package, you may use ```decrypt14_15``` without the .py extension.
 
 ### Examples, with output
 #### Crypt15
@@ -186,6 +194,7 @@ Thank you so much to each one of you!
  Some help at the beginning: [DjEdu28](https://github.com/DjEdu28)  
  Actual crypt14/15 implementation with protobuf: [ElDavoo](https://github.com/ElDavoo)  
  Help with crypt14/15 footer: [george-lam](https://github.com/georg-lam)
+ Pip package implementation: [Mikel12455](https://github.com/Mikel12455)
 
 
 ### Stargazers over time

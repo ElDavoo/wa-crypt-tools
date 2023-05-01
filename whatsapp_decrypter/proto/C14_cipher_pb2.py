@@ -11,7 +11,7 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
-import proto.C14_cipher_version_pb2 as C14__cipher__version__pb2
+import whatsapp_decrypter.proto.C14_cipher_version_pb2 as C14__cipher__version__pb2
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10\x43\x31\x34_cipher.proto\x1a\x18\x43\x31\x34_cipher_version.proto\"U\n\nC14_cipher\x12\x13\n\x0bkey_version\x18\x02 \x01(\x0c\x12\x13\n\x0bserver_salt\x18\x03 \x01(\x0c\x12\x11\n\tgoogle_id\x18\x04 \x01(\x0c\x12\n\n\x02IV\x18\x05 \x01(\x0c\x62\x06proto3')

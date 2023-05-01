@@ -533,8 +533,8 @@ def parse_protobuf(logger, file_hash: _Hash, key: Key, encrypted):
     It does so by parsing the protobuf message."""
 
     try:
-        import proto.prefix_pb2 as prefix
-        import proto.key_type_pb2 as key_type
+        from whatsapp_decrypter.proto import prefix_pb2 as prefix
+        from whatsapp_decrypter.proto import key_type_pb2 as key_type
     except ImportError as e:
         logger.e("Could not import the proto classes: {}".format(e))
         if str(e).startswith("cannot import name 'builder' from 'google.protobuf.internal'"):
