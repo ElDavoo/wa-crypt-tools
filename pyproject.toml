@@ -38,6 +38,6 @@ classifiers = [
 decrypt14_15 = "wa_crypt_tools.decrypt14_15:main"
 
 [project.optional-dependencies]
-dev = [
+proto = [
     "protoletariat"
 ]
