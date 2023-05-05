@@ -156,9 +156,11 @@ This will also install the optional dependencies of the package.
 Next, download the protobuf compiler from its repository [here](https://github.com/protocolbuffers/protobuf/releases). You can move the protoc program to the `wa-crypt-tools/proto` folder where the .proto files are.
  
 Replace the protobuf classes as needed and run `protoc` to generate the python classes. From the `wa-crypt-tools/proto` directory of the project, run:
+
 `./protoc --python_out=../src/wa_crypt_tools/proto --proto_path=. *.proto`
 
 After generating the protobuf python classes through `protoc`, from that same directory run:
+
 `protol --in-place --python-out ..\src\wa_crypt_tools\proto protoc --proto-path=. *.proto`
 
 Now all of the generated python classes should have their imports fixed.
