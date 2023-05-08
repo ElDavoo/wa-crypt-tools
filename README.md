@@ -128,21 +128,6 @@ Stable:
 Beta: 
 2.23.8.25
 
-#### Protobuf classes generation
-
-You can replace the provided generated protobuf classes with your own.  
-In order to do that, download the protoc 21.0 from
-[here](https://github.com/protocolbuffers/protobuf/releases).
-After that put protoc in the proto folder and run:  
-`./protoc *.proto --python_out=.`   
-**We then need to manually patch the generated classes to fix import errors.**  
-Open `prefix_pb2.py` and `C14_cipher_pb2.py`  
-Add `proto.` after any `import` keyword.  
-For example:  
-`import C14_cipher_version_pb2 as C14__cipher__version__pb2`  
-becomes  
-`import proto.C14_cipher_version_pb2 as C14__cipher__version__pb2`
-
 #### Protobuf automatic fix
 
 You can install the proto optional dependencies to use `protoletariat` and fix the proto imports automatically.
