@@ -128,20 +128,27 @@ Stable:
 Beta: 
 2.23.8.25
 
-#### Protobuf classes generation
+#### Protobuf automatic fix
 
-You can replace the provided generated protobuf classes with your own.  
-In order to do that, download the protoc 21.0 from
-[here](https://github.com/protocolbuffers/protobuf/releases).
-After that put protoc in the proto folder and run:  
-`./protoc *.proto --python_out=.`   
-**We then need to manually patch the generated classes to fix import errors.**  
-Open `prefix_pb2.py` and `C14_cipher_pb2.py`  
-Add `proto.` after any `import` keyword.  
-For example:  
-`import C14_cipher_version_pb2 as C14__cipher__version__pb2`  
-becomes  
-`import proto.C14_cipher_version_pb2 as C14__cipher__version__pb2`
+You can install the proto optional dependencies to use `protoletariat` and fix the proto imports automatically.
+
+First, after cloning the repository, do an editable installation of the package (possibily in a virtual environment) with:
+
+`pip install -e .[proto]`
+
+This will also install the optional dependencies of the package.
+
+Next, download the protobuf compiler from its repository [here](https://github.com/protocolbuffers/protobuf/releases). You can move the protoc program to the `wa-crypt-tools/proto` folder where the .proto files are.
+ 
+Replace the protobuf classes as needed and run `protoc` to generate the python classes. From the `wa-crypt-tools/proto` directory of the project, run:
+
+`./protoc --python_out=../src/wa_crypt_tools/proto --proto_path=. *.proto`
+
+After generating the protobuf python classes through `protoc`, from that same directory run:
+
+`protol --in-place --python-out ..\src\wa_crypt_tools\proto protoc --proto-path=. *.proto`
+
+Now all of the generated python classes should have their imports fixed.
 
 ---
 
