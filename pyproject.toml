@@ -11,11 +11,11 @@ authors = [
 ]
 description = "Decrypts WhatsApp .crypt12, .crypt14 and .crypt15 files, given the key."
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 dependencies = [
     "javaobj-py3 ~= 0.4.3",
-    "pycryptodomex ~= 3.17",
-    "protobuf >= 4.22.3,< 4.25.0"
+    "pycryptodomex ~= 3.18",
+    "protobuf >= 4.24.1,< 4.25.0"
 ]
 classifiers = [
     "Environment :: Console",
@@ -35,7 +35,7 @@ classifiers = [
 ]
 
 [project.scripts]
-decrypt14_15 = "wa_crypt_tools.decrypt14_15:main"
+wadecrypt = "wa_crypt_tools.wadecrypt:main"
 
 [project.optional-dependencies]
 proto = [
