@@ -124,9 +124,9 @@ Issues asking for this will be closed as invalid.**
 
 ### Last tested version (don't expect this to be updated)
 Stable: 
-2.22.15.74  
+2.23.16.76  
 Beta: 
-2.23.8.25
+2.23.14.19
 
 #### Protobuf automatic fix
 
