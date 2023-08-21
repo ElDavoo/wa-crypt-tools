@@ -5,8 +5,8 @@ This script decrypts WhatsApp's DB files encrypted with Crypt12, Crypt14 or Cryp
 
 from __future__ import annotations
 
+from wa_crypt_tools import l
 from wa_crypt_tools.lib.key import Key14, Key15, Key
-from wa_crypt_tools.lib.log import SimpleLog
 
 # AES import party!
 # pycryptodome and PyCryptodomex's implementations of AES are the same,
@@ -39,13 +39,12 @@ except ModuleNotFoundError:
 
 # noinspection PyPackageRequirements
 # This is from javaobj-py3
-import javaobj.v2 as javaobj
 
 # noinspection PyPackageRequirements
 from google.protobuf.message import DecodeError
 
 import collections
-from hashlib import sha256, md5
+from hashlib import md5
 import io
 from re import findall
 from sys import exit, maxsize
@@ -53,7 +52,6 @@ from time import sleep
 from datetime import date
 
 import argparse
-import hmac
 import zlib
 
 __author__ = 'ElDavo'
@@ -77,7 +75,9 @@ HEADER_SIZE = 384
 DEFAULT_DATA_OFFSET = 122
 DEFAULT_IV_OFFSET = 8
 
+import logging
 
+l = logging.getLogger(__name__)
 
 
 def parsecmdline() -> argparse.Namespace:
@@ -97,7 +97,8 @@ def parsecmdline() -> argparse.Namespace:
                         help='Does not load files in RAM, stresses the disk more. '
                              'Default: load files into RAM')
     parser.add_argument('-bs', '--buffer-size', type=int, help='How many bytes of data to process at a time. '
-                                                               'Implies -nm. Default: {}'.format(io.DEFAULT_BUFFER_SIZE))
+                                                               'Implies -nm. Default: {}'.format(
+        io.DEFAULT_BUFFER_SIZE))
     parser.add_argument('-ng', '--no-guess', action='store_true',
                         help='Does not try to guess the offsets, only protobuf parsing.')
     parser.add_argument('-np', '--no-protobuf', action='store_true',
@@ -113,7 +114,6 @@ def parsecmdline() -> argparse.Namespace:
     parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
 
     return parser.parse_args()
-
 
 
 def oscillate(n: int, n_min: int, n_max: int) -> collections.Iterable:
@@ -162,7 +162,7 @@ def oscillate(n: int, n_min: int, n_max: int) -> collections.Iterable:
             yield j
 
 
-def test_decompression(logger, test_data: bytes) -> bool:
+def test_decompression(test_data: bytes) -> bool:
     """Returns true if the SQLite header is valid.
     It is assumed that the data are valid.
     (If it is valid, it also means the decryption and decompression were successful.)"""
@@ -175,18 +175,18 @@ def test_decompression(logger, test_data: bytes) -> bool:
         zlib_obj = zlib.decompressobj().decompress(test_data)
         # These two errors should never happen
         if len(zlib_obj) < 16:
-            logger.e("Test decompression: chunk too small")
+            l.e("Test decompression: chunk too small")
             return False
         if zlib_obj[:15].decode('ascii') != 'SQLite format 3':
-            logger.e("Test decompression: Decryption and decompression ok but not a valid SQLite database")
-            return logger.force
+            l.e("Test decompression: Decryption and decompression ok but not a valid SQLite database")
+            return l.force
         else:
             return True
     except zlib.error:
         return False
 
 
-def find_data_offset(logger, header: bytes, iv_offset: int, key: bytes, starting_data_offset: int) -> int:
+def find_data_offset(header: bytes, iv_offset: int, key: bytes, starting_data_offset: int) -> int:
     """Tries to find the offset in which the encrypted data starts.
     Returns the offset or -1 if the offset is not found.
     Only works with ZLIB stream, not with ZIP file."""
@@ -209,12 +209,12 @@ def find_data_offset(logger, header: bytes, iv_offset: int, key: bytes, starting
                 # We need to reinitialize the cipher everytime as it has an internal status.
                 cipher = AES.new(key, AES.MODE_GCM, iv)
                 decrypted = cipher.decrypt(header[i:])
-                if test_decompression(logger, decrypted):
+                if test_decompression(decrypted):
                     return i
     return -1
 
 
-def guess_offsets(logger, key: bytes, file_hash: _Hash, encrypted: io.BufferedReader, def_iv_offset: int,
+def guess_offsets(key: bytes, file_hash: _Hash, encrypted: io.BufferedReader, def_iv_offset: int,
                   def_data_offset: int):
     """Gets the IV, shifts the stream to the beginning of the encrypted data and returns the cipher.
     It does so by guessing the offset."""
@@ -227,30 +227,30 @@ def guess_offsets(logger, key: bytes, file_hash: _Hash, encrypted: io.BufferedRe
 
     db_header = encrypted.read(HEADER_SIZE)
     if len(db_header) < HEADER_SIZE:
-        logger.f("The encrypted database is too small.\n    "
-                 "Did you swap the keyfile and the encrypted database file by mistake?")
+        l.f("The encrypted database is too small.\n    "
+            "Did you swap the keyfile and the encrypted database file by mistake?")
 
     try:
         if db_header[:15].decode('ascii') == 'SQLite format 3':
-            logger.e("The database file is not encrypted.\n    "
-                     "Did you swap the input and the output files by mistake?")
+            l.e("The database file is not encrypted.\n    "
+                "Did you swap the input and the output files by mistake?")
     except ValueError:
         pass
 
     # Finding WhatsApp's version is nice
     version = findall(b"\\d(?:\\.\\d{1,3}){3}", db_header)
     if len(version) != 1:
-        logger.i('WhatsApp version not found (Crypt12?)')
+        l.info('WhatsApp version not found (Crypt12?)')
     else:
-        logger.v("WhatsApp version: {}".format(version[0].decode('ascii')))
+        l.debug("WhatsApp version: {}".format(version[0].decode('ascii')))
 
     # Determine IV offset and data offset.
     for iv_offset in oscillate(n=def_iv_offset, n_min=0, n_max=HEADER_SIZE - 128):
-        data_offset = find_data_offset(logger, db_header, iv_offset, key, def_data_offset)
+        data_offset = find_data_offset(db_header, iv_offset, key, def_data_offset)
         if data_offset != -1:
-            logger.i("Offsets guessed (IV: {}, data: {}).".format(iv_offset, data_offset))
+            l.info("Offsets guessed (IV: {}, data: {}).".format(iv_offset, data_offset))
             if iv_offset != def_iv_offset or data_offset != def_data_offset:
-                logger.i("Next time, use -ivo {} -do {} for guess-free decryption".format(iv_offset, data_offset))
+                l.info("Next time, use -ivo {} -do {} for guess-free decryption".format(iv_offset, data_offset))
             break
     if data_offset == -1:
         return None
@@ -264,9 +264,7 @@ def guess_offsets(logger, key: bytes, file_hash: _Hash, encrypted: io.BufferedRe
     return AES.new(key, AES.MODE_GCM, iv)
 
 
-
-
-def check_crypt12(logger, file_hash, key, encrypted):
+def check_crypt12(file_hash, key, encrypted):
     """Checks if the file is a Crypt12 file.
     Returns the cipher if it is, None otherwise."""
 
@@ -282,9 +280,10 @@ def check_crypt12(logger, file_hash, key, encrypted):
     IV (16 bytes)
     ( so we finally understood why the IV is at offset 51 ... )
     """
+
     def quit_12():
         encrypted.seek(0)
-        logger.v("Not a Crypt12 file, or corrupted")
+        l.debug("Not a Crypt12 file, or corrupted")
         raise ValueError
 
     if type(key) is not Key14:
@@ -317,14 +316,11 @@ def check_crypt12(logger, file_hash, key, encrypted):
     file_hash.update(iv)
 
     # We are done here
-    logger.i("Database header parsed")
+    l.info("Database header parsed")
     return AES.new(key.__key, AES.MODE_GCM, iv)
 
 
-
-
-
-def parse_protobuf(logger, file_hash: _Hash, key: Key, encrypted):
+def parse_protobuf(file_hash: _Hash, key: Key, encrypted):
     """Parses the database header, gets the IV,
      shifts the stream to the beginning of the encrypted data and returns the cipher.
     It does so by parsing the protobuf message."""
@@ -333,23 +329,23 @@ def parse_protobuf(logger, file_hash: _Hash, key: Key, encrypted):
         from wa_crypt_tools.proto import prefix_pb2 as prefix
         from wa_crypt_tools.proto import key_type_pb2 as key_type
     except ImportError as e:
-        logger.e("Could not import the proto classes: {}".format(e))
+        l.e("Could not import the proto classes: {}".format(e))
         if str(e).startswith("cannot import name 'builder' from 'google.protobuf.internal'"):
-            logger.e("You need to upgrade the protobuf library to at least 3.20.0.\n"
-                     "    python -m pip install --upgrade protobuf")
+            l.e("You need to upgrade the protobuf library to at least 3.20.0.\n"
+                "    python -m pip install --upgrade protobuf")
         elif str(e).startswith("no module named"):
-            logger.e("Please download them and put them in the \"proto\" sub folder.")
+            l.e("Please download them and put them in the \"proto\" sub folder.")
         return None
     except AttributeError as e:
-        logger.e("Could not import the proto classes: {}\n    ".format(e) +
-                 "Your protobuf library is probably too old.\n    "
-                 "Please upgrade to at least version 3.20.0 , by running:\n    "
-                 "python -m pip install --upgrade protobuf")
+        l.e("Could not import the proto classes: {}\n    ".format(e) +
+            "Your protobuf library is probably too old.\n    "
+            "Please upgrade to at least version 3.20.0 , by running:\n    "
+            "python -m pip install --upgrade protobuf")
         return None
 
     p = prefix.prefix()
 
-    logger.v("Parsing database header...")
+    l.debug("Parsing database header...")
 
     try:
 
@@ -364,11 +360,11 @@ def parse_protobuf(logger, file_hash: _Hash, key: Key, encrypted):
         backup_type = int.from_bytes(backup_type_raw, byteorder='big')
         if backup_type != 1:
             if backup_type == 8:
-                logger.v("Not a (recent) msgstore database")
+                l.debug("Not a (recent) msgstore database")
                 # For some reason we need to go backward one byte
                 encrypted.seek(-1, 1)
             else:
-                logger.e("Unexpected backup type: {}".format(backup_type))
+                l.e("Unexpected backup type: {}".format(backup_type))
         else:
             file_hash.update(backup_type_raw)
 
@@ -378,86 +374,86 @@ def parse_protobuf(logger, file_hash: _Hash, key: Key, encrypted):
             file_hash.update(protobuf_raw)
 
             if p.ParseFromString(protobuf_raw) != protobuf_size:
-                logger.e("Protobuf message not fully read. Please report a bug.")
+                l.e("Protobuf message not fully read. Please report a bug.")
             else:
 
                 # Checking and printing WA version and phone number
                 version = findall(r"\d(?:\.\d{1,3}){3}", p.info.whatsapp_version)
                 if len(version) != 1:
-                    logger.e('WhatsApp version not found')
+                    l.e('WhatsApp version not found')
                 else:
-                    logger.v("WhatsApp version: {}".format(version[0]))
+                    l.debug("WhatsApp version: {}".format(version[0]))
                 if len(p.info.substringedUserJid) != 2:
-                    logger.e("The phone number end is not 2 characters long")
-                logger.v("Your phone number ends with {}".format(p.info.substringedUserJid))
+                    l.e("The phone number end is not 2 characters long")
+                l.debug("Your phone number ends with {}".format(p.info.substringedUserJid))
 
                 if len(p.c15_iv.IV) != 0:
                     # DB Header is crypt15
                     if type(key) is not Key15:
-                        logger.e("You are using a crypt14 key file with a crypt15 backup.")
+                        l.e("You are using a crypt14 key file with a crypt15 backup.")
                     if len(p.c15_iv.IV) != 16:
-                        logger.e("IV is not 16 bytes long but is {} bytes long".format(len(p.c15_iv.IV)))
+                        l.e("IV is not 16 bytes long but is {} bytes long".format(len(p.c15_iv.IV)))
                     iv = p.c15_iv.IV
 
                 elif len(p.c14_cipher.IV) != 0:
 
                     # DB Header is crypt14
                     if type(key) is not Key14:
-                        logger.f("You are using a crypt15 key file with a crypt14 backup.")
+                        l.f("You are using a crypt15 key file with a crypt14 backup.")
 
                     # if key.cipher_version != p.c14_cipher.version.cipher_version:
-                    #    logger.e("Cipher version mismatch: {} != {}"
+                    #    l.e("Cipher version mismatch: {} != {}"
                     #    .format(key.cipher_version, p.c14_cipher.cipher_version))
 
                     # Fix bytes to string encoding
                     key.key_version = (key.key_version[0] + 48).to_bytes(1, byteorder='big')
                     if key.key_version != p.c14_cipher.key_version:
                         if key.key_version > p.c14_cipher.key_version:
-                            logger.e("Key version mismatch: {} != {} .\n    "
-                                     .format(key.key_version, p.c14_cipher.key_version) +
-                                     "Your backup is too old for this key file.\n    " +
-                                     "Please try using a newer backup.")
+                            l.e("Key version mismatch: {} != {} .\n    "
+                                .format(key.key_version, p.c14_cipher.key_version) +
+                                "Your backup is too old for this key file.\n    " +
+                                "Please try using a newer backup.")
                         elif key.key_version < p.c14_cipher.key_version:
-                            logger.e("Key version mismatch: {} != {} .\n    "
-                                     .format(key.key_version, p.c14_cipher.key_version) +
-                                     "Your backup is too new for this key file.\n    " +
-                                     "Please try using an older backup, or getting the new key.")
+                            l.e("Key version mismatch: {} != {} .\n    "
+                                .format(key.key_version, p.c14_cipher.key_version) +
+                                "Your backup is too new for this key file.\n    " +
+                                "Please try using an older backup, or getting the new key.")
                         else:
-                            logger.e("Key version mismatch: {} != {} (?)"
-                                     .format(key.key_version, p.c14_cipher.key_version))
+                            l.e("Key version mismatch: {} != {} (?)"
+                                .format(key.key_version, p.c14_cipher.key_version))
                     if key.get_serversalt() != p.c14_cipher.server_salt:
-                        logger.e("Server salt mismatch: {} != {}".format(key.get_serversalt(), p.c14_cipher.server_salt))
+                        l.e("Server salt mismatch: {} != {}".format(key.get_serversalt(), p.c14_cipher.server_salt))
                     if key.get_googleid() != p.c14_cipher.google_id:
-                        logger.e("Google ID mismatch: {} != {}".format(key.get_googleid(), p.c14_cipher.google_id))
+                        l.e("Google ID mismatch: {} != {}".format(key.get_googleid(), p.c14_cipher.google_id))
                     if len(p.c14_cipher.IV) != 16:
-                        logger.e("IV is not 16 bytes long but is {} bytes long".format(len(p.c14_cipher.IV)))
+                        l.e("IV is not 16 bytes long but is {} bytes long".format(len(p.c14_cipher.IV)))
                     iv = p.c14_cipher.IV
 
                 else:
-                    logger.e("Could not parse the IV from the protobuf message. Please report a bug.")
+                    l.e("Could not parse the IV from the protobuf message. Please report a bug.")
                     return None
 
                 # We are done here
-                logger.i("Database header parsed")
+                l.info("Database header parsed")
                 return AES.new(key.get(), AES.MODE_GCM, iv)
 
         except DecodeError as e:
             print(e)
 
     except OSError as e:
-        logger.f("Reading database header failed: {}".format(e))
+        l.f("Reading database header failed: {}".format(e))
 
-    logger.e("Could not parse the protobuf message. Please report a bug.")
+    l.e("Could not parse the protobuf message. Please report a bug.")
     return None
 
 
-def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size: int = 0):
+def decrypt(file_hash: _Hash, cipher, encrypted, decrypted, buffer_size: int = 0):
     """Does the actual decryption."""
 
     z_obj = zlib.decompressobj()
 
     if cipher is None:
-        logger.f("Could not create a decryption cipher")
+        l.f("Could not create a decryption cipher")
 
     try:
 
@@ -477,12 +473,11 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                 if len(jid) == 1:
                     # Confirmed to be crypt12
                     encrypted_data = encrypted_data[:-4]
-                    logger.v("Your phone number ends with {}".format(jid[0]))
+                    l.debug("Your phone number ends with {}".format(jid[0]))
                 checksum = encrypted_data[-16:]
                 authentication_tag = encrypted_data[-32:-16]
                 encrypted_data = encrypted_data[:-32]
                 is_multifile_backup = False
-
 
                 file_hash.update(encrypted_data)
                 file_hash.update(authentication_tag)
@@ -491,13 +486,13 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                     # We are probably in a multifile backup, which does not have a checksum.
                     is_multifile_backup = True
                 else:
-                    logger.v("Checksum OK ({}). Decrypting...".format(file_hash.hexdigest()))
+                    l.debug("Checksum OK ({}). Decrypting...".format(file_hash.hexdigest()))
 
                 try:
                     output_decrypted: bytearray = cipher.decrypt(encrypted_data)
                 except ValueError as e:
-                    logger.f("Decryption failed: {}."
-                             "\n    This probably means your backup is corrupted.".format(e))
+                    l.f("Decryption failed: {}."
+                        "\n    This probably means your backup is corrupted.".format(e))
                     # Dead code to make pycharm warning go away
                     exit(1)
 
@@ -514,31 +509,31 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                     else:
                         cipher.verify(authentication_tag)
                 except ValueError as e:
-                    logger.e("Authentication tag mismatch: {}."
-                             "\n    This probably means your backup is corrupted.".format(e))
+                    l.e("Authentication tag mismatch: {}."
+                        "\n    This probably means your backup is corrupted.".format(e))
 
                 try:
                     output_file = z_obj.decompress(output_decrypted)
                     if not z_obj.eof:
-                        logger.e("The encrypted database file is truncated (damaged).")
+                        l.e("The encrypted database file is truncated (damaged).")
                 except zlib.error:
                     output_file = output_decrypted
-                    if test_decompression(logger, output_file[:io.DEFAULT_BUFFER_SIZE]):
-                        logger.i("Decrypted data is a ZIP file that I will not decompress automatically.")
+                    if test_decompression(output_file[:io.DEFAULT_BUFFER_SIZE]):
+                        l.info("Decrypted data is a ZIP file that I will not decompress automatically.")
                     else:
-                        logger.e("I can't recognize decrypted data. Decryption not successful.\n    "
-                                 "The key probably does not match with the encrypted file.\n    "
-                                 "Or the backup is simply empty. (check with --force)")
+                        l.e("I can't recognize decrypted data. Decryption not successful.\n    "
+                            "The key probably does not match with the encrypted file.\n    "
+                            "Or the backup is simply empty. (check with --force)")
 
                 decrypted.write(output_file)
 
             except MemoryError:
-                logger.f("Out of RAM, please use -nm.")
+                l.f("Out of RAM, please use -nm.")
 
         else:
 
             if buffer_size < 17:
-                logger.i("Invalid buffer size, will use default of {}".format(io.DEFAULT_BUFFER_SIZE))
+                l.info("Invalid buffer size, will use default of {}".format(io.DEFAULT_BUFFER_SIZE))
                 buffer_size = io.DEFAULT_BUFFER_SIZE
 
             # Does the thing above but only with DEFAULT_BUFFER_SIZE bytes at a time.
@@ -550,7 +545,7 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
 
             chunk = None
 
-            logger.v("Reading and decrypting...")
+            l.debug("Reading and decrypting...")
 
             while True:
 
@@ -566,17 +561,17 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                     try:
                         chunk = encrypted.read(buffer_size)
                     except MemoryError:
-                        logger.f("Out of RAM, please use a smaller buffer size.")
+                        l.f("Out of RAM, please use a smaller buffer size.")
                     if len(chunk) < buffer_size:
                         # Just error out, handling this case is too complicated.
                         # If the file is so small, the user can just load the whole thing into RAM.
-                        logger.f("Buffer size too large, use a smaller buffer size or don't use a buffer.")
+                        l.f("Buffer size too large, use a smaller buffer size or don't use a buffer.")
                     continue
 
                 try:
                     next_chunk = encrypted.read(buffer_size)
                 except MemoryError:
-                    logger.f("Out of RAM, please use a smaller buffer size.")
+                    l.f("Out of RAM, please use a smaller buffer size.")
 
                 if len(next_chunk) <= 36:
                     # Last bytes read. Three cases:
@@ -599,11 +594,11 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                     try:
                         decrypted.write(z_obj.decompress(decrypted_chunk))
                     except zlib.error:
-                        if test_decompression(logger, decrypted_chunk):
-                            logger.i("Decrypted data is a ZIP file that I will not decompress automatically.")
+                        if test_decompression(decrypted_chunk):
+                            l.info("Decrypted data is a ZIP file that I will not decompress automatically.")
                         else:
-                            logger.e("I can't recognize decrypted data. Decryption not successful.\n    "
-                                     "The key probably does not match with the encrypted file.")
+                            l.e("I can't recognize decrypted data. Decryption not successful.\n    "
+                                "The key probably does not match with the encrypted file.")
                         is_zip = False
                         decrypted.write(decrypted_chunk)
                 else:
@@ -618,7 +613,7 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                     if len(jid) == 1:
                         # Confirmed to be crypt12
                         checksum = checksum[:-4]
-                        logger.v("Your phone number ends with {}".format(jid[0]))
+                        l.debug("Your phone number ends with {}".format(jid[0]))
                     else:
                         # Shift everything forward by 4 bytes
                         chunk = checksum[:4]
@@ -628,7 +623,7 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                             try:
                                 decrypted.write(z_obj.decompress(decrypted_chunk))
                             except zlib.error:
-                                logger.e("Backup is corrupted.")
+                                l.e("Backup is corrupted.")
                                 decrypted.write(decrypted_chunk)
                         else:
                             decrypted.write(decrypted_chunk)
@@ -638,7 +633,7 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                     if file_hash.digest() != checksum[16:]:
                         is_multifile_backup = True
                     else:
-                        logger.v("Checksum OK ({})!".format(file_hash.hexdigest()))
+                        l.debug("Checksum OK ({})!".format(file_hash.hexdigest()))
                     try:
                         if is_multifile_backup:
                             decrypted.write(cipher.decrypt(checksum[:16]))
@@ -646,22 +641,22 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
                         else:
                             cipher.verify(checksum[:16])
                     except ValueError as e:
-                        logger.e("Authentication tag mismatch: {}."
-                                 "\n    This probably means your backup is corrupted.".format(e))
+                        l.e("Authentication tag mismatch: {}."
+                            "\n    This probably means your backup is corrupted.".format(e))
                     break
 
                 chunk = next_chunk
 
             if is_zip and not z_obj.eof:
 
-                if not logger.force:
+                if not l.force:
                     decrypted.truncate(0)
-                logger.e("The encrypted database file is truncated (damaged).")
+                l.e("The encrypted database file is truncated (damaged).")
 
         decrypted.flush()
 
     except OSError as e:
-        logger.f("I/O error: {}".format(e))
+        l.f("I/O error: {}".format(e))
 
     finally:
         decrypted.close()
@@ -670,17 +665,16 @@ def decrypt(logger, file_hash: _Hash, cipher, encrypted, decrypted, buffer_size:
 
 def main():
     args = parsecmdline()
-    logger = SimpleLog(verbose=args.verbose, force=args.force)
     if not (0 < args.data_offset < HEADER_SIZE - 128):
-        logger.f("The data offset must be between 1 and {}".format(HEADER_SIZE - 129))
+        l.f("The data offset must be between 1 and {}".format(HEADER_SIZE - 129))
     if not (0 < args.iv_offset < HEADER_SIZE - 128):
-        logger.f("The IV offset must be between 1 and {}".format(HEADER_SIZE - 129))
+        l.f("The IV offset must be between 1 and {}".format(HEADER_SIZE - 129))
     if args.buffer_size is not None:
         if not 1 < args.buffer_size < maxsize:
-            logger.f("Invalid buffer size")
+            l.f("Invalid buffer size")
     # Get the decryption key from the key file or the hex encoded string.
-    key = Key.from_file_or_hex(logger, args.keyfile)
-    logger.v(str(key))
+    key = Key.from_file_or_hex(args.keyfile)
+    l.debug(str(key))
     cipher = None
     file_hash = md5()
     # Now we have to get the IV and to guess where the data starts.
@@ -689,29 +683,36 @@ def main():
     if not args.no_protobuf:
         # Check if the backup is crypt12 first.
         try:
-            cipher = check_crypt12(logger, file_hash, key, args.encrypted)
+            cipher = check_crypt12(file_hash, key, args.encrypted)
         except ValueError:
-            cipher = parse_protobuf(logger=logger, file_hash=file_hash, key=key, encrypted=args.encrypted)
+            cipher = parse_protobuf(file_hash=file_hash, key=key, encrypted=args.encrypted)
 
     if cipher is None and not args.no_guess:
         # If parsing the protobuf message failed, we try guessing the offsets.
-        cipher = guess_offsets(logger=logger, file_hash=file_hash, key=key.get(), encrypted=args.encrypted,
+        cipher = guess_offsets(file_hash=file_hash, key=key.get(), encrypted=args.encrypted,
                                def_iv_offset=args.iv_offset, def_data_offset=args.data_offset)
 
     if args.buffer_size is not None:
-        decrypt(logger, file_hash, cipher, args.encrypted, args.decrypted, args.buffer_size)
+        decrypt(file_hash, cipher, args.encrypted, args.decrypted, args.buffer_size)
     elif args.no_mem:
-        decrypt(logger, file_hash, cipher, args.encrypted, args.decrypted, io.DEFAULT_BUFFER_SIZE)
+        decrypt(file_hash, cipher, args.encrypted, args.decrypted, io.DEFAULT_BUFFER_SIZE)
     else:
-        decrypt(logger, file_hash, cipher, args.encrypted, args.decrypted)
+        decrypt(file_hash, cipher, args.encrypted, args.decrypted)
 
     if date.today().day == 1 and date.today().month == 4:
-        logger.i("Done. Uploading messages to the developer's server...")
+        l.info("Done. Uploading messages to the developer's server...")
         sleep(0.5)
-        logger.i("Uploaded. The developer will now read and publish your messages!")
+        l.info("Uploaded. The developer will now read and publish your messages!")
     else:
-        logger.i("Done")
+        l.info("Done")
 
 
 if __name__ == "__main__":
+
+    # set wa_crypt_tools l to debug
+    l.setLevel(logging.DEBUG)
+    # Log to standard output
+    l.addHandler(logging.StreamHandler())
+    
+
     main()

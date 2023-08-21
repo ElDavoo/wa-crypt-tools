@@ -10,13 +10,13 @@ from os import urandom
 # This is from javaobj-py3
 import javaobj.v2 as javaobj
 
-from wa_crypt_tools.lib.log import SimpleLog
 from wa_crypt_tools.lib.utils import javaintlist2bytes, hexstring2bytes
 
-
+import logging
+l = logging.getLogger(__name__)
 class Key(abc.ABC):
     @abc.abstractmethod
-    def __init__(self, logger: SimpleLog, keyarray: bytes = None):
+    def __init__(self, keyarray: bytes = None):
         pass
 
     @abc.abstractmethod
@@ -28,22 +28,22 @@ class Key(abc.ABC):
         pass
 
     @staticmethod
-    def from_file_or_hex(logger: SimpleLog, file: Path):
+    def from_file_or_hex(file: Path):
         """Tries to load the key from a file, or if it fails, from a hex string."""
         try:
-            return Key.from_file(logger, file)
+            return Key.from_file(file)
         except Exception:
             try:
-                return Key.from_hex(logger, str(file))
+                return Key.from_hex(str(file))
             except ValueError:
-                logger.f("The key file specified does not exist.\n    "
+                l.critical("The key file specified does not exist.\n    "
                          "If you tried to specify the key directly, note it should be "
-                         "64 characters long and not {} characters long.".format(len(file)))
+                         "64 characters long and not {} characters long.".format(len(str(file))))
     @staticmethod
-    def from_file(logger: SimpleLog, file: Path):
+    def from_file(file: Path):
         keyfile: bytes = b''
 
-        logger.v("Reading keyfile...")
+        l.debug("Reading keyfile...")
 
         # Try to open the keyfile.
         try:
@@ -55,26 +55,26 @@ class Key(abc.ABC):
                 keyfile: bytes = javaintlist2bytes(jarr)
 
             except (ValueError, RuntimeError) as e:
-                logger.f("The keyfile is not a valid Java object: {}".format(e))
+                l.critical("The keyfile is not a valid Java object: {}".format(e))
 
         except OSError:
-            logger.i("The keyfile could not be opened.")
+            l.info("The keyfile could not be opened.")
             raise ValueError
 
         # We guess the key type from its length
         if len(keyfile) == 131:
-            return Key14(logger, keyarray=keyfile)
+            return Key14(keyarray=keyfile)
         elif len(keyfile) == 32:
-            return Key15(logger, keyarray=keyfile)
+            return Key15(keyarray=keyfile)
         else:
-            logger.f("Unrecognized key file format.")
+            l.critical("Unrecognized key file format.")
 
     @staticmethod
-    def from_hex(logger: SimpleLog, hexstring: str):
-        barr: bytes = hexstring2bytes(logger, hexstring)
+    def from_hex(hexstring: str):
+        barr: bytes = hexstring2bytes(hexstring)
         if barr is None or len(barr) != 32:
             raise ValueError("The key is invalid or of the wrong length.")
-        return Key15(logger, keyarray=barr)
+        return Key15(keyarray=barr)
 
 
 class Key14(Key):
@@ -82,7 +82,7 @@ class Key14(Key):
     __SUPPORTED_CIPHER_VERSION = b'\x00\x01'
     __SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02', b'\x03']
 
-    def __init__(self, logger: SimpleLog, keyarray: bytes = None,
+    def __init__(self, keyarray: bytes = None,
                  cipher_version: bytes = None, key_version: bytes = None,
                     serversalt: bytes = None, googleid: bytes = None, hashedgoogleid: bytes = None,
                  iv: bytes = None, key: bytes = None):
@@ -108,44 +108,44 @@ class Key14(Key):
                 cipher_version = self.__SUPPORTED_CIPHER_VERSION
             else:
                 if cipher_version != self.__SUPPORTED_CIPHER_VERSION:
-                    logger.e("Invalid cipher version: {}".format(cipher_version.hex()))
+                    l.error("Invalid cipher version: {}".format(cipher_version.hex()))
             if key_version is None:
                 key_version = self.__SUPPORTED_KEY_VERSIONS[-1]
             else:
                 if key_version not in self.__SUPPORTED_KEY_VERSIONS:
-                    logger.e("Invalid key version: {}".format(key_version.hex()))
+                    l.error("Invalid key version: {}".format(key_version.hex()))
             if serversalt is None:
                 self.__serversalt = urandom(32)
             else:
                 if len(serversalt) != 32:
-                    logger.e("Invalid server salt length: {}".format(serversalt.hex()))
+                    l.error("Invalid server salt length: {}".format(serversalt.hex()))
                 self.__serversalt = serversalt
             if googleid is None:
                 self.__googleid = urandom(16)
             else:
                 if len(googleid) != 16:
-                    logger.e("Invalid google id length: {}".format(googleid.hex()))
+                    l.error("Invalid google id length: {}".format(googleid.hex()))
                 self.__googleid = googleid
             if hashedgoogleid is None:
                 self.__hashedgoogleid = sha256(self.__googleid).digest()
             else:
-                logger.w("Using supplied hashed google id")
+                l.warning("Using supplied hashed google id")
                 if len(hashedgoogleid) != 32:
-                    logger.e("Invalid hashed google id length: {}".format(hashedgoogleid.hex()))
+                    l.error("Invalid hashed google id length: {}".format(hashedgoogleid.hex()))
                 self.__hashedgoogleid = hashedgoogleid
             if iv is None:
                 self.__padding = b'\x00' * 16
             else:
                 if len(iv) != 16:
-                    logger.e("Invalid IV length: {}".format(iv.hex()))
+                    l.error("Invalid IV length: {}".format(iv.hex()))
                 if iv != b'\x00' * 16:
-                    logger.w("IV should be empty")
+                    l.warning("IV should be empty")
                 self.__padding = iv
             return
         # Check if the keyfile has a supported cipher version
         self.__cipher_version = keyarray[:len(self.__SUPPORTED_CIPHER_VERSION)]
         if self.__SUPPORTED_CIPHER_VERSION != self.__cipher_version:
-            logger.e("Invalid keyfile: Unsupported cipher version {}"
+            l.error("Invalid keyfile: Unsupported cipher version {}"
                      .format(keyarray[:len(self.__SUPPORTED_CIPHER_VERSION)].hex()))
         index = len(self.__SUPPORTED_CIPHER_VERSION)
 
@@ -157,7 +157,7 @@ class Key14(Key):
                 self.key_version = v
                 break
         if not version_supported:
-            logger.e('Invalid keyfile: Unsupported key version {}'
+            l.error('Invalid keyfile: Unsupported key version {}'
                      .format(keyarray[index:index + len(self.__SUPPORTED_KEY_VERSIONS[0])].hex()))
 
         self.__serversalt = keyarray[3:35]
@@ -167,7 +167,7 @@ class Key14(Key):
         expected_digest = sha256(self.__googleid).digest()
         actual_digest = keyarray[51:83]
         if expected_digest != actual_digest:
-            logger.e("Invalid keyfile: Invalid SHA-256 of salt.\n    "
+            l.error("Invalid keyfile: Invalid SHA-256 of salt.\n    "
                      "Expected: {}\n    Got:{}".format(expected_digest, actual_digest))
 
         __padding = keyarray[83:99]
@@ -175,12 +175,12 @@ class Key14(Key):
         # Check if IV is made of zeroes
         for byte in __padding:
             if byte:
-                logger.e("Invalid keyfile: IV is not zeroed out but is: {}".format(__padding.hex()))
+                l.error("Invalid keyfile: IV is not zeroed out but is: {}".format(__padding.hex()))
                 break
 
         self.__key = keyarray[99:]
 
-        logger.i("Crypt12/14 key loaded")
+        l.info("Crypt12/14 key loaded")
 
     def get(self) -> bytes:
         return self.__key
@@ -229,7 +229,7 @@ class Key15(Key):
 
     BACKUP_ENCRYPTION = b'backup encryption\x01'
 
-    def __init__(self, logger: SimpleLog, keyarray: bytes=None, key: bytes=None):
+    def __init__(self, keyarray: bytes=None, key: bytes=None):
         """Extracts the key from a loaded crypt15 key file."""
         # encrypted_backup.key file format and encoding explanation:
         # The E2E key file is actually a serialized byte[] object.
@@ -253,19 +253,19 @@ class Key15(Key):
                 self.__key = urandom(32)
             else:
                 if len(key) != 32:
-                    logger.e("Invalid key length: {}".format(key.hex()))
+                    l.error("Invalid key length: {}".format(key.hex()))
                 self.__key = key
             return
 
         if len(keyarray) != 32:
-            logger.f("Crypt15 loader trying to load a crypt14 key")
-        logger.v("Root key: {}".format(keyarray.hex()))
+            l.critical("Crypt15 loader trying to load a crypt14 key")
+        l.debug("Root key: {}".format(keyarray.hex()))
         # First do the HMACSHA256 hash of the file with an empty private key
         self.__key: bytes = hmac.new(b'\x00' * 32, keyarray, sha256).digest()
         # Then do the HMACSHA256 using the previous result as key and ("backup encryption" + iteration count) as data
         self.__key = hmac.new(self.__key, self.BACKUP_ENCRYPTION, sha256).digest()
 
-        logger.i("Crypt15 / Raw key loaded")
+        l.info("Crypt15 / Raw key loaded")
 
     def get(self) -> bytes:
         return self.__key
