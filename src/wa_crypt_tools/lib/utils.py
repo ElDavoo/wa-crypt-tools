@@ -1,7 +1,21 @@
-from javaobj.v2.beans import JavaArray
+from javaobj import JavaByteArray
+from javaobj.v2.beans import JavaArray, JavaClassDesc, ClassDescType
 
 import logging
 l = logging.getLogger(__name__)
+
+
+def create_jba(out: bytes) -> JavaByteArray:
+    """Creates a JavaByteArray object from a bytes array"""
+    # Create the classdesc
+    cd = JavaClassDesc(ClassDescType.NORMALCLASS)
+    cd.name = "[B"
+    cd.superclass = None
+    cd.serial_version_uid = -5984413125824719648
+    cd.desc_flags = 2
+
+    return JavaByteArray(out, classdesc=cd)
+
 def hexstring2bytes(string: str) -> bytes:
     """Converts a hex string into a bytes array"""
     if len(string) != 64:

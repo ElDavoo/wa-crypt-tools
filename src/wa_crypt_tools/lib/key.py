@@ -6,16 +6,12 @@ from hashlib import sha256
 from pathlib import Path
 from os import urandom
 
-# noinspection PyPackageRequirements
-# This is from javaobj-py3
-import javaobj.v2 as javaobj
 from javaobj.v1.marshaller import JavaObjectMarshaller
-from javaobj.v1.beans import JavaByteArray
-from javaobj.v2.beans import JavaClassDesc
-
-from wa_crypt_tools.lib.utils import javaintlist2bytes, hexstring2bytes
 
 import logging
+
+from wa_crypt_tools.lib.utils import create_jba
+
 l = logging.getLogger(__name__)
 class Key(abc.ABC):
     @abc.abstractmethod
@@ -63,12 +59,12 @@ class Key14(Key):
         if keyarray is None:
             # Randomly generated key or with supplied parameters
             if cipher_version is None:
-                cipher_version = self.__SUPPORTED_CIPHER_VERSION
+                self.__cipher_version = self.__SUPPORTED_CIPHER_VERSION
             else:
                 if cipher_version != self.__SUPPORTED_CIPHER_VERSION:
                     l.error("Invalid cipher version: {}".format(cipher_version.hex()))
             if key_version is None:
-                key_version = self.__SUPPORTED_KEY_VERSIONS[-1]
+                self.__key_version = self.__SUPPORTED_KEY_VERSIONS[-1]
             else:
                 if key_version not in self.__SUPPORTED_KEY_VERSIONS:
                     l.error("Invalid key version: {}".format(key_version.hex()))
@@ -135,7 +131,7 @@ class Key14(Key):
         # Check if IV is made of zeroes
         for byte in self.__padding:
             if byte:
-                l.error("Invalid keyfile: IV is not zeroed out but is: {}".format(__padding.hex()))
+                l.error("Invalid keyfile: IV is not zeroed out but is: {}".format(self.__padding.hex()))
                 break
 
         self.__key = keyarray[99:]
@@ -192,32 +188,12 @@ class Key14(Key):
         out += self.__key
         if len(out) != 131:
             l.error("Invalid key length: {}".format(len(out)))
-        try:
-            with open(file, 'wb') as f:
-                # Create the classdesc
-                c = JavaClassDesc(0)
-                c.name = "[B"
-                c.superclass = None
-                c.serial_version_uid = -5984413125824719648
-                #c.flags = 2
-                c.desc_flags = 2
-                # Serialize the byte object written in the file
-                jarr: JavaByteArray = JavaByteArray(out, classdesc=c)
-                fra = JavaObjectMarshaller(f).dump(jarr)
-                print(fra)
-                f.write(fra)
-
-        except OSError:
-            pass
-
+        with open(file, 'wb') as f:
+            f.write(JavaObjectMarshaller(f).dump(create_jba(out)))
 
 
 class Key15(Key):
     # This constant is only used with crypt15 keys.
-    @property
-    def __key(self):
-        return self.___key
-
     BACKUP_ENCRYPTION = b'backup encryption\x01'
 
     def __init__(self, keyarray: bytes=None, key: bytes=None):
@@ -272,22 +248,8 @@ class Key15(Key):
         out += self.__key
         if len(out) != 32:
             l.error("Invalid key length: {}".format(len(out)))
-        try:
-            with open(file, 'wb') as f:
-                # Create the classdesc
-                c = JavaClassDesc(0)
-                c.name = "[B"
-                c.superclass = None
-                c.serial_version_uid = -5984413125824719648
-                #c.flags = 2
-                c.desc_flags = 2
-                # Serialize the byte object written in the file
-                jarr: JavaByteArray = JavaByteArray(out, classdesc=c)
-                fra = JavaObjectMarshaller(f).dump(jarr)
-                print(fra)
-                f.write(fra)
-        except OSError:
-            pass
+        with open(file, 'wb') as f:
+            f.write(JavaObjectMarshaller(f).dump(create_jba(out)))
 
     def __str__(self) -> str:
         """Returns a string representation of the key"""
@@ -302,7 +264,3 @@ class Key15(Key):
     def __repr__(self) -> str:
         # TODO
         return self.__str__()
-
-    @__key.setter
-    def __key(self, value):
-        self.___key = value

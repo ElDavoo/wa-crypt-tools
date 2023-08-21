@@ -2,7 +2,7 @@ from pathlib import Path
 
 import javaobj.v2 as javaobj
 
-from wa_crypt_tools.lib.key import Key, Key14, Key15
+from wa_crypt_tools.lib.key import Key14, Key15
 
 import logging
 
@@ -15,7 +15,7 @@ class KeyFactory:
         """Tries to load the key from a file, or if it fails, from a hex string."""
         try:
             return KeyFactory.from_file(file)
-        except Exception:
+        except OSError:
             try:
                 return KeyFactory.from_hex(str(file))
             except ValueError:
