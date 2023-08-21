@@ -27,10 +27,10 @@ class Key(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def dump(self, file: Path):
+    def dump(self) -> bytes:
         pass
 
-
+# Thanks to python, these all have to go to the same file
 class Key14(Key):
     # These constants are only used with crypt12/14 keys.
     __SUPPORTED_CIPHER_VERSION = b'\x00\x01'
@@ -68,6 +68,7 @@ class Key14(Key):
             else:
                 if key_version not in self.__SUPPORTED_KEY_VERSIONS:
                     l.error("Invalid key version: {}".format(key_version.hex()))
+                self.__key_version = key_version
             if serversalt is None:
                 self.__serversalt = urandom(32)
             else:
@@ -95,6 +96,12 @@ class Key14(Key):
                 if iv != b'\x00' * 16:
                     l.warning("IV should be empty")
                 self.__padding = iv
+            if key is None:
+                self.__key = urandom(32)
+            else:
+                if len(key) != 32:
+                    l.error("Invalid key length: {}".format(key.hex()))
+                self.__key = key
             return
         # Check if the keyfile has a supported cipher version
         self.__cipher_version = keyarray[:len(self.__SUPPORTED_CIPHER_VERSION)]
@@ -164,8 +171,8 @@ class Key14(Key):
                 string += " , serversalt: {}".format(self.__serversalt.hex())
             if self.__googleid is not None:
                 string += " , googleid: {}".format(self.__googleid.hex())
-            if self.key_version is not None:
-                string += " , key_version: {}".format(self.key_version.hex())
+            if self.__key_version is not None:
+                string += " , key_version: {}".format(self.__key_version.hex())
             if self.__cipher_version is not None:
                 string += " , cipher_version: {}".format(self.__cipher_version.hex())
             return string + ")"
@@ -176,21 +183,21 @@ class Key14(Key):
         # TODO
         return self.__str__()
 
-    def dump(self, file: Path):
+    def dump(self) -> bytes:
         """Dumps the key to a file"""
         out: bytes = b''
         out += self.__cipher_version
-        out += self.key_version
+        out += self.__key_version
         out += self.__serversalt
         out += self.__googleid
         out += self.__hashedgoogleid
         out += self.__padding
         out += self.__key
-        if len(out) != 131:
-            l.error("Invalid key length: {}".format(len(out)))
-        with open(file, 'wb') as f:
-            f.write(JavaObjectMarshaller(f).dump(create_jba(out)))
+        return JavaObjectMarshaller().dump(create_jba(out))
 
+    def file_dump(self, file: Path):
+        with open(file, 'wb') as f:
+            f.write(self.dump())
 
 class Key15(Key):
     # This constant is only used with crypt15 keys.
@@ -242,14 +249,13 @@ class Key15(Key):
         key = hmac.new(key, self.BACKUP_ENCRYPTION, sha256).digest()
         return key
 
-    def dump(self, file: Path):
-        """Dumps the key to a file"""
-        out: bytes = b''
-        out += self.__key
-        if len(out) != 32:
-            l.error("Invalid key length: {}".format(len(out)))
+    def dump(self) -> bytes:
+        """Dumps the key"""
+        return JavaObjectMarshaller().dump(create_jba(self.__key))
+
+    def file_dump(self, file: Path):
         with open(file, 'wb') as f:
-            f.write(JavaObjectMarshaller(f).dump(create_jba(out)))
+            f.write(self.dump())
 
     def __str__(self) -> str:
         """Returns a string representation of the key"""
