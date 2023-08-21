@@ -664,7 +664,15 @@ def decrypt(file_hash: _Hash, cipher, encrypted, decrypted, buffer_size: int = 0
 
 
 def main():
+
     args = parsecmdline()
+
+    # set wa_crypt_tools l to debug
+    l.setLevel(logging.DEBUG if args.verbose else logging.INFO)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG if args.verbose else logging.INFO)
+    ch.setFormatter(CustomFormatter())
+    l.addHandler(ch)
     if not (0 < args.data_offset < HEADER_SIZE - 128):
         l.f("The data offset must be between 1 and {}".format(HEADER_SIZE - 129))
     if not (0 < args.iv_offset < HEADER_SIZE - 128):
@@ -706,13 +714,7 @@ def main():
     else:
         l.info("Done")
 
+from lib.logformat import CustomFormatter
 
 if __name__ == "__main__":
-
-    # set wa_crypt_tools l to debug
-    l.setLevel(logging.DEBUG)
-    # Log to standard output
-    l.addHandler(logging.StreamHandler())
-    
-
     main()
