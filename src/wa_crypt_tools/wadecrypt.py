@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from wa_crypt_tools import l
 from wa_crypt_tools.lib.key import Key14, Key15, Key
+from wa_crypt_tools.lib.keyfactory import KeyFactory
 
 # AES import party!
 # pycryptodome and PyCryptodomex's implementations of AES are the same,
@@ -681,7 +682,7 @@ def main():
         if not 1 < args.buffer_size < maxsize:
             l.f("Invalid buffer size")
     # Get the decryption key from the key file or the hex encoded string.
-    key = Key.from_file_or_hex(args.keyfile)
+    key = KeyFactory.new(args.keyfile)
     l.debug(str(key))
     cipher = None
     file_hash = md5()

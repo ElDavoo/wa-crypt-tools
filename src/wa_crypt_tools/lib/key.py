@@ -9,6 +9,9 @@ from os import urandom
 # noinspection PyPackageRequirements
 # This is from javaobj-py3
 import javaobj.v2 as javaobj
+from javaobj.v1.marshaller import JavaObjectMarshaller
+from javaobj.v1.beans import JavaByteArray
+from javaobj.v2.beans import JavaClassDesc
 
 from wa_crypt_tools.lib.utils import javaintlist2bytes, hexstring2bytes
 
@@ -27,54 +30,9 @@ class Key(abc.ABC):
     def get(self) -> bytes:
         pass
 
-    @staticmethod
-    def from_file_or_hex(file: Path):
-        """Tries to load the key from a file, or if it fails, from a hex string."""
-        try:
-            return Key.from_file(file)
-        except Exception:
-            try:
-                return Key.from_hex(str(file))
-            except ValueError:
-                l.critical("The key file specified does not exist.\n    "
-                         "If you tried to specify the key directly, note it should be "
-                         "64 characters long and not {} characters long.".format(len(str(file))))
-    @staticmethod
-    def from_file(file: Path):
-        keyfile: bytes = b''
-
-        l.debug("Reading keyfile...")
-
-        # Try to open the keyfile.
-        try:
-            key_file_stream = open(file, 'rb')
-            try:
-                # Deserialize the byte object written in the file
-                jarr: javaobj.beans.JavaArray = javaobj.load(key_file_stream).data
-                # Convert from a list of Int8 to a byte array
-                keyfile: bytes = javaintlist2bytes(jarr)
-
-            except (ValueError, RuntimeError) as e:
-                l.critical("The keyfile is not a valid Java object: {}".format(e))
-
-        except OSError:
-            l.info("The keyfile could not be opened.")
-            raise ValueError
-
-        # We guess the key type from its length
-        if len(keyfile) == 131:
-            return Key14(keyarray=keyfile)
-        elif len(keyfile) == 32:
-            return Key15(keyarray=keyfile)
-        else:
-            l.critical("Unrecognized key file format.")
-
-    @staticmethod
-    def from_hex(hexstring: str):
-        barr: bytes = hexstring2bytes(hexstring)
-        if barr is None or len(barr) != 32:
-            raise ValueError("The key is invalid or of the wrong length.")
-        return Key15(keyarray=barr)
+    @abc.abstractmethod
+    def dump(self, file: Path):
+        pass
 
 
 class Key14(Key):
@@ -170,10 +128,12 @@ class Key14(Key):
             l.error("Invalid keyfile: Invalid SHA-256 of salt.\n    "
                      "Expected: {}\n    Got:{}".format(expected_digest, actual_digest))
 
-        __padding = keyarray[83:99]
+        self.__hashedgoogleid = actual_digest
+
+        self.__padding = keyarray[83:99]
 
         # Check if IV is made of zeroes
-        for byte in __padding:
+        for byte in self.__padding:
             if byte:
                 l.error("Invalid keyfile: IV is not zeroed out but is: {}".format(__padding.hex()))
                 break
@@ -220,6 +180,37 @@ class Key14(Key):
         # TODO
         return self.__str__()
 
+    def dump(self, file: Path):
+        """Dumps the key to a file"""
+        out: bytes = b''
+        out += self.__cipher_version
+        out += self.key_version
+        out += self.__serversalt
+        out += self.__googleid
+        out += self.__hashedgoogleid
+        out += self.__padding
+        out += self.__key
+        if len(out) != 131:
+            l.error("Invalid key length: {}".format(len(out)))
+        try:
+            with open(file, 'wb') as f:
+                # Create the classdesc
+                c = JavaClassDesc(0)
+                c.name = "[B"
+                c.superclass = None
+                c.serial_version_uid = -5984413125824719648
+                #c.flags = 2
+                c.desc_flags = 2
+                # Serialize the byte object written in the file
+                jarr: JavaByteArray = JavaByteArray(out, classdesc=c)
+                fra = JavaObjectMarshaller(f).dump(jarr)
+                print(fra)
+                f.write(fra)
+
+        except OSError:
+            pass
+
+
 
 class Key15(Key):
     # This constant is only used with crypt15 keys.
@@ -260,15 +251,43 @@ class Key15(Key):
         if len(keyarray) != 32:
             l.critical("Crypt15 loader trying to load a crypt14 key")
         l.debug("Root key: {}".format(keyarray.hex()))
-        # First do the HMACSHA256 hash of the file with an empty private key
-        self.__key: bytes = hmac.new(b'\x00' * 32, keyarray, sha256).digest()
-        # Then do the HMACSHA256 using the previous result as key and ("backup encryption" + iteration count) as data
-        self.__key = hmac.new(self.__key, self.BACKUP_ENCRYPTION, sha256).digest()
+        # Save the root key in the class
+        self.__key = keyarray
 
         l.info("Crypt15 / Raw key loaded")
 
     def get(self) -> bytes:
-        return self.__key
+        """
+        Returns the key used for encryption, that is not the root key.
+        """
+        # First do the HMACSHA256 hash of the file with an empty private key
+        key: bytes = hmac.new(b'\x00' * 32, self.__key, sha256).digest()
+        # Then do the HMACSHA256 using the previous result as key and ("backup encryption" + iteration count) as data
+        key = hmac.new(key, self.BACKUP_ENCRYPTION, sha256).digest()
+        return key
+
+    def dump(self, file: Path):
+        """Dumps the key to a file"""
+        out: bytes = b''
+        out += self.__key
+        if len(out) != 32:
+            l.error("Invalid key length: {}".format(len(out)))
+        try:
+            with open(file, 'wb') as f:
+                # Create the classdesc
+                c = JavaClassDesc(0)
+                c.name = "[B"
+                c.superclass = None
+                c.serial_version_uid = -5984413125824719648
+                #c.flags = 2
+                c.desc_flags = 2
+                # Serialize the byte object written in the file
+                jarr: JavaByteArray = JavaByteArray(out, classdesc=c)
+                fra = JavaObjectMarshaller(f).dump(jarr)
+                print(fra)
+                f.write(fra)
+        except OSError:
+            pass
 
     def __str__(self) -> str:
         """Returns a string representation of the key"""
