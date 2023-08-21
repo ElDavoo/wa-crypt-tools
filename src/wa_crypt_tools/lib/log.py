@@ -15,6 +15,11 @@ class SimpleLog:
         """Always prints message."""
         print('[I] {}'.format(msg))
 
+    @staticmethod
+    def w(msg: str):
+        """Always prints message."""
+        print('[W] {}'.format(msg))
+
     def e(self, msg: str):
         """Prints message and exit, unless force is enabled."""
         print('[E] {}'.format(msg))

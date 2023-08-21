@@ -4,18 +4,19 @@ import abc
 import hmac
 from hashlib import sha256
 from pathlib import Path
+from os import urandom
 
 # noinspection PyPackageRequirements
 # This is from javaobj-py3
 import javaobj.v2 as javaobj
 
 from wa_crypt_tools.lib.log import SimpleLog
-from wa_crypt_tools.lib.utils import javaintlist2bytes
+from wa_crypt_tools.lib.utils import javaintlist2bytes, hexstring2bytes
 
 
 class Key(abc.ABC):
     @abc.abstractmethod
-    def __init__(self, logger: SimpleLog, keyarray: bytes):
+    def __init__(self, logger: SimpleLog, keyarray: bytes = None):
         pass
 
     @abc.abstractmethod
@@ -26,6 +27,18 @@ class Key(abc.ABC):
     def get(self) -> bytes:
         pass
 
+    @staticmethod
+    def from_file_or_hex(logger: SimpleLog, file: Path):
+        """Tries to load the key from a file, or if it fails, from a hex string."""
+        try:
+            return Key.from_file(logger, file)
+        except Exception:
+            try:
+                return Key.from_hex(logger, str(file))
+            except ValueError:
+                logger.f("The key file specified does not exist.\n    "
+                         "If you tried to specify the key directly, note it should be "
+                         "64 characters long and not {} characters long.".format(len(file)))
     @staticmethod
     def from_file(logger: SimpleLog, file: Path):
         keyfile: bytes = b''
@@ -45,7 +58,8 @@ class Key(abc.ABC):
                 logger.f("The keyfile is not a valid Java object: {}".format(e))
 
         except OSError:
-            logger.f("The keyfile could not be opened.")
+            logger.i("The keyfile could not be opened.")
+            raise ValueError
 
         # We guess the key type from its length
         if len(keyfile) == 131:
@@ -55,13 +69,23 @@ class Key(abc.ABC):
         else:
             logger.f("Unrecognized key file format.")
 
+    @staticmethod
+    def from_hex(logger: SimpleLog, hexstring: str):
+        barr: bytes = hexstring2bytes(logger, hexstring)
+        if barr is None or len(barr) != 32:
+            raise ValueError("The key is invalid or of the wrong length.")
+        return Key15(logger, keyarray=barr)
+
 
 class Key14(Key):
     # These constants are only used with crypt12/14 keys.
     __SUPPORTED_CIPHER_VERSION = b'\x00\x01'
     __SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02', b'\x03']
 
-    def __init__(self, logger: SimpleLog, keyarray: bytes):
+    def __init__(self, logger: SimpleLog, keyarray: bytes = None,
+                 cipher_version: bytes = None, key_version: bytes = None,
+                    serversalt: bytes = None, googleid: bytes = None, hashedgoogleid: bytes = None,
+                 iv: bytes = None, key: bytes = None):
         """Extracts the fields from a crypt14 loaded key file."""
         # key file format and encoding explanation:
         # The key file is actually a serialized byte[] object.
@@ -78,6 +102,46 @@ class Key14(Key):
         # 6) encryption IV (zeroed out, as it is read from the database) (16 bytes)
         # 7) cipherKey (The actual AES-256 decryption key) (32 bytes)
 
+        if keyarray is None:
+            # Randomly generated key or with supplied parameters
+            if cipher_version is None:
+                cipher_version = self.__SUPPORTED_CIPHER_VERSION
+            else:
+                if cipher_version != self.__SUPPORTED_CIPHER_VERSION:
+                    logger.e("Invalid cipher version: {}".format(cipher_version.hex()))
+            if key_version is None:
+                key_version = self.__SUPPORTED_KEY_VERSIONS[-1]
+            else:
+                if key_version not in self.__SUPPORTED_KEY_VERSIONS:
+                    logger.e("Invalid key version: {}".format(key_version.hex()))
+            if serversalt is None:
+                self.__serversalt = urandom(32)
+            else:
+                if len(serversalt) != 32:
+                    logger.e("Invalid server salt length: {}".format(serversalt.hex()))
+                self.__serversalt = serversalt
+            if googleid is None:
+                self.__googleid = urandom(16)
+            else:
+                if len(googleid) != 16:
+                    logger.e("Invalid google id length: {}".format(googleid.hex()))
+                self.__googleid = googleid
+            if hashedgoogleid is None:
+                self.__hashedgoogleid = sha256(self.__googleid).digest()
+            else:
+                logger.w("Using supplied hashed google id")
+                if len(hashedgoogleid) != 32:
+                    logger.e("Invalid hashed google id length: {}".format(hashedgoogleid.hex()))
+                self.__hashedgoogleid = hashedgoogleid
+            if iv is None:
+                self.__padding = b'\x00' * 16
+            else:
+                if len(iv) != 16:
+                    logger.e("Invalid IV length: {}".format(iv.hex()))
+                if iv != b'\x00' * 16:
+                    logger.w("IV should be empty")
+                self.__padding = iv
+            return
         # Check if the keyfile has a supported cipher version
         self.__cipher_version = keyarray[:len(self.__SUPPORTED_CIPHER_VERSION)]
         if self.__SUPPORTED_CIPHER_VERSION != self.__cipher_version:
@@ -165,7 +229,7 @@ class Key15(Key):
 
     BACKUP_ENCRYPTION = b'backup encryption\x01'
 
-    def __init__(self, logger: SimpleLog, keyarray: bytes):
+    def __init__(self, logger: SimpleLog, keyarray: bytes=None, key: bytes=None):
         """Extracts the key from a loaded crypt15 key file."""
         # encrypted_backup.key file format and encoding explanation:
         # The E2E key file is actually a serialized byte[] object.
@@ -183,8 +247,19 @@ class Key15(Key):
         # and thus a \x01 at the end.
         # Take a look at utils/wa_hmacsha256_loop.java that is the original code.
 
+        if keyarray is None:
+            # Randomly generated key or with supplied parameters
+            if key is None:
+                self.__key = urandom(32)
+            else:
+                if len(key) != 32:
+                    logger.e("Invalid key length: {}".format(key.hex()))
+                self.__key = key
+            return
+
         if len(keyarray) != 32:
             logger.f("Crypt15 loader trying to load a crypt14 key")
+        logger.v("Root key: {}".format(keyarray.hex()))
         # First do the HMACSHA256 hash of the file with an empty private key
         self.__key: bytes = hmac.new(b'\x00' * 32, keyarray, sha256).digest()
         # Then do the HMACSHA256 using the previous result as key and ("backup encryption" + iteration count) as data

@@ -77,22 +77,7 @@ HEADER_SIZE = 384
 DEFAULT_DATA_OFFSET = 122
 DEFAULT_IV_OFFSET = 8
 
-def from_hex(logger: SimpleLog, string: str) -> bytes:
-    """Converts a hex string into a bytes array"""
-    if len(string) != 64:
-        logger.f("The key file specified does not exist.\n    "
-                 "If you tried to specify the key directly, note it should be "
-                 "64 characters long and not {} characters long.".format(len(string)))
 
-    barr = None
-    try:
-        barr = bytes.fromhex(string)
-    except ValueError as e:
-        logger.f("Couldn't convert the hex string.\n    "
-                 "Exception: {}".format(e))
-    if len(barr) != 32:
-        logger.e("The key is not 32 bytes long but {} bytes long.".format(len(barr)))
-    return barr
 
 
 def parsecmdline() -> argparse.Namespace:
@@ -694,7 +679,7 @@ def main():
         if not 1 < args.buffer_size < maxsize:
             logger.f("Invalid buffer size")
     # Get the decryption key from the key file or the hex encoded string.
-    key = Key.from_file(logger, args.keyfile)
+    key = Key.from_file_or_hex(logger, args.keyfile)
     logger.v(str(key))
     cipher = None
     file_hash = md5()
