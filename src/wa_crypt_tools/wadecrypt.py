@@ -79,11 +79,12 @@ def parsecmdline() -> argparse.Namespace:
                                                                'Implies -nm. Default: {}'.format(
         io.DEFAULT_BUFFER_SIZE))
     parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
+    parser.add_argument('-f', '--force', action='store_true', help='Does nothing, but it is here for compatibility')
 
     return parser.parse_args()
 
 
-def decrypt(file_hash: _Hash, cipher, encrypted, decrypted, buffer_size: int = 0):
+def chunked_decrypt(file_hash: _Hash, cipher, encrypted, decrypted, buffer_size: int = 0):
     """Does the actual decryption."""
 
     z_obj = zlib.decompressobj()
@@ -99,35 +100,20 @@ def decrypt(file_hash: _Hash, cipher, encrypted, decrypted, buffer_size: int = 0
 
             # Does the thing above but only with DEFAULT_BUFFER_SIZE bytes at a time.
             # Less RAM used, more I/O used
-            # TODO use assignment expression, which drops compatibility with 3.7
-            # while chunk := encrypted.read(DEFAULT_BUFFER_SIZE):
 
             is_zip = True
 
-            chunk = None
+            chunk = encrypted.read(buffer_size)
 
             l.debug("Reading and decrypting...")
 
-            while True:
+            while next_chunk := encrypted.read(buffer_size):
 
                 # We will need to manage two chunks at a time, because we might have
                 # the checksum in both the last chunk and the chunk before that.
                 # This makes the logic more complicated, but it's the only way to.
 
-                next_chunk = None
                 checksum = None
-
-                if chunk is None:
-                    # First read
-                    try:
-                        chunk = encrypted.read(buffer_size)
-                    except MemoryError:
-                        l.fatal("Out of RAM, please use a smaller buffer size.")
-                    if len(chunk) < buffer_size:
-                        # Just error out, handling this case is too complicated.
-                        # If the file is so small, the user can just load the whole thing into RAM.
-                        l.fatal("Buffer size too large, use a smaller buffer size or don't use a buffer.")
-                    continue
 
                 try:
                     next_chunk = encrypted.read(buffer_size)
@@ -241,9 +227,9 @@ def main():
     cipher = AES.new(key.get(), AES.MODE_GCM, db.get_iv())
 
     if args.buffer_size is not None:
-        decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, args.buffer_size)
+        chunked_decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, args.buffer_size)
     elif args.no_mem:
-        decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, io.DEFAULT_BUFFER_SIZE)
+        chunked_decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, io.DEFAULT_BUFFER_SIZE)
     else:
         output_decrypted: bytearray = db.decrypt(key, args.encrypted.read())
         try:
