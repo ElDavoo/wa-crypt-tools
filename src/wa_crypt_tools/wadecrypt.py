@@ -93,84 +93,9 @@ def decrypt(file_hash: _Hash, cipher, encrypted, decrypted, buffer_size: int = 0
 
     try:
 
-        if buffer_size == 0:
-            # Load the encrypted file into RAM, decrypts into RAM,
-            # decompresses into RAM, writes into disk.
-            # More RAM used (~x3), less I/O used
-            try:
-                encrypted_data = encrypted.read()
-                # Crypt12 moment: the last 4 bytes are --xx, where xx
-                # are the last 2 numbers of the jid (user's phone number).
-                # We need to remove them.
-                crypt12_footer = str(encrypted_data[-4:])
-                # Looks like a complicated regex, but it's just
-                # "if it's --xx or xxxx"
-                jid = findall(r"(?:-|\d)(?:-|\d)(\d\d)", crypt12_footer)
-                if len(jid) == 1:
-                    # Confirmed to be crypt12
-                    encrypted_data = encrypted_data[:-4]
-                    l.debug("Your phone number ends with {}".format(jid[0]))
-                checksum = encrypted_data[-16:]
-                authentication_tag = encrypted_data[-32:-16]
-                encrypted_data = encrypted_data[:-32]
-                is_multifile_backup = False
-
-                file_hash.update(encrypted_data)
-                file_hash.update(authentication_tag)
-
-                if file_hash.digest() != checksum:
-                    # We are probably in a multifile backup, which does not have a checksum.
-                    is_multifile_backup = True
-                else:
-                    l.debug("Checksum OK ({}). Decrypting...".format(file_hash.hexdigest()))
-
-                try:
-                    output_decrypted: bytearray = cipher.decrypt(encrypted_data)
-                except ValueError as e:
-                    l.fatal("Decryption failed: {}."
-                            "\n    This probably means your backup is corrupted.".format(e))
-                    # Dead code to make pycharm warning go away
-                    exit(1)
-
-                # Verify the authentication tag
-                try:
-                    if is_multifile_backup:
-                        # In multifile backups, there is no checksum.
-                        # This means, the last 16 bytes of the files are not the checksum,
-                        # despite being called "checksum", but are the authentication tag.
-                        # Same way, "authentication tag" is not the tag, but the last
-                        # 16 bytes of the encrypted file.
-                        output_decrypted += cipher.decrypt(authentication_tag)
-                        cipher.verify(checksum)
-                    else:
-                        cipher.verify(authentication_tag)
-                except ValueError as e:
-                    l.error("Authentication tag mismatch: {}."
-                            "\n    This probably means your backup is corrupted.".format(e))
-
-                try:
-                    output_file = z_obj.decompress(output_decrypted)
-                    if not z_obj.eof:
-                        l.error("The encrypted database file is truncated (damaged).")
-                except zlib.error:
-                    output_file = output_decrypted
-                    if test_decompression(output_file[:io.DEFAULT_BUFFER_SIZE]):
-                        l.info("Decrypted data is a ZIP file that I will not decompress automatically.")
-                    else:
-                        l.error("I can't recognize decrypted data. Decryption not successful.\n    "
-                                "The key probably does not match with the encrypted file.\n    "
-                                "Or the backup is simply empty. (check with --force)")
-
-                decrypted.write(output_file)
-
-            except MemoryError:
-                l.fatal("Out of RAM, please use -nm.")
-
-        else:
-
-            if buffer_size < 17:
-                l.info("Invalid buffer size, will use default of {}".format(io.DEFAULT_BUFFER_SIZE))
-                buffer_size = io.DEFAULT_BUFFER_SIZE
+        if buffer_size < 17:
+            l.info("Invalid buffer size, will use default of {}".format(io.DEFAULT_BUFFER_SIZE))
+            buffer_size = io.DEFAULT_BUFFER_SIZE
 
             # Does the thing above but only with DEFAULT_BUFFER_SIZE bytes at a time.
             # Less RAM used, more I/O used
@@ -320,7 +245,23 @@ def main():
     elif args.no_mem:
         decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, io.DEFAULT_BUFFER_SIZE)
     else:
-        decrypt(db.file_hash, cipher, args.encrypted, args.decrypted)
+        output_decrypted: bytearray = db.decrypt(key, args.encrypted.read())
+        try:
+
+            z_obj = zlib.decompressobj()
+            output_file = z_obj.decompress(output_decrypted)
+            if not z_obj.eof:
+                l.error("The encrypted database file is truncated (damaged).")
+        except zlib.error:
+            output_file = output_decrypted
+            if test_decompression(output_file[:io.DEFAULT_BUFFER_SIZE]):
+                l.info("Decrypted data is a ZIP file that I will not decompress automatically.")
+            else:
+                l.error("I can't recognize decrypted data. Decryption not successful.\n    "
+                        "The key probably does not match with the encrypted file.\n    "
+                        "Or the backup is simply empty. (check with --force)")
+        args.decrypted.write(output_file)
+
 
     if date.today().day == 1 and date.today().month == 4:
         l.info("Done. Uploading messages to the developer's server...")

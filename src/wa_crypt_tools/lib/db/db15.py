@@ -3,6 +3,7 @@ from hashlib import md5
 from os import urandom
 from re import findall
 
+from Cryptodome.Cipher import AES
 from google.protobuf.message import DecodeError
 
 l = logging.getLogger(__name__)
@@ -108,4 +109,43 @@ class Database15(Database):
                 self.iv = urandom(16)
 
     def decrypt(self, key: Key15, encrypted: bytes) -> bytes:
-        pass
+        """Decrypts the database using the provided key"""
+        checksum = encrypted[-16:]
+        authentication_tag = encrypted[-32:-16]
+        encrypted_data = encrypted[:-32]
+        is_multifile_backup = False
+
+        self.file_hash.update(encrypted_data)
+        self.file_hash.update(authentication_tag)
+
+        if self.file_hash.digest() != checksum:
+            # We are probably in a multifile backup, which does not have a checksum.
+            is_multifile_backup = True
+        else:
+            l.debug("Checksum OK ({}). Decrypting...".format(self.file_hash.hexdigest()))
+
+        cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)
+        try:
+            output_decrypted: bytes = cipher.decrypt(encrypted_data)
+        except ValueError as e:
+            l.fatal("Decryption failed: {}."
+                    "\n    This probably means your backup is corrupted.".format(e))
+            raise e
+
+        # Verify the authentication tag
+        try:
+            if is_multifile_backup:
+                # In multifile backups, there is no checksum.
+                # This means, the last 16 bytes of the files are not the checksum,
+                # despite being called "checksum", but are the authentication tag.
+                # Same way, "authentication tag" is not the tag, but the last
+                # 16 bytes of the encrypted file.
+                output_decrypted += cipher.decrypt(authentication_tag)
+                cipher.verify(checksum)
+            else:
+                cipher.verify(authentication_tag)
+        except ValueError as e:
+            l.error("Authentication tag mismatch: {}."
+                    "\n    This probably means your backup is corrupted.".format(e))
+
+        return output_decrypted
