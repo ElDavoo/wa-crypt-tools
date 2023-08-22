@@ -43,7 +43,7 @@ class KeyFactory:
 
         except OSError:
             l.info("The keyfile could not be opened.")
-            raise ValueError
+            raise OSError
 
         # We guess the key type from its length
         if len(keyfile) == 131:
