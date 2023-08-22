@@ -32,6 +32,21 @@ class Database12(Database):
     def __init__(self, key: Key14 = None, encrypted=None, file_hash=None,
                  cipher_version: bytes = None, key_version: bytes = None, serversalt: bytes = None,
                  googleid: bytes = None, iv: bytes = None):
+        """Checks if the file is a Crypt12 file.
+        Returns the cipher if it is, None otherwise."""
+
+        """
+        The crypt12 file format is similar to the crypt14 file format.
+        It is a "raw" header, which means it's not a protobuf message,
+        nor a serialized java object.
+        Structure:
+        Cipher version (2 bytes)
+        Key version (1 byte)
+        Server salt (32 bytes)
+        Google ID (16 bytes)
+        IV (16 bytes)
+        ( so we finally understood why the IV is at offset 51 ... )
+        """
         if encrypted and file_hash:
             self.cipher_version = encrypted.read(2)
             # if test_bytes != key.get_cipher_version():

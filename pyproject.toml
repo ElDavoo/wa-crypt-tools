@@ -36,6 +36,7 @@ classifiers = [
 
 [project.scripts]
 wadecrypt = "wa_crypt_tools.wadecrypt:main"
+waguess = "wa_crypt_tools.waguess:main"
 
 [project.optional-dependencies]
 proto = [

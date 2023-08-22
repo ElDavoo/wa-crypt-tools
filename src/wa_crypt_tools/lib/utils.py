@@ -1,8 +1,37 @@
+import zlib
+
 from javaobj import JavaByteArray
 from javaobj.v2.beans import JavaArray, JavaClassDesc, ClassDescType
 
 import logging
+
+from wa_crypt_tools.lib.constants import C
+
 l = logging.getLogger(__name__)
+
+
+def test_decompression(test_data: bytes) -> bool:
+    """Returns true if the SQLite header is valid.
+    It is assumed that the data are valid.
+    (If it is valid, it also means the decryption and decompression were successful.)"""
+
+    # If we get a ZIP file header, return true
+    if test_data[:4] == C.ZIP_HEADER:
+        return True
+
+    try:
+        zlib_obj = zlib.decompressobj().decompress(test_data)
+        # These two errors should never happen
+        if len(zlib_obj) < 16:
+            l.error("Test decompression: chunk too small")
+            return False
+        if zlib_obj[:15].decode('ascii') != 'SQLite format 3':
+            l.error("Test decompression: Decryption and decompression ok but not a valid SQLite database")
+            return False
+        else:
+            return True
+    except zlib.error:
+        return False
 
 
 def create_jba(out: bytes) -> JavaByteArray:
