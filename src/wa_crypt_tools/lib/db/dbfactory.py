@@ -2,7 +2,9 @@ import logging
 
 from google.protobuf.message import DecodeError
 
-from wa_crypt_tools.lib.database import Database15, Database14, Database12
+from wa_crypt_tools.lib.db.db12 import Database12
+from wa_crypt_tools.lib.db.db14 import Database14
+from wa_crypt_tools.lib.db.db15 import Database15
 
 l = logging.getLogger(__name__)
 
@@ -12,7 +14,7 @@ from re import findall
 
 class DatabaseFactory:
     @staticmethod
-    def from_file(file_hash, encrypted):
+    def from_file(encrypted):
         try:
             from wa_crypt_tools.proto import prefix_pb2 as prefix
             from wa_crypt_tools.proto import key_type_pb2 as key_type
@@ -36,7 +38,7 @@ class DatabaseFactory:
         l.debug("Parsing database header...")
 
         try:
-
+            file_hash = md5()
             # The first byte is the size of the upcoming protobuf message
             protobuf_size = encrypted.read(1)
             file_hash.update(protobuf_size)
@@ -121,9 +123,16 @@ class DatabaseFactory:
 
                     # We are done here
                     if header.c15_iv.IV:
-                        return Database15(iv=iv), file_hash
+                        db = Database15(iv=iv)
+                        db.file_hash = file_hash
+                        return db
+                    elif header.c14_cipher.IV:
+                        db = Database14(iv=iv)
+                        db.file_hash = file_hash
+                        return db
                     else:
-                        return Database14(iv=iv), file_hash
+                        l.error("Could not parse the IV from the protobuf message. Please report a bug.")
+                        raise DecodeError
 
             except DecodeError:
 
@@ -134,8 +143,7 @@ class DatabaseFactory:
                 except OSError as e:
                     l.fatal("Could not reset the file pointer: {}".format(e))
                     raise e
-                file_hash = md5()
-                return Database12(encrypted=encrypted, file_hash=file_hash), file_hash
+                return Database12(encrypted=encrypted)
 
 
         except OSError as e:

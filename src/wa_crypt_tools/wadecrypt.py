@@ -4,11 +4,10 @@ This script decrypts WhatsApp's DB files encrypted with Crypt12, Crypt14 or Cryp
 """
 
 from __future__ import annotations
-from lib.logformat import CustomFormatter
 
-from wa_crypt_tools import l
-from wa_crypt_tools.lib.databasefactory import DatabaseFactory
-from wa_crypt_tools.lib.keyfactory import KeyFactory
+from lib.logformat import CustomFormatter
+from lib.key.keyfactory import KeyFactory
+from lib.db.dbfactory import DatabaseFactory
 from wa_crypt_tools.lib.utils import test_decompression
 
 # AES import party!
@@ -25,26 +24,22 @@ except ModuleNotFoundError:
 
         if not hasattr(AES, 'MODE_GCM'):
             # pycrypto
-            print("You installed pycrypto and not pycryptodome(x).")
-            print("Pycrypto is old, deprecated and not supported.")
-            print("Run: python -m pip uninstall pycrypto")
-            print("And: python -m pip install pycryptodomex")
-            print("Or:  python -m pip install pycryptodome")
-            exit(1)
+            raise ModuleNotFoundError("You installed pycrypto and not pycryptodome(x). "
+            "Pycrypto is old, deprecated and not supported. \n"
+            "Run: python -m pip uninstall pycrypto\n"
+            "And: python -m pip install pycryptodomex\n"
+            "Or:  python -m pip install pycryptodome")
     except ModuleNotFoundError:
         # crypto (or nothing)
-        print("You need pycryptodome(x) to run this script")
-        print("python -m pip install pycryptodomex")
-        print("Or: python -m pip install pycryptodome")
-        print("You can also remove \"crypto\" if you have it installed")
-        print("python -m pip uninstall crypto")
-        exit(1)
-
+        raise ModuleNotFoundError("You need pycryptodome(x) to run these scripts!\n"
+        "python -m pip install pycryptodome\n"
+        "Or: python -m pip install pycryptodome\n"
+        "You can also remove \"crypto\" if you have it installed\n"
+        "python -m pip uninstall crypto")
 # noinspection PyPackageRequirements
 # This is from javaobj-py3
 
 # noinspection PyPackageRequirements
-from google.protobuf.message import DecodeError
 
 from hashlib import md5
 import io
@@ -61,13 +56,9 @@ __copyright__ = 'Copyright (C) 2023'
 __license__ = 'GPLv3'
 __status__ = 'Production'
 
-
-
-
-
 import logging
-
 l = logging.getLogger(__name__)
+
 
 
 def parsecmdline() -> argparse.Namespace:
@@ -90,9 +81,6 @@ def parsecmdline() -> argparse.Namespace:
     parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
 
     return parser.parse_args()
-
-
-
 
 
 def decrypt(file_hash: _Hash, cipher, encrypted, decrypted, buffer_size: int = 0):
@@ -140,7 +128,7 @@ def decrypt(file_hash: _Hash, cipher, encrypted, decrypted, buffer_size: int = 0
                     output_decrypted: bytearray = cipher.decrypt(encrypted_data)
                 except ValueError as e:
                     l.fatal("Decryption failed: {}."
-                        "\n    This probably means your backup is corrupted.".format(e))
+                            "\n    This probably means your backup is corrupted.".format(e))
                     # Dead code to make pycharm warning go away
                     exit(1)
 
@@ -158,7 +146,7 @@ def decrypt(file_hash: _Hash, cipher, encrypted, decrypted, buffer_size: int = 0
                         cipher.verify(authentication_tag)
                 except ValueError as e:
                     l.error("Authentication tag mismatch: {}."
-                        "\n    This probably means your backup is corrupted.".format(e))
+                            "\n    This probably means your backup is corrupted.".format(e))
 
                 try:
                     output_file = z_obj.decompress(output_decrypted)
@@ -170,8 +158,8 @@ def decrypt(file_hash: _Hash, cipher, encrypted, decrypted, buffer_size: int = 0
                         l.info("Decrypted data is a ZIP file that I will not decompress automatically.")
                     else:
                         l.error("I can't recognize decrypted data. Decryption not successful.\n    "
-                            "The key probably does not match with the encrypted file.\n    "
-                            "Or the backup is simply empty. (check with --force)")
+                                "The key probably does not match with the encrypted file.\n    "
+                                "Or the backup is simply empty. (check with --force)")
 
                 decrypted.write(output_file)
 
@@ -246,7 +234,7 @@ def decrypt(file_hash: _Hash, cipher, encrypted, decrypted, buffer_size: int = 0
                             l.info("Decrypted data is a ZIP file that I will not decompress automatically.")
                         else:
                             l.error("I can't recognize decrypted data. Decryption not successful.\n    "
-                                "The key probably does not match with the encrypted file.")
+                                    "The key probably does not match with the encrypted file.")
                         is_zip = False
                         decrypted.write(decrypted_chunk)
                 else:
@@ -290,15 +278,12 @@ def decrypt(file_hash: _Hash, cipher, encrypted, decrypted, buffer_size: int = 0
                             cipher.verify(checksum[:16])
                     except ValueError as e:
                         l.error("Authentication tag mismatch: {}."
-                            "\n    This probably means your backup is corrupted.".format(e))
+                                "\n    This probably means your backup is corrupted.".format(e))
                     break
 
                 chunk = next_chunk
 
             if is_zip and not z_obj.eof:
-
-                if not l.force:
-                    decrypted.truncate(0)
                 l.error("The encrypted database file is truncated (damaged).")
 
         decrypted.flush()
@@ -312,7 +297,6 @@ def decrypt(file_hash: _Hash, cipher, encrypted, decrypted, buffer_size: int = 0
 
 
 def main():
-
     args = parsecmdline()
 
     # set wa_crypt_tools l to debug
@@ -327,17 +311,16 @@ def main():
     # Get the decryption key from the key file or the hex encoded string.
     key = KeyFactory.new(args.keyfile)
     l.debug(str(key))
-    file_hash = md5()
 
-    db, file_hash = DatabaseFactory.from_file(file_hash, args.encrypted)
+    db = DatabaseFactory.from_file(args.encrypted)
     cipher = AES.new(key.get(), AES.MODE_GCM, db.get_iv())
 
     if args.buffer_size is not None:
-        decrypt(file_hash, cipher, args.encrypted, args.decrypted, args.buffer_size)
+        decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, args.buffer_size)
     elif args.no_mem:
-        decrypt(file_hash, cipher, args.encrypted, args.decrypted, io.DEFAULT_BUFFER_SIZE)
+        decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, io.DEFAULT_BUFFER_SIZE)
     else:
-        decrypt(file_hash, cipher, args.encrypted, args.decrypted)
+        decrypt(db.file_hash, cipher, args.encrypted, args.decrypted)
 
     if date.today().day == 1 and date.today().month == 4:
         l.info("Done. Uploading messages to the developer's server...")
@@ -345,6 +328,7 @@ def main():
         l.info("Uploaded. The developer will now read and publish your messages!")
     else:
         l.info("Done")
+
 
 if __name__ == "__main__":
     main()

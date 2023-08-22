@@ -2,7 +2,6 @@
 # pycryptodome and PyCryptodomex's implementations of AES are the same,
 # so we try to import one of these twos.
 import argparse
-import collections
 import io
 import zlib
 from datetime import date
@@ -12,12 +11,15 @@ import logging
 from time import sleep
 
 from wa_crypt_tools.lib.constants import C
-from wa_crypt_tools.lib.keyfactory import KeyFactory
+from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 from wa_crypt_tools.lib.logformat import CustomFormatter
 from wa_crypt_tools.lib.utils import test_decompression
 
 l = logging.getLogger(__name__)
 
+# AES import party!
+# pycryptodome and PyCryptodomex's implementations of AES are the same,
+# so we try to import one of these twos.
 try:
     # pycryptodomex
     from Cryptodome.Cipher import AES
@@ -29,20 +31,19 @@ except ModuleNotFoundError:
 
         if not hasattr(AES, 'MODE_GCM'):
             # pycrypto
-            print("You installed pycrypto and not pycryptodome(x).")
-            print("Pycrypto is old, deprecated and not supported.")
-            print("Run: python -m pip uninstall pycrypto")
-            print("And: python -m pip install pycryptodomex")
-            print("Or:  python -m pip install pycryptodome")
-            exit(1)
+            raise ModuleNotFoundError("You installed pycrypto and not pycryptodome(x). "
+            "Pycrypto is old, deprecated and not supported. \n"
+            "Run: python -m pip uninstall pycrypto\n"
+            "And: python -m pip install pycryptodomex\n"
+            "Or:  python -m pip install pycryptodome")
     except ModuleNotFoundError:
         # crypto (or nothing)
-        print("You need pycryptodome(x) to run this script")
-        print("python -m pip install pycryptodomex")
-        print("Or: python -m pip install pycryptodome")
-        print("You can also remove \"crypto\" if you have it installed")
-        print("python -m pip uninstall crypto")
-        exit(1)
+        raise ModuleNotFoundError("You need pycryptodome(x) to run these scripts!\n"
+        "python -m pip install pycryptodome\n"
+        "Or: python -m pip install pycryptodome\n"
+        "You can also remove \"crypto\" if you have it installed\n"
+        "python -m pip uninstall crypto")
+
 
 
 def oscillate(n: int, n_min: int, n_max: int):

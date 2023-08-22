@@ -2,7 +2,8 @@ from pathlib import Path
 
 import javaobj.v2 as javaobj
 
-from wa_crypt_tools.lib.key import Key14, Key15
+from wa_crypt_tools.lib.key.key14 import Key14
+from wa_crypt_tools.lib.key.key15 import Key15
 
 import logging
 
