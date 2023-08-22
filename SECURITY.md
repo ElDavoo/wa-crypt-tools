@@ -6,4 +6,4 @@ Latest
 
 ## Reporting a Vulnerability
 
-Open an issue
+Open an issue or contact me in my profile's email

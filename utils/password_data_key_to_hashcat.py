@@ -59,7 +59,7 @@ def javaintlist2bytes(barr: javaobj.beans.JavaArray) -> bytes:
     return out
 
 
-def read_password_data_key(passworddatakeyfilestream: argparse.FileType('rb')) -> str:
+def read_password_data_key(passworddatakeyfilestream) -> str:
     # Assign variables to suppress warnings
     deserialized: list = list()
 

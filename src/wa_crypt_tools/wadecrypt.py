@@ -41,10 +41,9 @@ except ModuleNotFoundError:
 
 # noinspection PyPackageRequirements
 
-from hashlib import md5
 import io
 from re import findall
-from sys import exit, maxsize
+from sys import maxsize
 from time import sleep
 from datetime import date
 
@@ -84,7 +83,7 @@ def parsecmdline() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def chunked_decrypt(file_hash: _Hash, cipher, encrypted, decrypted, buffer_size: int = 0):
+def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 0):
     """Does the actual decryption."""
 
     z_obj = zlib.decompressobj()

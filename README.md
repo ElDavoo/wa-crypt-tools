@@ -1,3 +1,5 @@
+[![Coverage Status](https://coveralls.io/repos/github/ElDavoo/wa-crypt-tools/badge.svg?branch=main)](https://coveralls.io/github/ElDavoo/wa-crypt-tools?branch=main)
+
 # WhatsApp Crypt Tools
 Decrypts WhatsApp .crypt12, .crypt14 and .crypt15 files, **given the key file** or the 64-characters long key.  
 The key file is named "key" if the backup is crypt14 or  
