@@ -38,4 +38,5 @@ message Version_Features {
     optional bool quoted_ui_elements_reply_message = 35;
     optional bool alter_message_ephemeral_to_message_ephemeral_remove_column = 36;
     optional bool alter_message_ephemeral_setting_to_message_ephemeral_setting_remove_column = 37;
+    optional bool feature_39 = 39;
 }
