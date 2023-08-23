@@ -149,3 +149,9 @@ class Database15(Database):
                     "\n    This probably means your backup is corrupted.".format(e))
 
         return output_decrypted
+
+    def encrypt(self, key: Key15, decrypted: bytes) -> bytes:
+        pass
+
+    def get_iv(self) -> bytes:
+        return self.iv

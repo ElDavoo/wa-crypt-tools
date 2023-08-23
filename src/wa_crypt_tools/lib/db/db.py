@@ -20,8 +20,10 @@ class Database(abc.ABC):
     def decrypt(self, key: Key, encrypted: bytes) -> bytes:
         pass
 
+    @abc.abstractmethod
     def encrypt(self, key: Key, decrypted: bytes) -> bytes:
         pass
 
+    @abc.abstractmethod
     def get_iv(self) -> bytes:
         return self.iv

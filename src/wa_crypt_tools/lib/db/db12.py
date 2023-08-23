@@ -192,15 +192,22 @@ class Database12(Database):
                     "\n    This probably means your backup is corrupted.".format(e))
 
         return output_decrypted
-    def write(self, file: Path, input: bytes):
-        """Writes the database to a file."""
-        with open(file, 'wb') as f:
+    def encrypt(self, key: Key14, decrypted: bytes) -> bytes:
+        hash = md5()
+        out = b""
+        out += self.cipher_version
+        out += self.key_version
+        out += self.serversalt
+        out += self.googleid
+        out += self.iv
+        cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)
+        encrypted = cipher.encrypt(decrypted)
+        out += encrypted
+        out += cipher.digest()
+        hash.update(out)
+        out += hash.digest()
+        return out
 
-            f.write(self.cipher_version)
-            f.write(self.key_version)
-            f.write(self.serversalt)
-            f.write(self.googleid)
-            f.write(self.iv)
 
 
     def get_iv(self) -> bytes:
