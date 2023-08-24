@@ -16,7 +16,7 @@ class Database15(Database):
         return "Database15"
         # todo
 
-    def __init__(self, key: Key15 = None, encrypted=None, iv: bytes = None):
+    def __init__(self, *, key: Key15 = None, encrypted=None, iv: bytes = None):
         self.file_hash = md5()
         if encrypted:
             try:
@@ -104,6 +104,8 @@ class Database15(Database):
                 raise e
         else:
             if iv:
+                if len(iv) != 16:
+                    l.error("IV is not 16 bytes long but is {} bytes long".format(len(iv)))
                 self.iv = iv
             else:
                 self.iv = urandom(16)
@@ -151,7 +153,79 @@ class Database15(Database):
         return output_decrypted
 
     def encrypt(self, key: Key15, decrypted: bytes) -> bytes:
-        pass
+        """Encrypts the database using the provided key"""
+        from wa_crypt_tools.proto import C15_IV_pb2 as C15_IV
+        cipher = C15_IV.C15_IV()
+        cipher.IV = self.iv
+        from wa_crypt_tools.proto import prefix_pb2 as prefix
+        from wa_crypt_tools.proto import key_type_pb2 as key_type
+        prefix = prefix.prefix()
+        prefix.key_type = key_type.Key_Type.HSM_CONTROLLED
+        prefix.c15_iv.CopyFrom(cipher)
 
+        from wa_crypt_tools.proto import version_features_pb2 as version_features
+        version_features = version_features.Version_Features()
+        version_features.whatsapp_version = "2.22.5.13"
+        version_features.substringedUserJid = "67"
+
+        def populate_info(info, is_crypt15=True):
+            """
+            For know there is no way to know the correct values for these fields.
+            So it is strongly advised to have another encrypted msgstore,
+            and to copy the values from there. This feature is not implemented yet.
+            """
+            if is_crypt15:
+                # Iterate over all the features and set them to true
+                for feature in info.DESCRIPTOR.fields:
+                    value = getattr(info, feature.name)
+                    if feature.type == feature.TYPE_BOOL:
+                        setattr(info, feature.name, True)
+                info.idk = False
+                info.message_main_verification = False
+                info.feature_39 = True
+
+        def populate_info(info):
+            # Iterate over all the features and set them to true
+            for feature in info.DESCRIPTOR.fields:
+                value = getattr(info, feature.name)
+                if feature.type == feature.TYPE_BOOL:
+                    setattr(info, feature.name, False)
+                info.call_log = True
+                info.message_fts = True
+                info.blank_me_jid = True
+                info.receipt_user = True
+                info.message_media = True
+                info.receipt_device = True
+                info.broadcast_me_jid = True
+                info.participant_user = True
+                info.migration_jid_store = True
+                info.migration_chat_store = True
+                info.quoted_order_message = True
+                info.media_migration_fixer = True
+                info.alter_message_ephemeral_to_message_ephemeral_remove_column = True
+                info.alter_message_ephemeral_setting_to_message_ephemeral_setting_remove_column = True
+                info.ClearField("feature_39")
+
+        populate_info(version_features)
+
+        prefix.info.CopyFrom(version_features)
+        prefix = prefix.SerializeToString()
+        out = b''
+        file_hash = md5()
+        out += len(prefix).to_bytes(1, byteorder='big')
+        file_hash.update(out)
+        # FIXME support feature table
+        out += b'\x01'
+        file_hash.update(b'\x01')
+        out += prefix
+        file_hash.update(prefix)
+        cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)
+        encrypted_data, authentication_tag = cipher.encrypt_and_digest(decrypted)
+        out += encrypted_data
+        file_hash.update(encrypted_data)
+        out += authentication_tag
+        file_hash.update(authentication_tag)
+        out += file_hash.digest()
+        return out
     def get_iv(self) -> bytes:
         return self.iv

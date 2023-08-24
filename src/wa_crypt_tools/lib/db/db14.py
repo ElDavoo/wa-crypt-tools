@@ -1,18 +1,20 @@
+import logging
+from hashlib import md5
 from os import urandom
-from pathlib import Path
 from re import findall
 
 from Cryptodome.Cipher import AES
 from google.protobuf.message import DecodeError
-
-import logging
 
 from wa_crypt_tools.lib.db.db import Database
 from wa_crypt_tools.lib.key.key import Key
 from wa_crypt_tools.lib.key.key14 import Key14
 
 l = logging.getLogger(__name__)
+
+
 class Database14(Database):
+
     def __init__(self, key: Key14 = None, encrypted=None, file_hash=None,
                  cipher_version: bytes = None, key_version: bytes = None, serversalt: bytes = None,
                  googleid: bytes = None, iv: bytes = None):
@@ -134,9 +136,9 @@ class Database14(Database):
             else:
                 self.__iv = urandom(16)
 
-    # overwrite write method
-    def write_header(self, file: Path):
-        # Writes a protobuf message
+
+    def encrypt(self, key: Key, decrypted: bytes) -> bytes:
+        """Encrypts the database using the provided key"""
         from wa_crypt_tools.proto import C14_cipher_pb2 as C14_cipher
         cipher = C14_cipher.C14_cipher()
         cipher.key_version = self.key_version
@@ -152,26 +154,58 @@ class Database14(Database):
         version_features = version_features.Version_Features()
         version_features.whatsapp_version = "2.21.11"
         version_features.substringedUserJid = "00"
+        version_features.idk = 0
+        version_features.call_log=1
+
+        def populate_info(info, is_crypt15=True):
+            """
+            For know there is no way to know the correct values for these fields.
+            So it is strongly advised to have another encrypted msgstore,
+            and to copy the values from there. This feature is not implemented yet.
+            """
+            if is_crypt15:
+                # Iterate over all the features and set them to true
+                for feature in info.DESCRIPTOR.fields:
+                    value = getattr(info, feature.name)
+                    if feature.type == feature.TYPE_BOOL:
+                        setattr(info, feature.name, True)
+                info.idk = False
+                info.message_main_verification = False
+                info.feature_39 = True
+        populate_info(version_features, True)
 
         prefix.info.CopyFrom(version_features)
         prefix = prefix.SerializeToString()
-        print(prefix)
-        print(type(prefix))
-        with open(file, 'wb') as f:
-            f.write(len(prefix).to_bytes(1, 'big'))
-            if version_features.HasField("idk"):
-                f.write(b'\x01')
-            f.write(prefix)
+        out = b''
+        file_hash = md5()
+        out += len(prefix).to_bytes(1, byteorder='big')
+        file_hash.update(out)
+        # FIXME support feature table
+        out += b'\x01'
+        file_hash.update(b'\x01')
+        out += prefix
+        file_hash.update(prefix)
+        cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)
+        encrypted_data, authentication_tag = cipher.encrypt_and_digest(decrypted)
+        out += encrypted_data
+        file_hash.update(encrypted_data)
+        out += authentication_tag
+        file_hash.update(authentication_tag)
+        out += file_hash.digest()
+        return out
+
 
     def __str__(self):
         return f"""cipher_version: {self.cipher_version}
-key_version: {self.key_version}
-serversalt: {self.serversalt}
-googleid: {self.googleid}
-iv: {self.iv}"""
+    key_version: {self.key_version}
+    serversalt: {self.serversalt}
+    googleid: {self.googleid}
+    iv: {self.iv}"""
+
 
     def get_iv(self) -> bytes:
         return self.__iv
+
 
     def decrypt(self, key: Key14, encrypted: bytes) -> bytes:
         """Decrypts the database using the provided key"""
