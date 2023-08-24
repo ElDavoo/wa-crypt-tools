@@ -5,9 +5,9 @@ This script decrypts WhatsApp's DB files encrypted with Crypt12, Crypt14 or Cryp
 
 from __future__ import annotations
 
-from lib.logformat import CustomFormatter
-from lib.key.keyfactory import KeyFactory
-from lib.db.dbfactory import DatabaseFactory
+from wa_crypt_tools.lib.logformat import CustomFormatter
+from wa_crypt_tools.lib.key.keyfactory import KeyFactory
+from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
 from wa_crypt_tools.lib.utils import test_decompression
 
 # AES import party!

@@ -9,6 +9,7 @@ from google.protobuf.message import DecodeError
 from wa_crypt_tools.lib.db.db import Database
 from wa_crypt_tools.lib.key.key import Key
 from wa_crypt_tools.lib.key.key14 import Key14
+from wa_crypt_tools.lib.props import Props
 
 l = logging.getLogger(__name__)
 
@@ -137,44 +138,26 @@ class Database14(Database):
                 self.__iv = urandom(16)
 
 
-    def encrypt(self, key: Key, decrypted: bytes) -> bytes:
+    def encrypt(self, key: Key, props: Props, decrypted: bytes) -> bytes:
         """Encrypts the database using the provided key"""
         from wa_crypt_tools.proto import C14_cipher_pb2 as C14_cipher
+        from wa_crypt_tools.proto import key_type_pb2 as key_type
+
         cipher = C14_cipher.C14_cipher()
-        cipher.key_version = self.key_version
-        cipher.server_salt = self.serversalt
-        cipher.google_id = self.googleid
-        cipher.IV = self.iv
+        # TODO which ones take priority? Key or self values?
+        cipher.cipher_version = key.get_cipher_version()
+        #FIXME
+        cipher.key_version = "2".encode()
+        cipher.server_salt = key.get_serversalt()
+        cipher.google_id = key.get_googleid()
+        cipher.IV = self.__iv
         from wa_crypt_tools.proto import prefix_pb2 as prefix
         from wa_crypt_tools.proto import key_type_pb2 as key_type
         prefix = prefix.prefix()
+        prefix.key_type = 0
         prefix.c14_cipher.CopyFrom(cipher)
-        prefix.key_type = key_type.WA_PROVIDED
-        from wa_crypt_tools.proto import version_features_pb2 as version_features
-        version_features = version_features.Version_Features()
-        version_features.whatsapp_version = "2.21.11"
-        version_features.substringedUserJid = "00"
-        version_features.idk = 0
-        version_features.call_log=1
 
-        def populate_info(info, is_crypt15=True):
-            """
-            For know there is no way to know the correct values for these fields.
-            So it is strongly advised to have another encrypted msgstore,
-            and to copy the values from there. This feature is not implemented yet.
-            """
-            if is_crypt15:
-                # Iterate over all the features and set them to true
-                for feature in info.DESCRIPTOR.fields:
-                    value = getattr(info, feature.name)
-                    if feature.type == feature.TYPE_BOOL:
-                        setattr(info, feature.name, True)
-                info.idk = False
-                info.message_main_verification = False
-                info.feature_39 = True
-        populate_info(version_features, True)
-
-        prefix.info.CopyFrom(version_features)
+        prefix.info.CopyFrom(props.get_proto())
         prefix = prefix.SerializeToString()
         out = b''
         file_hash = md5()
@@ -185,7 +168,7 @@ class Database14(Database):
         file_hash.update(b'\x01')
         out += prefix
         file_hash.update(prefix)
-        cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)
+        cipher = AES.new(key.get(), AES.MODE_GCM, self.__iv)
         encrypted_data, authentication_tag = cipher.encrypt_and_digest(decrypted)
         out += encrypted_data
         file_hash.update(encrypted_data)

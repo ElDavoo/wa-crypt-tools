@@ -95,7 +95,7 @@ class Key14(Key):
         for v in self.__SUPPORTED_KEY_VERSIONS:
             if v == keyarray[index:index + len(self.__SUPPORTED_KEY_VERSIONS[0])]:
                 version_supported = True
-                self.key_version = v
+                self.__key_version = v
                 break
         if not version_supported:
             l.error('Invalid keyfile: Unsupported key version {}'
@@ -138,7 +138,7 @@ class Key14(Key):
         return self.__cipher_version
 
     def get_key_version(self) -> bytes:
-        return self.key_version
+        return self.__key_version
 
 
     def __str__(self) -> str:

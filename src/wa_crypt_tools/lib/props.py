@@ -8,7 +8,10 @@ class Props:
         self.props.whatsapp_version = wa_version
         self.props.substringedUserJid = jid
         for f in range(4, max_feature):
-            self.disable_feature(f)
+            try:
+                self.disable_feature(f)
+            except AttributeError:
+                pass
         for f in features:
             self.enable_feature(f)
 
