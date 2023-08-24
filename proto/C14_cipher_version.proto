@@ -1,6 +1,0 @@
-syntax = "proto3";
-
-// crypt14 cipher files. Actually the field tag is zero.
-message C14_cipher_version {
-    int32 version = 1;
-}

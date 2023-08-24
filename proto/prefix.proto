@@ -8,7 +8,9 @@ import "version_features.proto";
 This file describes the header you can find near the start of an encrypted backup file.
  */
 message prefix {
-    Key_Type key_type = 1; // 0 if traditional (crypt14), 1 if end-to-end (crypt15)
+    // The "optional" here is to make protobuf serialize the zero as well,
+    // otherwise, being the default for numeric, it would be omitted.
+    optional Key_Type key_type = 1; // 0 if traditional (crypt14), 1 if end-to-end (crypt15)
     oneof cipher_info {
         C14_cipher c14_cipher = 2; // If DB is crypt14
         C15_IV c15_iv = 3; // If DB is crypt15
