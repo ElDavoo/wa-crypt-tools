@@ -13,3 +13,14 @@ class C:
     HEADER_SIZE = 384
     DEFAULT_DATA_OFFSET = 122
     DEFAULT_IV_OFFSET = 8
+
+    # Encryption constants
+    DEFAULT_WA_VERSION = "2.23.18.4"
+    DEFAULT_JID = "00"
+    # The Props I got from a recent backup of mine
+    DEFAULT_FEATURE_LIST = [5, 6, 7, 8, 9,
+                            10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+                            20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+                            30, 31, 32, 33, 35, 36, 37, 39]
+    # Old backups might not have knowledge of the new features (in 2022 backups the max is 37)
+    DEFAULT_MAX_FEATURE = 39

@@ -6,6 +6,8 @@ from re import findall
 from Cryptodome.Cipher import AES
 from google.protobuf.message import DecodeError
 
+from wa_crypt_tools.lib.props import Props
+
 l = logging.getLogger(__name__)
 
 from wa_crypt_tools.lib.db.db import Database
@@ -152,7 +154,7 @@ class Database15(Database):
 
         return output_decrypted
 
-    def encrypt(self, key: Key15, decrypted: bytes) -> bytes:
+    def encrypt(self, key: Key15, props: Props, decrypted: bytes) -> bytes:
         """Encrypts the database using the provided key"""
         from wa_crypt_tools.proto import C15_IV_pb2 as C15_IV
         cipher = C15_IV.C15_IV()
@@ -163,52 +165,7 @@ class Database15(Database):
         prefix.key_type = key_type.Key_Type.HSM_CONTROLLED
         prefix.c15_iv.CopyFrom(cipher)
 
-        from wa_crypt_tools.proto import version_features_pb2 as version_features
-        version_features = version_features.Version_Features()
-        version_features.whatsapp_version = "2.22.5.13"
-        version_features.substringedUserJid = "67"
-
-        def populate_info(info, is_crypt15=True):
-            """
-            For know there is no way to know the correct values for these fields.
-            So it is strongly advised to have another encrypted msgstore,
-            and to copy the values from there. This feature is not implemented yet.
-            """
-            if is_crypt15:
-                # Iterate over all the features and set them to true
-                for feature in info.DESCRIPTOR.fields:
-                    value = getattr(info, feature.name)
-                    if feature.type == feature.TYPE_BOOL:
-                        setattr(info, feature.name, True)
-                info.idk = False
-                info.message_main_verification = False
-                info.feature_39 = True
-
-        def populate_info(info):
-            # Iterate over all the features and set them to true
-            for feature in info.DESCRIPTOR.fields:
-                value = getattr(info, feature.name)
-                if feature.type == feature.TYPE_BOOL:
-                    setattr(info, feature.name, False)
-                info.call_log = True
-                info.message_fts = True
-                info.blank_me_jid = True
-                info.receipt_user = True
-                info.message_media = True
-                info.receipt_device = True
-                info.broadcast_me_jid = True
-                info.participant_user = True
-                info.migration_jid_store = True
-                info.migration_chat_store = True
-                info.quoted_order_message = True
-                info.media_migration_fixer = True
-                info.alter_message_ephemeral_to_message_ephemeral_remove_column = True
-                info.alter_message_ephemeral_setting_to_message_ephemeral_setting_remove_column = True
-                info.ClearField("feature_39")
-
-        populate_info(version_features)
-
-        prefix.info.CopyFrom(version_features)
+        prefix.info.CopyFrom(props.get_proto())
         prefix = prefix.SerializeToString()
         out = b''
         file_hash = md5()
