@@ -163,9 +163,9 @@ class Database14(Database):
         file_hash = md5()
         out += len(prefix).to_bytes(1, byteorder='big')
         file_hash.update(out)
-        # FIXME support feature table
-        out += b'\x01'
-        file_hash.update(b'\x01')
+        if len(props.get_features()) > 0:
+            out += b'\x01'
+            file_hash.update(b'\x01')
         out += prefix
         file_hash.update(prefix)
         cipher = AES.new(key.get(), AES.MODE_GCM, self.__iv)

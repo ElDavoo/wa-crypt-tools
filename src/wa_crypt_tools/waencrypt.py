@@ -29,8 +29,7 @@ def parsecmdline() -> argparse.Namespace:
     parser.add_argument('-f', '--force', action='store_true',
                         help='Makes errors non fatal. Default: false')
     parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
-    parser.add_argument('--msgstore', action='store_true', help='Encrypts a msgstore.db file')
-    parser.add_argument('--enable-features', type=int, nargs='+', default=C.DEFAULT_FEATURE_LIST, help='Enables the specified features. ')
+    parser.add_argument('--enable-features', type=int, nargs='*', default=C.DEFAULT_FEATURE_LIST, help='Enables the specified features. ')
     parser.add_argument('--max-feature', type=int, default=39, help='The max feature number, the older is the backup the lower should be the number. ')
     parser.add_argument('--multi-file', action='store_true', help='Encrypts a multi-file backup (either stickers or wallpapers)')
     # Add an argument "type" that can be either 14 or 15
