@@ -77,13 +77,16 @@ def parsecmdline() -> argparse.Namespace:
     parser.add_argument('-bs', '--buffer-size', type=int, help='How many bytes of data to process at a time. '
                                                                'Implies -nm. Default: {}'.format(
         io.DEFAULT_BUFFER_SIZE))
+    parser.add_argument('-nd', '--no-decompress', action='store_true',
+                        help='Does not decompress the decrypted data. '
+                             'Default: decompresses the decrypted data')
     parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
     parser.add_argument('-f', '--force', action='store_true', help='Does nothing, but it is here for compatibility')
 
     return parser.parse_args()
 
 
-def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 0):
+def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 0, no_decompress: bool = False):
     """Does the actual decryption."""
 
     z_obj = zlib.decompressobj()
@@ -138,7 +141,10 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
                 decrypted_chunk = cipher.decrypt(chunk)
                 if is_zip:
                     try:
-                        decrypted.write(z_obj.decompress(decrypted_chunk))
+                        if no_decompress:
+                            decrypted.write(decrypted_chunk)
+                        else:
+                            decrypted.write(z_obj.decompress(decrypted_chunk))
                     except zlib.error:
                         if test_decompression(decrypted_chunk):
                             l.info("Decrypted data is a ZIP file that I will not decompress automatically.")
@@ -167,7 +173,10 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
                         decrypted_chunk = cipher.decrypt(chunk)
                         if is_zip:
                             try:
-                                decrypted.write(z_obj.decompress(decrypted_chunk))
+                                if no_decompress:
+                                    decrypted.write(decrypted_chunk)
+                                else:
+                                    decrypted.write(z_obj.decompress(decrypted_chunk))
                             except zlib.error:
                                 l.error("Backup is corrupted.")
                                 decrypted.write(decrypted_chunk)
@@ -226,17 +235,20 @@ def main():
     cipher = AES.new(key.get(), AES.MODE_GCM, db.get_iv())
 
     if args.buffer_size is not None:
-        chunked_decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, args.buffer_size)
+        chunked_decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, args.buffer_size, args.no_decompress)
     elif args.no_mem:
-        chunked_decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, io.DEFAULT_BUFFER_SIZE)
+        chunked_decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, io.DEFAULT_BUFFER_SIZE, args.no_decompress)
     else:
         output_decrypted: bytearray = db.decrypt(key, args.encrypted.read())
         try:
 
             z_obj = zlib.decompressobj()
-            output_file = z_obj.decompress(output_decrypted)
-            if not z_obj.eof:
-                l.error("The encrypted database file is truncated (damaged).")
+            if args.no_decompress:
+                output_file = output_decrypted
+            else:
+                output_file = z_obj.decompress(output_decrypted)
+                if not z_obj.eof:
+                    l.error("The encrypted database file is truncated (damaged).")
         except zlib.error:
             output_file = output_decrypted
             if test_decompression(output_file[:io.DEFAULT_BUFFER_SIZE]):

@@ -46,7 +46,7 @@ class Props:
         return self.props.version
 
     def get_jid(self) -> str:
-        return self.props.jid
+        return self.props.substringedUserJid
 
     def get_proto(self):
         return self.props

@@ -56,6 +56,8 @@ class KeyFactory:
 
     @staticmethod
     def from_hex(hexstring: str):
+        if hexstring is None or len(hexstring) != 64:
+            raise ValueError("The key is invalid or of the wrong length.")
         barr: bytes = hexstring2bytes(hexstring)
         if barr is None or len(barr) != 32:
             raise ValueError("The key is invalid or of the wrong length.")

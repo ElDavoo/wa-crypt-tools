@@ -9,6 +9,7 @@ import logging
 
 from wa_crypt_tools.lib.db.db import Database
 from wa_crypt_tools.lib.key.key14 import Key14
+from wa_crypt_tools.lib.props import Props
 
 l = logging.getLogger(__name__)
 class Database12(Database):
@@ -93,7 +94,10 @@ class Database12(Database):
             self.file_hash.update(self.serversalt)
             self.googleid = key.get_googleid()
             self.file_hash.update(self.googleid)
-            self.iv = urandom(16)
+            if iv:
+                self.iv = iv
+            else:
+                self.iv = urandom(16)
             self.file_hash.update(self.iv)
         else:
             if cipher_version:
@@ -192,7 +196,7 @@ class Database12(Database):
                     "\n    This probably means your backup is corrupted.".format(e))
 
         return output_decrypted
-    def encrypt(self, key: Key14, decrypted: bytes) -> bytes:
+    def encrypt(self, key: Key14, props: Props, decrypted: bytes) -> bytes:
         hash = md5()
         out = b""
         out += self.cipher_version
@@ -206,6 +210,10 @@ class Database12(Database):
         out += cipher.digest()
         hash.update(out)
         out += hash.digest()
+        jid = props.get_jid()
+        if len(jid) != 2:
+            l.error("The phone number end is not 2 characters long")
+        out += "--{}".format(jid).encode()
         return out
 
 
