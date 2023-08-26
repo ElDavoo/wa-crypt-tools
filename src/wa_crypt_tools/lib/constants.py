@@ -14,8 +14,9 @@ class C:
     DEFAULT_IV_OFFSET = 8
 
     # Encryption constants
-    DEFAULT_WA_VERSION = "2.23.18.4"
-    DEFAULT_JID = "00"
+    DEFAULT_APP_VERSION = "2.23.18.12"
+    DEFAULT_JID_SUFFIX = "00"
+    DEFAULT_BACKUP_VERSION = 0
     # The Props I got from a recent backup of mine
     DEFAULT_FEATURE_LIST = [5, 6, 7, 8, 9,
                             10, 11, 12, 13, 14, 15, 16, 17, 18, 19,

@@ -1,0 +1,45 @@
+syntax = "proto3";
+// This describes the metadata, e.g. the version, the ph number and various features.
+message BackupExpiry {
+    string app_version = 1; // Whatsapp version, for example "2.22.4.14"
+    // optional string device_model = 2; // Device model, unused
+    string jidSuffix = 3; // The last two numbers of the user's Jid (phone number)
+    // These bools are only written if the backup is a msgstore backup.
+    optional int32 backup_version = 4;
+    // Booleans that indicate various features
+    optional bool f_5 = 5; // call_log
+    optional bool f_6 = 6; // labeled_jid
+    optional bool f_7 = 7; // message_fts
+    optional bool f_8 = 8; // blank_me_jid
+    optional bool f_9 = 9; // message_link
+    optional bool f_10 = 10; // message_main
+    optional bool f_11 = 11; // message_text
+    optional bool f_12 = 12; // missed_calls
+    optional bool f_13 = 13; // receipt_user
+    optional bool f_14 = 14; // message_media
+    optional bool f_15 = 15; // message_vcard
+    optional bool f_16 = 16; // message_future
+    optional bool f_17 = 17; // message_quoted
+    optional bool f_18 = 18; // message_system
+    optional bool f_19 = 19; // receipt_device
+    optional bool f_20 = 20; // message_mention
+    optional bool f_21 = 21; // message_revoked
+    optional bool f_22 = 22; // broadcast_me_jid
+    optional bool f_23 = 23; // message_frequent
+    optional bool f_24 = 24; // message_location
+    optional bool f_25 = 25; // participant_user
+    optional bool f_26 = 26; // message_thumbnail
+    optional bool f_27 = 27; // message_send_count
+    optional bool f_28 = 28; // migration_jid_store
+    optional bool f_29 = 29; // payment_transaction
+    optional bool f_30 = 30; // migration_chat_store
+    optional bool f_31 = 31; // quoted_order_message
+    optional bool f_32 = 32; // media_migration_fixer
+    optional bool f_33 = 33; // quoted_order_message_v2
+    optional bool f_34 = 34; // message_main_verification
+    optional bool f_35 = 35; // quoted_ui_elements_reply_message
+    optional bool f_36 = 36; // alter_message_ephemeral_to_message_ephemeral_remove_column
+    optional bool f_37 = 37; // alter_message_ephemeral_setting_to_message_ephemeral_setting_remove_column
+    // optional int32 backup_export_file_size = 38; // The size of the backup file, unused
+    optional bool f_39 = 39; // cleaned_db
+}

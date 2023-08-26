@@ -59,6 +59,12 @@ class Key15(Key):
             message=b'backup encryption',
             permutations=1)
 
+    def get_root(self) -> bytes:
+        """
+        Returns the root key.
+        """
+        return self.__key
+
     def dump(self) -> bytes:
         """Dumps the key"""
         return JavaObjectMarshaller().dump(create_jba(self.__key))

@@ -16,7 +16,7 @@ class DatabaseFactory:
     @staticmethod
     def from_file(encrypted):
         try:
-            from wa_crypt_tools.proto import prefix_pb2 as prefix
+            from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
             from wa_crypt_tools.proto import key_type_pb2 as key_type
         except ImportError as e:
             l.error("Could not import the proto classes: {}".format(e))
@@ -33,7 +33,7 @@ class DatabaseFactory:
                     "python -m pip install --upgrade protobuf")
             raise e
 
-        header = prefix.prefix()
+        header = prefix.BackupPrefix()
 
         l.debug("Parsing database header...")
 
@@ -65,14 +65,14 @@ class DatabaseFactory:
                 else:
 
                     # Checking and printing WA version and phone number
-                    version = findall(r"\d(?:\.\d{1,3}){3}", header.info.whatsapp_version)
+                    version = findall(r"\d(?:\.\d{1,3}){3}", header.info.app_version)
                     if len(version) != 1:
                         l.error('WhatsApp version not found')
                     else:
                         l.debug("WhatsApp version: {}".format(version[0]))
-                    if len(header.info.substringedUserJid) != 2:
+                    if len(header.info.jidSuffix) != 2:
                         l.error("The phone number end is not 2 characters long")
-                    l.debug("Your phone number ends with {}".format(header.info.substringedUserJid))
+                    l.debug("Your phone number ends with {}".format(header.info.jidSuffix))
 
                     if len(header.c15_iv.IV) != 0:
                         # DB Header is crypt15

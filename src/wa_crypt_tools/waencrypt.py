@@ -37,9 +37,9 @@ def parsecmdline() -> argparse.Namespace:
     parser.add_argument('--iv', type=str, help='The IV to use for crypt15 encryption. Default: random')
     parser.add_argument('--reference', type=argparse.FileType('rb'), help='The reference file to use for crypt15 encryption. Highly recommended.')
     parser.add_argument('--noparse', action='store_true', help='Do not parse the header of the reference file. Default: false')
-    parser.add_argument('--wa-version', type=str, default=C.DEFAULT_WA_VERSION, help='The WhatsApp version to use for crypt15 encryption. Default:' +
-                        C.DEFAULT_WA_VERSION)
-    parser.add_argument('--jid', type=str, default=C.DEFAULT_JID, help='The last 2 numbers of your phone number. Default: 00')
+    parser.add_argument('--wa-version', type=str, default=C.DEFAULT_APP_VERSION, help='The WhatsApp version to use for crypt15 encryption. Default:' +
+                                                                                      C.DEFAULT_APP_VERSION)
+    parser.add_argument('--jid', type=str, default=C.DEFAULT_JID_SUFFIX, help='The last 2 numbers of your phone number. Default: 00')
     parser.add_argument('--no-compress', action='store_true', help='Do not compress the file. This will make the backup not working. Only used in develpiomente. Default: false')
     return parser.parse_args()
 

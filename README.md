@@ -135,7 +135,7 @@ Issues asking for this will be closed as invalid.**
 Stable: 
 2.23.16.76  
 Beta: 
-2.23.14.19
+2.23.18.12
 
 #### Protobuf automatic fix
 
