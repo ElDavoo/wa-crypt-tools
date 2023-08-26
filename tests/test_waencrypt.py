@@ -33,7 +33,7 @@ class Test_Encryption:
             orig_check = sha512(f.read()).digest()
         assert new_check == orig_check
 
-    def test_encryption14_noprops(self):
+    def test_encryption14_noexpiry(self):
         key = KeyFactory.new("res/key")
         props = Props(wa_version="2.22.5.13", jid="67", features=None)
         db = Database14(key=key, iv=bytes.fromhex("EA53CEAE36ECAB50BC331AEB62491625"))
@@ -41,7 +41,7 @@ class Test_Encryption:
         new_check = sha512(data).digest()
         with open("res/msgstore-new.db.crypt14", 'wb') as f:
             f.write(data)
-        with open("res/msgstore-noprops.db.crypt14", 'rb') as f:
+        with open("res/msgstore-noexpiry.db.crypt14", 'rb') as f:
             orig_check = sha512(f.read()).digest()
         assert new_check == orig_check
 
