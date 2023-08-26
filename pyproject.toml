@@ -34,6 +34,7 @@ classifiers = [
 ]
 
 [project.scripts]
+wacreatekey = "wa_crypt_tools.wacreatekey:main"
 wadecrypt = "wa_crypt_tools.wadecrypt:main"
 waencrypt = "wa_crypt_tools.waencrypt:main"
 waguess = "wa_crypt_tools.waguess:main"

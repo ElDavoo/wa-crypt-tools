@@ -43,6 +43,7 @@ class Key14(Key):
             else:
                 if cipher_version != self.__SUPPORTED_CIPHER_VERSION:
                     l.error("Invalid cipher version: {}".format(cipher_version.hex()))
+                self.__cipher_version = cipher_version
             if key_version is None:
                 self.__key_version = self.__SUPPORTED_KEY_VERSIONS[-1]
             else:

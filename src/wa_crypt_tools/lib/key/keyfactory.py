@@ -55,7 +55,7 @@ class KeyFactory:
             l.critical("Unrecognized key file format.")
 
     @staticmethod
-    def from_hex(hexstring: str):
+    def from_hex(hexstring: str) -> Key15:
         if hexstring is None or len(hexstring) != 64:
             raise ValueError("The key is invalid or of the wrong length.")
         barr: bytes = hexstring2bytes(hexstring)

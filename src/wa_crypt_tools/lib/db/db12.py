@@ -7,15 +7,16 @@ from Cryptodome.Cipher import AES
 
 import logging
 
+from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.lib.db.db import Database
 from wa_crypt_tools.lib.key.key14 import Key14
 from wa_crypt_tools.lib.props import Props
 
 l = logging.getLogger(__name__)
 class Database12(Database):
-    # These constants are only used with crypt12/14 keys.
-    SUPPORTED_CIPHER_VERSION = b'\x00\x01'
-    SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02', b'\x03']
+    """
+    Implementation of a crypt12 database.
+    """
 
     def __init__(self, key: Key14 = None, encrypted=None,
                  cipher_version: bytes = None, key_version: bytes = None, serversalt: bytes = None,
@@ -101,24 +102,24 @@ class Database12(Database):
             self.file_hash.update(self.iv)
         else:
             if cipher_version:
-                if cipher_version == Database12.SUPPORTED_CIPHER_VERSION:
+                if cipher_version == C.SUPPORTED_CIPHER_VERSION:
                     self.cipher_version = cipher_version
                     self.file_hash.update(self.cipher_version)
                 else:
                     l.error("Unsupported cipher version provided!")
                     raise ValueError
             else:
-                self.cipher_version = Database12.SUPPORTED_CIPHER_VERSION
+                self.cipher_version = C.SUPPORTED_CIPHER_VERSION
                 self.file_hash.update(self.cipher_version)
 
             if key_version:
-                if key_version in Database12.SUPPORTED_KEY_VERSIONS:
+                if key_version in C.SUPPORTED_KEY_VERSIONS:
                     self.key_version = key_version
                     self.file_hash.update(self.key_version)
                 else:
                     l.error("Unsupported key version provided!")
             else:
-                self.key_version = Database12.SUPPORTED_KEY_VERSIONS[-1]
+                self.key_version = C.SUPPORTED_KEY_VERSIONS[-1]
                 self.file_hash.update(self.key_version)
 
             if serversalt:

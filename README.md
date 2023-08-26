@@ -33,6 +33,13 @@ You can install this script as a package through pip. Just use:
 python -m pip install wa-crypt-tools
 ```
 
+Install the development version with new features and tools:
+```
+$ git clone https://github.com/ElDavoo/wa-crypt-tools.git
+$ cd wa-crypt-tools
+$ python -m pip install .
+```
+
 ## Usage
 
  ```
