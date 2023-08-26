@@ -5,14 +5,14 @@ from pathlib import Path
 
 from javaobj import JavaObjectMarshaller
 
-from wa_crypt_tools.lib.utils import create_jba
+from wa_crypt_tools.lib.utils import create_jba, encryptionloop
 
 from wa_crypt_tools.lib.key.key import Key
 import logging
 l = logging.getLogger(__name__)
 class Key15(Key):
     # This constant is only used with crypt15 keys.
-    BACKUP_ENCRYPTION = b'backup encryption\x01'
+    BACKUP_ENCRYPTION = b'backup encryption'
 
     def __init__(self, keyarray: bytes=None, key: bytes=None):
         """Extracts the key from a loaded crypt15 key file."""
@@ -54,11 +54,10 @@ class Key15(Key):
         """
         Returns the key used for encryption, that is not the root key.
         """
-        # First do the HMACSHA256 hash of the file with an empty private key
-        key: bytes = hmac.new(b'\x00' * 32, self.__key, sha256).digest()
-        # Then do the HMACSHA256 using the previous result as key and ("backup encryption" + iteration count) as data
-        key = hmac.new(key, self.BACKUP_ENCRYPTION, sha256).digest()
-        return key
+        return encryptionloop(
+            first_iteration_data=self.__key,
+            message=b'backup encryption',
+            permutations=1)
 
     def dump(self) -> bytes:
         """Dumps the key"""

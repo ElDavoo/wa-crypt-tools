@@ -1,4 +1,6 @@
+import hmac
 import zlib
+from hashlib import sha256
 
 from javaobj import JavaByteArray
 from javaobj.v2.beans import JavaArray, JavaClassDesc, ClassDescType
@@ -45,22 +47,24 @@ def create_jba(out: bytes) -> JavaByteArray:
 
     return JavaByteArray(out, classdesc=cd)
 
+
 def hexstring2bytes(string: str) -> bytes:
     """Converts a hex string into a bytes array"""
     if len(string) != 64:
         l.critical("The key file specified does not exist.\n    "
-                 "If you tried to specify the key directly, note it should be "
-                 "64 characters long and not {} characters long.".format(len(string)))
+                   "If you tried to specify the key directly, note it should be "
+                   "64 characters long and not {} characters long.".format(len(string)))
 
     barr = None
     try:
         barr = bytes.fromhex(string)
     except ValueError as e:
         l.critical("Couldn't convert the hex string.\n    "
-                 "Exception: {}".format(e))
+                   "Exception: {}".format(e))
     if len(barr) != 32:
         l.error("The key is not 32 bytes long but {} bytes long.".format(len(barr)))
     return barr
+
 
 def javaintlist2bytes(barr: JavaArray) -> bytes:
     """Converts a javaobj bytearray which somehow became a list of signed integers back to a Python byte array"""
@@ -68,3 +72,19 @@ def javaintlist2bytes(barr: JavaArray) -> bytes:
     for i in barr:
         out += i.to_bytes(1, byteorder='big', signed=True)
     return out
+
+
+def encryptionloop(*, first_iteration_data: bytes, privateseed: bytes = b'\x00' * 32, message: bytes, permutations: int):
+    # The private key and the seed are used to create the HMAC key
+    privatekey = hmac.new(privateseed, msg=first_iteration_data, digestmod=sha256).digest()
+
+    data = b''
+    output = b''
+    for i in range(1, permutations + 1):
+        hasher = hmac.new(privatekey, msg=data, digestmod=sha256)
+        if message is not None:
+            hasher.update(message)
+        hasher.update(i.to_bytes(1, byteorder='big'))
+        data = hasher.digest()
+        output += data
+    return output
