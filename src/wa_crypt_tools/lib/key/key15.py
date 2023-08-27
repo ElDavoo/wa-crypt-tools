@@ -65,6 +65,24 @@ class Key15(Key):
         """
         return self.__key
 
+    def get_metadata_encryption(self) -> bytes:
+        """
+        Returns the key used for metadata encryption
+        """
+        return encryptionloop(
+            first_iteration_data=self.__key,
+            message=b'metadata encryption',
+            permutations=1)
+
+    def get_metadata_authentication(self) -> bytes:
+        """
+        Returns the key used for metadata authentication
+        """
+        return encryptionloop(
+            first_iteration_data=self.__key,
+            message=b'metadata authentication',
+            permutations=1)
+
     def dump(self) -> bytes:
         """Dumps the key"""
         return JavaObjectMarshaller().dump(create_jba(self.__key))

@@ -1,7 +1,10 @@
+import base64
 import hmac
+import json
 import zlib
 from hashlib import sha256
 
+from Cryptodome.Cipher import AES
 from javaobj import JavaByteArray
 from javaobj.v2.beans import JavaArray, JavaClassDesc, ClassDescType
 
@@ -74,7 +77,8 @@ def javaintlist2bytes(barr: JavaArray) -> bytes:
     return out
 
 
-def encryptionloop(*, first_iteration_data: bytes, privateseed: bytes = b'\x00' * 32, message: bytes, permutations: int):
+def encryptionloop(*, first_iteration_data: bytes, privateseed: bytes = b'\x00' * 32, message: bytes,
+                   permutations: int):
     # The private key and the seed are used to create the HMAC key
     privatekey = hmac.new(privateseed, msg=first_iteration_data, digestmod=sha256).digest()
 
@@ -88,3 +92,41 @@ def encryptionloop(*, first_iteration_data: bytes, privateseed: bytes = b'\x00' 
         data = hasher.digest()
         output += data
     return output
+
+
+def mcrypt1_metadata_decrypt(key, encoded: str):
+    """
+    Decrypts the metadata of a mcrypt1 file.
+    :param key: The key used to decrypt the metadata
+    :param encoded: The metadata downloaded from google drive in base64
+    :return: The decrypted JSON
+    """
+    # Base64 decoding
+    encoded = base64.b64decode(encoded)
+    # PKCS5Padding is not natively supported
+    unpad = lambda s: s[:-ord(s[len(s) - 1:])]
+    ivSize = encoded[0]
+    if ivSize != 16:
+        raise Exception("IV Size is not 16")
+
+    iv = encoded[1:17]
+    macSize = encoded[17]
+    if macSize != 32:
+        raise Exception("MAC Size is not 32")
+
+    mac = encoded[18:50]
+    encrypted_metadata = encoded[50:]
+    # Authentication part
+    hmac_auth = hmac.new(key.get_metadata_authentication(), digestmod='sha256')
+    hmac_auth.update(iv)
+    hmac_auth.update(encrypted_metadata)
+    hmac_auth = hmac_auth.digest()
+    if hmac_auth != mac:
+        raise ValueError("MAC does not match")
+    # Decryption part
+    cipher = AES.new(key.get_metadata_encryption(), AES.MODE_CBC, iv)
+    decrypted_metadata = cipher.decrypt(encrypted_metadata)
+    decrypted_metadata = unpad(decrypted_metadata)
+    # Load the JSON
+    return json.loads(decrypted_metadata.decode('utf-8'))
+
