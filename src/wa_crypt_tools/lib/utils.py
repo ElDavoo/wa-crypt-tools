@@ -94,7 +94,7 @@ def encryptionloop(*, first_iteration_data: bytes, privateseed: bytes = b'\x00' 
     return output
 
 
-def mcrypt1_metadata_decrypt(key, encoded: str):
+def mcrypt1_metadata_decrypt(*, key, encoded: str):
     """
     Decrypts the metadata of a mcrypt1 file.
     :param key: The key used to decrypt the metadata
@@ -130,3 +130,18 @@ def mcrypt1_metadata_decrypt(key, encoded: str):
     # Load the JSON
     return json.loads(decrypted_metadata.decode('utf-8'))
 
+
+def get_mcrypt1_name(*, key, name: str, md5: bytes) -> bytes:
+    hmac_n = hmac.new(key.get_root(), digestmod='sha256')
+    # Calculate SHA256 of the name
+    digest = sha256()
+    digest.update(name.encode('utf-8'))
+    # Pour it into the HMAC
+    hmac_n.update(digest.digest())
+    # If md5 is a string, convert it to bytes
+    if isinstance(md5, str):
+        md5 = bytes.fromhex(md5)
+    # Now pour the MD5 into the HMAC
+    hmac_n.update(md5)
+    media_hash = hmac_n.digest()
+    return media_hash
