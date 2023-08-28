@@ -1,6 +1,7 @@
 import base64
 import hmac
 import json
+import math
 import zlib
 from hashlib import sha256
 
@@ -78,19 +79,23 @@ def javaintlist2bytes(barr: JavaArray) -> bytes:
 
 
 def encryptionloop(*, first_iteration_data: bytes, privateseed: bytes = b'\x00' * 32, message: bytes,
-                   permutations: int):
+                   outputBytes: int):
     # The private key and the seed are used to create the HMAC key
     privatekey = hmac.new(privateseed, msg=first_iteration_data, digestmod=sha256).digest()
 
     data = b''
     output = b''
-    for i in range(1, permutations + 1):
+    numPermutations = int(math.ceil(float(outputBytes) / float(32)))
+    i = 1
+    while i < numPermutations + 1:
         hasher = hmac.new(privatekey, msg=data, digestmod=sha256)
         if message is not None:
             hasher.update(message)
         hasher.update(i.to_bytes(1, byteorder='big'))
         data = hasher.digest()
-        output += data
+        bytestowrite = min(outputBytes, len(data))
+        output += data[:bytestowrite]
+        i += 1
     return output
 
 

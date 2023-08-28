@@ -57,7 +57,7 @@ class Key15(Key):
         return encryptionloop(
             first_iteration_data=self.__key,
             message=b'backup encryption',
-            permutations=1)
+            outputBytes=32)
 
     def get_root(self) -> bytes:
         """
@@ -72,7 +72,7 @@ class Key15(Key):
         return encryptionloop(
             first_iteration_data=self.__key,
             message=b'metadata encryption',
-            permutations=1)
+            outputBytes=32)
 
     def get_metadata_authentication(self) -> bytes:
         """
@@ -81,7 +81,7 @@ class Key15(Key):
         return encryptionloop(
             first_iteration_data=self.__key,
             message=b'metadata authentication',
-            permutations=1)
+            outputBytes=32)
 
     def dump(self) -> bytes:
         """Dumps the key"""
