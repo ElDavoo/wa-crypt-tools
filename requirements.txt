@@ -1,3 +1,3 @@
 javaobj-py3 @ git+https://github.com/tcalmant/python-javaobj@fba64e9
 pycryptodomex==3.18.0
-protobuf==4.24.2
+protobuf==4.24.3
