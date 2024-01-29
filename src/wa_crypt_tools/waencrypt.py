@@ -40,6 +40,7 @@ def parsecmdline() -> argparse.Namespace:
     parser.add_argument('--wa-version', type=str, default=C.DEFAULT_APP_VERSION, help='The WhatsApp version to use for crypt15 encryption. Default:' +
                                                                                       C.DEFAULT_APP_VERSION)
     parser.add_argument('--jid', type=str, default=C.DEFAULT_JID_SUFFIX, help='The last 2 numbers of your phone number. Default: 00')
+    parser.add_argument('--backup-version', type=int, default=C.DEFAULT_BACKUP_VERSION, help='The backup version to use in the header of the encrypted file. Default: 0')
     parser.add_argument('--no-compress', action='store_true', help='Do not compress the file. This will make the backup not working. Only used in develpiomente. Default: false')
     return parser.parse_args()
 
@@ -56,7 +57,7 @@ def main():
     l.warning("This is still a work in progress, that will be completed in the future.")
     # Create the props object from the command line arguments
     props = Props(wa_version=args.wa_version, jid=args.jid, max_feature=args.max_feature,
-                  features=args.enable_features)
+                  features=args.enable_features, backup_version=args.backup_version)
 
     # Read the key file
     key = KeyFactory.new(args.keyfile)
