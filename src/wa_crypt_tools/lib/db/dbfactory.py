@@ -121,15 +121,23 @@ class DatabaseFactory:
                         l.error("Could not parse the IV from the protobuf message. Please report a bug.")
                         raise DecodeError
 
+                    # Checking the existence of potentially new features
+                    if msgstore_features_flag == 1:
+                        if header.info.HasField( "f_dummy"):
+                            l.warn("There are new features. The feature list might be incomplete.")
+                            l.warn("The BackupExpiry message needs to be updated.")
+                        else:
+                            l.info("No further new features have been detected!")
+
                     # We are done here
                     if header.c15_iv.IV:
                         db = Database15(iv=iv)
                         db.file_hash = file_hash
-                        return db
+                        return header, db
                     elif header.c14_cipher.IV:
                         db = Database14(iv=iv)
                         db.file_hash = file_hash
-                        return db
+                        return header, db
                     else:
                         l.error("Could not parse the IV from the protobuf message. Please report a bug.")
                         raise DecodeError
