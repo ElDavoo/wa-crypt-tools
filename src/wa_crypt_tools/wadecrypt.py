@@ -80,6 +80,7 @@ def parsecmdline() -> argparse.Namespace:
     parser.add_argument('-nd', '--no-decompress', action='store_true',
                         help='Does not decompress the decrypted data. '
                              'Default: decompresses the decrypted data')
+    parser.add_argument('-hf', '--header-info', action='store_true', help='Prints the header of the encrypted 14 or 15 file')
     parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
     parser.add_argument('-f', '--force', action='store_true', help='Does nothing, but it is here for compatibility')
 
@@ -215,6 +216,29 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
         encrypted.close()
 
 
+# show all header information including the feature vector
+def header_info( header):
+    if header.c15_iv.IV:
+        l.info("Header information in your crypt15 file:")
+        l.info("IV: {}".format(header.c15_iv.IV.hex()))
+    if header.c14_cipher.IV:
+        l.info("Header information in your crypt14 file:")
+        l.info("Cilpher version: {}".format(header.c14_cipher.cipher_version.hex()))
+        l.info("Key version: {}".format(header.c14_cipher.key_version.hex()))
+        l.info("Server satlt: {}".format(header.c14_cipher.server_salt.hex()))
+        l.info("Google ID: {}".format(header.c14_cipher.google_id.hex()))
+        l.info("IV: {}".format(header.c14_cipher.IV.hex()))
+    l.info("Key type: {}".format(header.key_type))
+    l.info("WhatsApp version: {}".format(header.info.app_version))
+    #l.info("Device model: {}".format(header.info.device_model))
+    l.info("The last two numbers of the user's Jid: {}".format(header.info.jidSuffix))
+    l.info("Backup version: {}".format(header.info.backup_version))
+    #l.info("Size of the backup file: {}".format(header.backup_export_file_size))
+    features = [n for n in [*range(5,38), 39] if getattr(header.info, "f_" + str(n)) == True]
+    l.info("Features: {}".format(features))
+    l.info("Max feature number: {}".format(max(features)))
+
+
 def main():
     args = parsecmdline()
 
@@ -231,8 +255,11 @@ def main():
     key = KeyFactory.new(args.keyfile)
     l.debug(str(key))
 
-    db = DatabaseFactory.from_file(args.encrypted)
+    encryptheader, db = DatabaseFactory.from_file(args.encrypted)
     cipher = AES.new(key.get(), AES.MODE_GCM, db.get_iv())
+
+    if args.header_info:
+        header_info( encryptheader)
 
     if args.buffer_size is not None:
         chunked_decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, args.buffer_size, args.no_decompress)
