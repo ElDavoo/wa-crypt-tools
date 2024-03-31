@@ -145,6 +145,5 @@ class DatabaseFactory:
                     raise e
                 return Database12(encrypted=encrypted)
 
-
         except OSError as e:
             l.fatal("Reading database header failed: {}".format(e))

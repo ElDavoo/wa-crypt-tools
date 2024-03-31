@@ -99,54 +99,78 @@ def encryptionloop(*, first_iteration_data: bytes, privateseed: bytes = b'\x00' 
     return output
 
 
+def unpad_pkcs5(data: bytes) -> bytes:
+    """Unpads a PKCS5-padded byte array"""
+    return data[:-ord(data[len(data) - 1:])]
+
+
+def pad_pcks5(data: bytes) -> bytes:
+    """Pads a byte array with PKCS5"""
+    pad = 16 - (len(data) % 16)
+    return data + bytes([pad] * pad)
+
+
 def mcrypt1_metadata_decrypt(*, key, encoded: str):
     """
     Decrypts the metadata of a mcrypt1 file.
     :param key: The key used to decrypt the metadata
-    :param encoded: The metadata downloaded from google drive in base64
+    :param encoded: The metadata downloaded from Google Drive in base64
     :return: The decrypted JSON
     """
-    # Base64 decoding
     encoded = base64.b64decode(encoded)
-    # PKCS5Padding is not natively supported
-    unpad = lambda s: s[:-ord(s[len(s) - 1:])]
-    ivSize = encoded[0]
-    if ivSize != 16:
-        raise Exception("IV Size is not 16")
+
+    iv_size = encoded[0]
+    if iv_size != 16:
+        raise ValueError("IV Size is not 16")
 
     iv = encoded[1:17]
-    macSize = encoded[17]
-    if macSize != 32:
-        raise Exception("MAC Size is not 32")
+    mac_size = encoded[17]
+    if mac_size != 32:
+        raise ValueError("MAC Size is not 32")
 
     mac = encoded[18:50]
     encrypted_metadata = encoded[50:]
+
     # Authentication part
     hmac_auth = hmac.new(key.get_metadata_authentication(), digestmod='sha256')
     hmac_auth.update(iv)
     hmac_auth.update(encrypted_metadata)
     hmac_auth = hmac_auth.digest()
     if hmac_auth != mac:
-        raise ValueError("MAC does not match")
+        raise ValueError("Authentication error, MAC does not match")
+
     # Decryption part
     cipher = AES.new(key.get_metadata_encryption(), AES.MODE_CBC, iv)
     decrypted_metadata = cipher.decrypt(encrypted_metadata)
-    decrypted_metadata = unpad(decrypted_metadata)
-    # Load the JSON
+
+    # PKCS5Padding is not natively supported
+    decrypted_metadata = unpad_pkcs5(decrypted_metadata)
+
     return json.loads(decrypted_metadata.decode('utf-8'))
 
 
 def get_mcrypt1_name(*, key, name: str, md5: bytes) -> bytes:
+    """
+    Computes the file name of a mcrypt1 file from its name and MD5 hash.
+    :param key: The key used to encrypt the file
+    :param name: The name of the file
+    :param md5: The MD5 hash of the file
+    :return: The name (in bytes and without the extension)
+    """
+
     hmac_n = hmac.new(key.get_root(), digestmod='sha256')
     # Calculate SHA256 of the name
     digest = sha256()
     digest.update(name.encode('utf-8'))
+
     # Pour it into the HMAC
     hmac_n.update(digest.digest())
+
     # If md5 is a string, convert it to bytes
     if isinstance(md5, str):
         md5 = bytes.fromhex(md5)
-    # Now pour the MD5 into the HMAC
+
+    # Pour the MD5 into the HMAC
     hmac_n.update(md5)
-    media_hash = hmac_n.digest()
-    return media_hash
+
+    return hmac_n.digest()
