@@ -165,16 +165,20 @@ Now all of the generated python classes should have their imports fixed.
 
 Thank you so much to each one of you!
 - **🎉🎉🎉 [githubsterer](https://github.com/githubsterer) 🎉🎉🎉** 
-- **🎉🎉🎉 [courious875](https://github.com/courious875) 🎉🎉🎉** 
+- **🎉🎉🎉 [courious875](https://github.com/courious875) 🎉🎉🎉**  
 
+Anyone else that I forgot to mention!  
 ---
 
 #### Credits:
- Original implementation for crypt12: [TripCode](https://github.com/TripCode)    
- Some help at the beginning: [DjEdu28](https://github.com/DjEdu28)  
- Actual crypt14/15 implementation with protobuf: [ElDavoo](https://github.com/ElDavoo)  
- Help with crypt14/15 footer: [george-lam](https://github.com/georg-lam)
- Pip package implementation: [Mikel12455](https://github.com/Mikel12455)
+ - Original implementation for crypt12: [TripCode](https://github.com/TripCode)    
+ - Some help at the beginning: [DjEdu28](https://github.com/DjEdu28)  
+ - Actual crypt14/15 implementation with protobuf: [ElDavoo](https://github.com/ElDavoo)  
+ - Help with crypt14/15 footer: [george-lam](https://github.com/georg-lam)  
+ - Pip package implementation: [Mikel12455](https://github.com/Mikel12455)  
+ - [kingbtcvl](https://github.com/kingbtcvl)  
+
+ Anyone else that helped!  
 
 
 ### Stargazers over time
