@@ -13,6 +13,7 @@ import logging
 
 from wa_crypt_tools.lib.constants import C
 
+# FIXME a "utils" file shouldn't have its own logger
 l = logging.getLogger(__name__)
 
 
@@ -150,3 +151,31 @@ def get_mcrypt1_name(*, key, name: str, md5: bytes) -> bytes:
     hmac_n.update(md5)
     media_hash = hmac_n.digest()
     return media_hash
+
+def header_info(header):
+    """
+    shows all header, information including the feature vector
+    FIXME
+    """
+    string: str = ""
+    if header.c15_iv.IV:
+        string += "Crypt15 info:\n"
+        string += str("Header information in your crypt15 file:")
+        string += str("IV: {}\n".format(header.c15_iv.IV.hex()))
+    if header.c14_cipher.IV:
+        string += str("Header information in your crypt14 file:\n")
+        string += str("Cipher version: {}\n".format(header.c14_cipher.cipher_version.hex()))
+        string += str("Key version: {}\n".format(header.c14_cipher.key_version.hex()))
+        string += str("Server satl: {}\n".format(header.c14_cipher.server_salt.hex()))
+        string += str("Google ID: {}\n".format(header.c14_cipher.google_id.hex()))
+        string += str("IV: {}\n".format(header.c14_cipher.IV.hex()))
+    string += str("Key type: {}\n".format(header.key_type))
+    string += str("WhatsApp version: {}\n".format(header.info.app_version))
+    #string += str("Device model: {}".format(header.info.device_model))
+    string += str("The last two numbers of the user's Jid: {}\n".format(header.info.jidSuffix))
+    string += str("Backup version: {}\n".format(header.info.backup_version))
+    #string += str("Size of the backup file: {}".format(header.backup_export_file_size))
+    features = [n for n in [*range(5,38), 39] if getattr(header.info, "f_" + str(n)) == True]
+    string += str("Features: {}\n".format(features))
+    string += str("Max feature number: {}\n".format(max(features)))
+    return string

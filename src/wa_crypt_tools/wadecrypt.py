@@ -224,6 +224,9 @@ def main():
     ch.setLevel(logging.DEBUG if args.verbose else logging.INFO)
     ch.setFormatter(CustomFormatter())
     l.addHandler(ch)
+    # also add to "wa_crypt_tools.lib" logger
+    logging.getLogger("wa_crypt_tools.lib").addHandler(ch)
+    logging.getLogger("wa_crypt_tools.lib").setLevel(logging.DEBUG if args.verbose else logging.INFO)
     if args.buffer_size is not None:
         if not 1 < args.buffer_size < maxsize:
             l.fatal("Invalid buffer size")

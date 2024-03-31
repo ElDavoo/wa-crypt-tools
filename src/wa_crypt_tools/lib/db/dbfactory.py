@@ -5,6 +5,7 @@ from google.protobuf.message import DecodeError
 from wa_crypt_tools.lib.db.db12 import Database12
 from wa_crypt_tools.lib.db.db14 import Database14
 from wa_crypt_tools.lib.db.db15 import Database15
+from wa_crypt_tools.lib.utils import header_info
 
 l = logging.getLogger(__name__)
 
@@ -122,6 +123,7 @@ class DatabaseFactory:
                         raise DecodeError
 
                     # We are done here
+                    l.debug(header_info(header))
                     if header.c15_iv.IV:
                         db = Database15(iv=iv)
                         db.file_hash = file_hash
