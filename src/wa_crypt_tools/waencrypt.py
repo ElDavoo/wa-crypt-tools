@@ -79,7 +79,7 @@ def main():
     if args.no_compress:
         encrypted = db.encrypt(key, props, data)
     else:
-        compressed = zlib.compress(data, 1, 15)
+        compressed = zlib.compress(data, 1)
         encrypted = db.encrypt(key, props, compressed)
     args.encrypted.write(encrypted)
     # Close the files
