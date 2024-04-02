@@ -9,6 +9,7 @@ from wa_crypt_tools.lib.db.db import Database
 from wa_crypt_tools.lib.db.db12 import Database12
 from wa_crypt_tools.lib.db.db14 import Database14
 from wa_crypt_tools.lib.db.db15 import Database15
+from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
 from wa_crypt_tools.lib.key.key import Key
 from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 from wa_crypt_tools.lib.logformat import CustomFormatter
@@ -32,7 +33,6 @@ def parsecmdline() -> argparse.Namespace:
     parser.add_argument('--enable-features', type=int, nargs='*', default=C.DEFAULT_FEATURE_LIST, help='Enables the specified features. ')
     parser.add_argument('--max-feature', type=int, default=39, help='The max feature number, the older is the backup the lower should be the number. ')
     parser.add_argument('--multi-file', action='store_true', help='Encrypts a multi-file backup (either stickers or wallpapers)')
-    # Add an argument "type" that can be either 14 or 15
     parser.add_argument('--type', type=int, choices=[12, 14, 15], default=15, help='The type of encryption to use. Default: 15')
     parser.add_argument('--iv', type=str, help='The IV to use for crypt15 encryption. Default: random')
     parser.add_argument('--reference', type=argparse.FileType('rb'), help='The reference file to use for crypt15 encryption. Highly recommended.')
@@ -54,21 +54,24 @@ def main():
     ch.setLevel(logging.DEBUG if args.verbose else logging.INFO)
     ch.setFormatter(CustomFormatter())
     l.addHandler(ch)
-    l.warning("This is still a work in progress, that will be completed in the future.")
-    # Create the props object from the command line arguments
-    props = Props(wa_version=args.wa_version, jid=args.jid, max_feature=args.max_feature,
-                  features=args.enable_features, backup_version=args.backup_version)
+    l.warning("This script is in beta stage")
+
 
     # Read the key file
     key = KeyFactory.new(args.keyfile)
     # If specified, use the IV from the command line
     iv = None
-    if args.iv:
-        if args.reference is not None:
-            # TODO for now we do not support this
-            l.error("Cannot specify both --iv and --reference")
-        iv = bytes.fromhex(args.iv)
-
+    props = None
+    if not args.reference:
+        if args.iv:
+            iv = bytes.fromhex(args.iv)
+        # Create the props object from the command line arguments
+        props = Props(wa_version=args.wa_version, jid=args.jid, max_feature=args.max_feature,
+                    features=args.enable_features, backup_version=args.backup_version)
+    else:
+        reference = DatabaseFactory.from_file(args.reference)
+        iv: bytes = reference.get_iv()
+        props = reference.props
     data = args.decrypted.read()
     if args.type == 15:
         db = Database15(key=key, iv=iv)
