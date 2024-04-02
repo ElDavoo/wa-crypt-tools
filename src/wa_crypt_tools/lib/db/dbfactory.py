@@ -2,9 +2,11 @@ import logging
 
 from google.protobuf.message import DecodeError
 
+from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.lib.db.db12 import Database12
 from wa_crypt_tools.lib.db.db14 import Database14
 from wa_crypt_tools.lib.db.db15 import Database15
+from wa_crypt_tools.lib.props import Props
 from wa_crypt_tools.lib.utils import header_info
 
 l = logging.getLogger(__name__)
@@ -124,12 +126,14 @@ class DatabaseFactory:
 
                     # We are done here
                     l.debug(header_info(header))
+                   
+                    props = Props(v_features=header.info)
                     if header.c15_iv.IV:
-                        db = Database15(iv=iv)
+                        db = Database15(iv=iv, props=props)
                         db.file_hash = file_hash
                         return db
                     elif header.c14_cipher.IV:
-                        db = Database14(iv=iv)
+                        db = Database14(iv=iv, props=props)
                         db.file_hash = file_hash
                         return db
                     else:

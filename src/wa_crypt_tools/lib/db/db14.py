@@ -18,7 +18,9 @@ class Database14(Database):
 
     def __init__(self, key: Key14 = None, encrypted=None, file_hash=None,
                  cipher_version: bytes = None, key_version: bytes = None, serversalt: bytes = None,
-                 googleid: bytes = None, iv: bytes = None):
+                 googleid: bytes = None, iv: bytes = None,
+                 props: Props = None):
+        self.props = props
         if encrypted and file_hash:
             try:
                 from wa_crypt_tools.proto import backup_prefix_pb2 as prefix

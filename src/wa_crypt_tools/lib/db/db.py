@@ -17,10 +17,6 @@ class Database(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_iv(self) -> bytes:
-        pass
-
-    @abc.abstractmethod
     def decrypt(self, key: Key, encrypted: bytes) -> bytes:
         pass
 

@@ -18,8 +18,11 @@ class Database15(Database):
         return "Database15"
         # todo
 
-    def __init__(self, *, key: Key15 = None, encrypted=None, iv: bytes = None):
+    def __init__(self, *, key: Key15 = None, encrypted=None, iv: bytes = None
+                 , props: Props = None):
         self.file_hash = md5()
+        # just store it for now
+        self.props = props
         if encrypted:
             try:
                 from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
