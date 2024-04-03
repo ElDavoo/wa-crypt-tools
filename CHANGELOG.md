@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.0.9
+
+- Code refactored as a library, with lots of files, classes and methods
+- decrypt14_15 renamed to wadecrypt
+- Guessing logic moved to waguess
+- New tools introduced:
+  - wacreatekey
+  - waencrypt, for encrypting backups
+  - wainfo, for printing infos
+
 ## Version 0.0.8
 
 As I uploaded the package to PyPI, the versioning scheme changed. It was too ugly to start from version 7.0.  

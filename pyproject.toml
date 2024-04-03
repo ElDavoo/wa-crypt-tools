@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "wa-crypt-tools"
 keywords = ["whatsapp", "crypt12", "crypt14", "crypt15"]
-version = "0.0.8"
+version = "0.0.9"
 authors = [
     {name = "Davide Palma", email = "pypi@davidepalma.it"},
 ]
-description = "Decrypts WhatsApp .crypt12, .crypt14 and .crypt15 files, given the key."
+description = "Manages WhatsApp .crypt12, .crypt14 and .crypt15 files, given the key."
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
