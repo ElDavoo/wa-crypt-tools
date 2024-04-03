@@ -166,6 +166,7 @@ Now all of the generated python classes should have their imports fixed.
 Thank you so much to each one of you!
 - **🎉🎉🎉 [githubsterer](https://github.com/githubsterer) 🎉🎉🎉** 
 - **🎉🎉🎉 [courious875](https://github.com/courious875) 🎉🎉🎉**  
+- **🎉 [pscriptos](https://github.com/pscriptos) 🎉**  
 
 Anyone else that I forgot to mention!  
 ---
