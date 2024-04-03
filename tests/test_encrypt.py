@@ -27,6 +27,7 @@ class Test_Encryption:
         with open("tests/res/msgstore.db.crypt15", 'rb') as f:
             orig_check = sha512(f.read()).digest()
         assert new_check == orig_check
+        os.remove("tests/res/msgstore-new.db.crypt15")
 
     def test_encryption14(self):
         key = KeyFactory.new("tests/res/key")
@@ -46,6 +47,7 @@ class Test_Encryption:
         with open("tests/res/msgstore.db.crypt14", 'rb') as f:
             orig_check = sha512(f.read()).digest()
         assert new_check == orig_check
+        os.remove("tests/res/msgstore-new.db.crypt14")
 
     def test_encryption14_noexpiry(self):
         key = KeyFactory.new("tests/res/key")
@@ -65,6 +67,7 @@ class Test_Encryption:
         with open("tests/res/msgstore-noexpiry.db.crypt14", 'rb') as f:
             orig_check = sha512(f.read()).digest()
         assert new_check == orig_check
+        os.remove("tests/res/msgstore-new.db.crypt14")
 
     def test_encryption12(self):
         key = KeyFactory.new("tests/res/key")
@@ -84,3 +87,4 @@ class Test_Encryption:
         with open("tests/res/msgstore.db.crypt12", 'rb') as f:
             orig_check = sha512(f.read()).digest()
         assert new_check == orig_check
+        os.remove("tests/res/msgstore-new.db.crypt12")
