@@ -1,16 +1,14 @@
 [![Coverage Status](https://coveralls.io/repos/github/ElDavoo/wa-crypt-tools/badge.svg?branch=main)](https://coveralls.io/github/ElDavoo/wa-crypt-tools?branch=main)
 
 # WhatsApp Crypt Tools
-Decrypts WhatsApp .crypt12, .crypt14 and .crypt15 files, **given the key file** or the 64-characters long key.  
+Decrypt and encrypt WhatsApp's .crypt12, .crypt14 and .crypt15 files with ease!  
+For decryption, you NEED **the key file** or the 64-characters long key.  
 The key file is named "key" if the backup is crypt14 or  
 "encrypted_backup.key" if the backup is crypt15 (encrypted E2E backups).  
-The output result is either a SQLite database 
-or a ZIP file (in case of wallpapers and stickers).  
-This is the only thing this script does. 
-Those who are looking for a complete suite for
+Those who are looking for a more complete suite for
 WhatsApp forensics, check out [whapa.](https://github.com/B16f00t/whapa)
 
-# Quickstart
+# Quick install
 
 ## Cloud - Google Colab
 
@@ -28,88 +26,111 @@ of the program.
 
 ## Local - pip
 
-You can install this script as a package through pip. Just use:
-```
+You can install this script as a package through pip. Just run:
+```bash
 python -m pip install wa-crypt-tools
 ```
 
-Install the development version with new features and tools:
+# Quick start
+
+## Decrypt a file with wadecrypt
 ```
-$ git clone https://github.com/ElDavoo/wa-crypt-tools.git
-$ cd wa-crypt-tools
-$ python -m pip install .
-```
-
-## Usage
-
- ```
-usage: decrypt14_15.py [-h] [-f] [-nm] [-bs BUFFER_SIZE] [-ng] [-np]
-                       [-ivo IV_OFFSET] [-do DATA_OFFSET] [-v]
-                       [keyfile] [encrypted] [decrypted]
-
-Decrypts WhatsApp backup files encrypted with crypt12, 14 or 15
-
-positional arguments:
-  keyfile               The WhatsApp encrypted_backup key file or the hex
-                        encoded key. Default: encrypted_backup.key
-  encrypted             The encrypted crypt12, 14 or 15 file. Default:
-                        msgstore.db.crypt15
-  decrypted             The decrypted output file. Default: msgstore.db
-
-options:
-  -h, --help            show this help message and exit
-  -f, --force           Makes errors non fatal. Default: false
-  -nm, --no-mem         Does not load files in RAM, stresses the disk more.
-                        Default: load files into RAM
-  -bs BUFFER_SIZE, --buffer-size BUFFER_SIZE
-                        How many bytes of data to process at a time. Implies
-                        -nm. Default: 8192
-  -ng, --no-guess       Does not try to guess the offsets, only protobuf
-                        parsing.
-  -np, --no-protobuf    Does not try to parse the protobuf message, only
-                        offset guessing.
-  -ivo IV_OFFSET, --iv-offset IV_OFFSET
-                        The default offset of the IV in the encrypted file.
-                        Only relevant in offset guessing mode. Default: 8
-  -do DATA_OFFSET, --data-offset DATA_OFFSET
-                        The default offset of the encrypted data in the
-                        encrypted file. Only relevant in offset guessing mode.
-                        Default: 122
-  -v, --verbose         Prints all offsets and messages
- ```
-
-### Examples, with output
-#### Crypt15
-```  
-decrypt14_15 ./encrypted_backup.key ./msgstore.db.crypt15 ./msgstore.db
-[I] Crypt15 key loaded
-[I] Database header parsed
-[I] Done
-```  
-or
-```  
-decrypt14_15 b1ef5568c31686d3339bcae4600c56cf7f0cb1ae982157060879828325257c11 ./msgstore.db.crypt15 ./msgstore.db
-[I] Crypt15 key loaded
-[I] Database header parsed
-[I] Done
-``` 
-#### Crypt14
-```  
-decrypt14_15 ./key ./msgstore.db.crypt14 ./msgstore.db
-[I] Crypt12/14 key loaded
-[I] Database header parsed
-[I] Done
-```  
-#### Crypt12
-```  
-decrypt14_15 ./key ./msgstore.db.crypt12 ./msgstore.db
-[I] Crypt12/14 key loaded
-[I] Database header parsed
-[I] Done
+usage: wadecrypt [-h] [-nm] [-bs BUFFER_SIZE] [-nd] [-v] [-f] [keyfile] [encrypted] [decrypted]
 ```
 
-## I had to use --force to decrypt
-Please open an issue.
+So, for decrypting a crypt12/14/15, we give the program the key file, the encrypted file and the name of the output file.
+
+### Example
+
+```
+$ wadecrypt encrypted_backup.key msgstore.db.crypt15 msgstore.db
+key15.py:51     : [I] Crypt15 / Raw key loaded
+wadecrypt.py:271        : [I] Done
+```
+
+## Encrypt a file with waencrypt (BETA)
+
+```
+usage: waencrypt [-h] [-f] [-v] [--enable-features [ENABLE_FEATURES ...]] [--max-feature MAX_FEATURE]
+                 [--multi-file] [--type {12,14,15}] [--iv IV] [--reference REFERENCE] [--noparse]
+                 [--wa-version WA_VERSION] [--jid JID] [--backup-version BACKUP_VERSION] [--no-compress]
+                 [keyfile] [decrypted] [encrypted]
+```
+
+Encryption is more complex and untested: it is advised to use another encrypted file 
+from the same account, which we will call "reference".  
+
+### With a reference file (only database crypt15 tested)
+```
+waencrypt --reference msgstore.db.crypt15 encrypted_backup.key msgstore.db msgstore-new.db.crypt15
+waencrypt.py:57         : [W] This script is in beta stage
+waencrypt.py:89         : [I] Done!
+```
+
+### Without a reference file
+
+You need to supply the following parameters:  
+
+1) The feature list: Only for 2019+ databases. A list of numbered boolean
+   properties related to your database. There is currently no way to infer them
+   from a database file. In the example, we will just use my backup's feature list,
+   but don't expect it to work for you.  
+2) The max feature number, which is 39 at the time of writing
+3) The version of the app that encrypted the file: Use a reasonable value,
+   like 2.24.8.6 or something.  
+4) Jid: The last 2 numbers of your phone number  
+5) Backup version: Use 1.
+
+Defaults will be used if parameters are omitted.  
+
+To sum it up:
+```
+$ waencrypt --enable-features 5 6 7 8 9 10 11 12 13 14 15 16
+ 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 39 --type 15 --wa-version 2.26.1.2 --jid 00 --backup
+-version 1 encrypted_backup.key msgstore.db msgstore-new.db.crypt15 
+waencrypt.py:57         : [W] This script is in beta stage
+waencrypt.py:89         : [I] Done!
+```
+
+You can get info about a backup file with the `wainfo` tool.
+
+# Tool list
+For usage, run the tool with `-h` option.
+1) `wacreatekey` - Create key files
+2) `wadecrypt` - Decrypt backups
+3) `waencrypt` - Encrypt backups
+4) `waguess` - Hacky way to try decrypt backups
+5) `wainfo` - Get info about a backup 
+
+# FAQ
+
+## Can I decrypt a backup without a key file?
+
+NO! What would be the point of encrypting a file otherwise?  
+
+## I forgot the password / 64-letters key, can you help me?
+
+See above.
+
+## What is the best setup for decrypting my own databases?
+
+1) Enable end-to-end backups and do NOT use a password, use the 64-letters key option.
+2) Use `wacreatekey` to create a `encrypted_backup.key` file
+3) Store your key file safely and use `wadecrypt` to decrypt your backups.
+
+In this way, you will manage your own root key - otherwise WhatsApp might change 
+your key when appropriate.  
+
+## Can I use the password to decrypt the database?
+
+No! The password is only used to talk with the WhatsApp servers and retrieve 
+the 64-letters key.  
+In other words, the password is used to **protect the key**, it's not used 
+to encrypt the backups.  
+
+## Can I decrypt .mcrypt1 files downloaded from Google Drive?
+Yes, but the code is not documented, so please at this time read the code.  
+
 
 ## Not working / crash / etc
 
@@ -118,9 +139,7 @@ Please open an issue and attach:
 2) Hexdump of keyfile
 3) Hexdump of first 512 bytes of encrypted DB
 
-### I will happily accept pull requests for the currently open issues. :)
-
-### Where do I get the key(file)?
+## Where do I get the key(file)?
 On a rooted Android device, you can just copy 
 `/data/data/com.whatsapp/files/key` 
 (or `/data/data/com.whatsapp/files/encrypted_backup.key` if backups are crypt15).  
@@ -130,6 +149,7 @@ you can just transcribe and use it in lieu of the key file parameter.
 **There are other ways, but it is not in the scope of this project 
 to tell you.  
 Issues asking for this will be closed as invalid.**  
+### I will happily accept pull requests for the currently open issues. :)
 
 ### Last tested version (don't expect this to be updated)
 Stable: 
@@ -188,4 +208,4 @@ Anyone else that I forgot to mention!
 
 ### Stargazers over time
 
-[![Star History Chart](https://api.star-history.com/svg?repos=ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter&type=Date)](https://star-history.com/#ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=ElDavoo/wa-crypt-tools&type=Date)](https://star-history.com/#ElDavoo/wa-crypt-tools&Date)
