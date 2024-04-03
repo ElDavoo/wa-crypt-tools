@@ -8,7 +8,7 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13backup_expiry.
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'backup_expiry_pb2', _globals)
-if _descriptor._USE_C_DESCRIPTORS == False:
-    DESCRIPTOR._options = None
+if not _descriptor._USE_C_DESCRIPTORS:
+    DESCRIPTOR._loaded_options = None
     _globals['_BACKUPEXPIRY']._serialized_start = 24
     _globals['_BACKUPEXPIRY']._serialized_end = 1068

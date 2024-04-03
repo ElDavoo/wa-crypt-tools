@@ -157,6 +157,10 @@ After generating the protobuf python classes through `protoc`, from that same di
 
 `protol --in-place --python-out ..\src\wa_crypt_tools\proto protoc --proto-path=. *.proto`
 
+Linux:  
+
+`PATH="$(pwd):$PATH" protol --in-place --python-out ../src/wa_crypt_tools/proto protoc --proto-path=. *.proto`
+
 Now all of the generated python classes should have their imports fixed.
 
 ---

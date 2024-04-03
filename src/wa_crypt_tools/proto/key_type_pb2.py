@@ -8,7 +8,7 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0ekey_type.proto
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'key_type_pb2', _globals)
-if _descriptor._USE_C_DESCRIPTORS == False:
-    DESCRIPTOR._options = None
+if not _descriptor._USE_C_DESCRIPTORS:
+    DESCRIPTOR._loaded_options = None
     _globals['_KEY_TYPE']._serialized_start = 18
     _globals['_KEY_TYPE']._serialized_end = 65
