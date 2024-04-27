@@ -176,6 +176,10 @@ def header_info(header):
     string += str("Backup version: {}\n".format(header.info.backup_version))
     #string += str("Size of the backup file: {}".format(header.backup_export_file_size))
     features = [n for n in [*range(5,38), 39] if getattr(header.info, "f_" + str(n)) == True]
-    string += str("Features: {}\n".format(features))
-    string += str("Max feature number: {}\n".format(max(features)))
+    if len(features) > 0:
+        string += str("Features: {}\n".format(features))
+        string += str("Max feature number: {}\n".format(max(features)))
+    else: 
+        string += str("No feature table found (not a msgstore DB or very old)\n")
+        
     return string
