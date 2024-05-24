@@ -67,8 +67,8 @@ def main():
             lo.warning("Server salt not specified, a random one will be generated.")
         if args.googleid is None:
             lo.warning("Google id not specified, a random one will be generated.")
-        key: Key14 = Key14(cipher_version=args.cipher_version.to_bytes(2,"big"),
-                           key_version=args.key_version.to_bytes(1,"big"),
+        key: Key14 = Key14(cipher_version=args.cipher_version.to_bytes(2, "big"),
+                           key_version=args.key_version.to_bytes(1, "big"),
                            serversalt=args.server_salt, googleid=args.googleid,
                            iv=None, key=None)
     else:

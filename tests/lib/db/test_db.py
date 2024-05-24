@@ -1,5 +1,3 @@
-from unittest import TestCase
 
-
-class TestDatabase(TestCase):
+class TestDatabase():
     pass

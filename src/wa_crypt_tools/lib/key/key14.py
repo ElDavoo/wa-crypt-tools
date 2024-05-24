@@ -8,9 +8,10 @@ from wa_crypt_tools.lib.key.key import Key
 from wa_crypt_tools.lib.utils import create_jba
 
 import logging
-l = logging.getLogger(__name__)
 
-# Thanks to python, these all have to go to the same file
+log = logging.getLogger(__name__)
+
+
 class Key14(Key):
     # These constants are only used with crypt12/14 keys.
     __SUPPORTED_CIPHER_VERSION = b'\x00\x01'
@@ -18,7 +19,7 @@ class Key14(Key):
 
     def __init__(self, keyarray: bytes = None,
                  cipher_version: bytes = None, key_version: bytes = None,
-                    serversalt: bytes = None, googleid: bytes = None, hashedgoogleid: bytes = None,
+                 serversalt: bytes = None, googleid: bytes = None, hashedgoogleid: bytes = None,
                  iv: bytes = None, key: bytes = None):
         """Extracts the fields from a crypt14 loaded key file."""
         # key file format and encoding explanation:
@@ -42,53 +43,53 @@ class Key14(Key):
                 self.__cipher_version = self.__SUPPORTED_CIPHER_VERSION
             else:
                 if cipher_version != self.__SUPPORTED_CIPHER_VERSION:
-                    l.error("Invalid cipher version: {}".format(cipher_version.hex()))
+                    log.error("Invalid cipher version: {}".format(cipher_version.hex()))
                 self.__cipher_version = cipher_version
             if key_version is None:
                 self.__key_version = self.__SUPPORTED_KEY_VERSIONS[-1]
             else:
                 if key_version not in self.__SUPPORTED_KEY_VERSIONS:
-                    l.error("Invalid key version: {}".format(key_version.hex()))
+                    log.error("Invalid key version: {}".format(key_version.hex()))
                 self.__key_version = key_version
             if serversalt is None:
                 self.__serversalt = urandom(32)
             else:
                 if len(serversalt) != 32:
-                    l.error("Invalid server salt length: {}".format(serversalt.hex()))
+                    log.error("Invalid server salt length: {}".format(serversalt.hex()))
                 self.__serversalt = serversalt
             if googleid is None:
                 self.__googleid = urandom(16)
             else:
                 if len(googleid) != 16:
-                    l.error("Invalid google id length: {}".format(googleid.hex()))
+                    log.error("Invalid google id length: {}".format(googleid.hex()))
                 self.__googleid = googleid
             if hashedgoogleid is None:
                 self.__hashedgoogleid = sha256(self.__googleid).digest()
             else:
-                l.warning("Using supplied hashed google id")
+                log.warning("Using supplied hashed google id")
                 if len(hashedgoogleid) != 32:
-                    l.error("Invalid hashed google id length: {}".format(hashedgoogleid.hex()))
+                    log.error("Invalid hashed google id length: {}".format(hashedgoogleid.hex()))
                 self.__hashedgoogleid = hashedgoogleid
             if iv is None:
                 self.__padding = b'\x00' * 16
             else:
                 if len(iv) != 16:
-                    l.error("Invalid IV length: {}".format(iv.hex()))
+                    log.error("Invalid IV length: {}".format(iv.hex()))
                 if iv != b'\x00' * 16:
-                    l.warning("IV should be empty")
+                    log.warning("IV should be empty")
                 self.__padding = iv
             if key is None:
                 self.__key = urandom(32)
             else:
                 if len(key) != 32:
-                    l.error("Invalid key length: {}".format(key.hex()))
+                    log.error("Invalid key length: {}".format(key.hex()))
                 self.__key = key
             return
         # Check if the keyfile has a supported cipher version
         self.__cipher_version = keyarray[:len(self.__SUPPORTED_CIPHER_VERSION)]
         if self.__SUPPORTED_CIPHER_VERSION != self.__cipher_version:
-            l.error("Invalid keyfile: Unsupported cipher version {}"
-                     .format(keyarray[:len(self.__SUPPORTED_CIPHER_VERSION)].hex()))
+            log.error("Invalid keyfile: Unsupported cipher version {}"
+                      .format(keyarray[:len(self.__SUPPORTED_CIPHER_VERSION)].hex()))
         index = len(self.__SUPPORTED_CIPHER_VERSION)
 
         # Check if the keyfile has a supported key version
@@ -99,8 +100,8 @@ class Key14(Key):
                 self.__key_version = v
                 break
         if not version_supported:
-            l.error('Invalid keyfile: Unsupported key version {}'
-                     .format(keyarray[index:index + len(self.__SUPPORTED_KEY_VERSIONS[0])].hex()))
+            log.error('Invalid keyfile: Unsupported key version {}'
+                      .format(keyarray[index:index + len(self.__SUPPORTED_KEY_VERSIONS[0])].hex()))
 
         self.__serversalt = keyarray[3:35]
 
@@ -109,8 +110,8 @@ class Key14(Key):
         expected_digest = sha256(self.__googleid).digest()
         actual_digest = keyarray[51:83]
         if expected_digest != actual_digest:
-            l.error("Invalid keyfile: Invalid SHA-256 of salt.\n    "
-                     "Expected: {}\n    Got:{}".format(expected_digest, actual_digest))
+            log.error("Invalid keyfile: Invalid SHA-256 of salt.\n    "
+                      "Expected: {}\n    Got:{}".format(expected_digest, actual_digest))
 
         self.__hashedgoogleid = actual_digest
 
@@ -119,12 +120,12 @@ class Key14(Key):
         # Check if IV is made of zeroes
         for byte in self.__padding:
             if byte:
-                l.error("Invalid keyfile: IV is not zeroed out but is: {}".format(self.__padding.hex()))
+                log.error("Invalid keyfile: IV is not zeroed out but is: {}".format(self.__padding.hex()))
                 break
 
         self.__key = keyarray[99:]
 
-        l.info("Crypt12/14 key loaded")
+        log.info("Crypt12/14 key loaded")
 
     def get(self) -> bytes:
         return self.__key
@@ -140,7 +141,6 @@ class Key14(Key):
 
     def get_key_version(self) -> bytes:
         return self.__key_version
-
 
     def __str__(self) -> str:
         """Returns a string representation of the key"""

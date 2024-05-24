@@ -9,7 +9,7 @@ from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 from wa_crypt_tools.lib.props import Props
 from hashlib import sha512
 
-class Test_Decryption:
+class TestDecryption:
     def test_decryption15(self):
         key = KeyFactory.new("tests/res/encrypted_backup.key")
         f = open("tests/res/msgstore.db.crypt15",'rb')

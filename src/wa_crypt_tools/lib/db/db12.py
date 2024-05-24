@@ -12,7 +12,9 @@ from wa_crypt_tools.lib.db.db import Database
 from wa_crypt_tools.lib.key.key14 import Key14
 from wa_crypt_tools.lib.props import Props
 
-l = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
+
+
 class Database12(Database):
     """
     Implementation of a crypt12 database.
@@ -40,25 +42,25 @@ class Database12(Database):
         if encrypted and key:
             self.cipher_version = encrypted.read(2)
             if self.cipher_version != key.get_cipher_version():
-                l.error("Cipher version mismatch: {} != {}".format(self.cipher_version, key.get_cipher_version()))
+                log.error("Cipher version mismatch: {} != {}".format(self.cipher_version, key.get_cipher_version()))
                 raise ValueError
             self.file_hash.update(self.cipher_version)
 
             self.key_version = encrypted.read(1)
             if self.key_version != key.get_key_version():
-                l.error("Key version mismatch: {} != {}".format(self.key_version, key.get_key_version()))
+                log.error("Key version mismatch: {} != {}".format(self.key_version, key.get_key_version()))
                 raise ValueError
             self.file_hash.update(self.key_version)
 
             self.serversalt = encrypted.read(32)
             if self.serversalt != key.get_serversalt():
-                l.error("Server salt mismatch: {} != {}".format(self.serversalt, key.get_serversalt()))
+                log.error("Server salt mismatch: {} != {}".format(self.serversalt, key.get_serversalt()))
                 raise ValueError
             self.file_hash.update(self.serversalt)
 
             self.googleid = encrypted.read(16)
             if self.googleid != key.get_googleid():
-               l.error("Google ID mismatch: {} != {}".format(self.googleid, key.get_googleid()))
+                log.error("Google ID mismatch: {} != {}".format(self.googleid, key.get_googleid()))
             self.file_hash.update(self.googleid)
 
             self.iv = encrypted.read(16)
@@ -106,7 +108,7 @@ class Database12(Database):
                     self.cipher_version = cipher_version
                     self.file_hash.update(self.cipher_version)
                 else:
-                    l.error("Unsupported cipher version provided!")
+                    log.error("Unsupported cipher version provided!")
                     raise ValueError
             else:
                 self.cipher_version = C.SUPPORTED_CIPHER_VERSION
@@ -117,7 +119,7 @@ class Database12(Database):
                     self.key_version = key_version
                     self.file_hash.update(self.key_version)
                 else:
-                    l.error("Unsupported key version provided!")
+                    log.error("Unsupported key version provided!")
             else:
                 self.key_version = C.SUPPORTED_KEY_VERSIONS[-1]
                 self.file_hash.update(self.key_version)
@@ -154,9 +156,9 @@ class Database12(Database):
         crypt12_footer = str(userjid)
         jid = findall(r"(?:-|\d)(?:-|\d)(\d\d)", crypt12_footer)
         if len(jid) != 1:
-            l.error("The phone number end is not 2 characters long")
+            log.error("The phone number end is not 2 characters long")
         else:
-            l.debug("Your phone number ends with {}".format(jid[0]))
+            log.debug("Your phone number ends with {}".format(jid[0]))
         checksum = encrypted[-20:-4]
         authentication_tag = encrypted[-36:-20]
         encrypted_data = encrypted[:-36]
@@ -170,14 +172,14 @@ class Database12(Database):
             # TODO do crypt12 multifiles actually exist?
             is_multifile_backup = True
         else:
-            l.debug("Checksum OK ({}). Decrypting...".format(self.file_hash.hexdigest()))
+            log.debug("Checksum OK ({}). Decrypting...".format(self.file_hash.hexdigest()))
 
         cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)
         try:
             output_decrypted: bytes = cipher.decrypt(encrypted_data)
         except ValueError as e:
-            l.fatal("Decryption failed: {}."
-                    "\n    This probably means your backup is corrupted.".format(e))
+            log.fatal("Decryption failed: {}."
+                      "\n    This probably means your backup is corrupted.".format(e))
             raise e
 
         # Verify the authentication tag
@@ -193,12 +195,13 @@ class Database12(Database):
             else:
                 cipher.verify(authentication_tag)
         except ValueError as e:
-            l.error("Authentication tag mismatch: {}."
-                    "\n    This probably means your backup is corrupted.".format(e))
+            log.error("Authentication tag mismatch: {}."
+                      "\n    This probably means your backup is corrupted.".format(e))
 
         return output_decrypted
+
     def encrypt(self, key: Key14, props: Props, decrypted: bytes) -> bytes:
-        hash = md5()
+        file_hash = md5()
         out = b""
         out += self.cipher_version
         out += self.key_version
@@ -209,16 +212,13 @@ class Database12(Database):
         encrypted = cipher.encrypt(decrypted)
         out += encrypted
         out += cipher.digest()
-        hash.update(out)
-        out += hash.digest()
+        file_hash.update(out)
+        out += file_hash.digest()
         jid = props.get_jid()
         if len(jid) != 2:
-            l.error("The phone number end is not 2 characters long")
+            log.error("The phone number end is not 2 characters long")
         out += "--{}".format(jid).encode()
         return out
 
-
-
     def get_iv(self) -> bytes:
         return self.iv
-

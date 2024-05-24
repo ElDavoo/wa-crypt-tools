@@ -9,12 +9,15 @@ from wa_crypt_tools.lib.utils import create_jba, encryptionloop
 
 from wa_crypt_tools.lib.key.key import Key
 import logging
+
 l = logging.getLogger(__name__)
+
+
 class Key15(Key):
     # This constant is only used with crypt15 keys.
     BACKUP_ENCRYPTION = b'backup encryption'
 
-    def __init__(self, keyarray: bytes=None, key: bytes=None):
+    def __init__(self, keyarray: bytes = None, key: bytes = None):
         """Extracts the key from a loaded crypt15 key file."""
         # encrypted_backup.key file format and encoding explanation:
         # The E2E key file is actually a serialized byte[] object.
@@ -57,7 +60,7 @@ class Key15(Key):
         return encryptionloop(
             first_iteration_data=self.__key,
             message=b'backup encryption',
-            outputBytes=32)
+            output_bytes=32)
 
     def get_root(self) -> bytes:
         """
@@ -72,7 +75,7 @@ class Key15(Key):
         return encryptionloop(
             first_iteration_data=self.__key,
             message=b'metadata encryption',
-            outputBytes=32)
+            output_bytes=32)
 
     def get_metadata_authentication(self) -> bytes:
         """
@@ -81,7 +84,7 @@ class Key15(Key):
         return encryptionloop(
             first_iteration_data=self.__key,
             message=b'metadata authentication',
-            outputBytes=32)
+            output_bytes=32)
 
     def dump(self) -> bytes:
         """Dumps the key"""

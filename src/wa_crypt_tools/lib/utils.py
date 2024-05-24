@@ -80,21 +80,21 @@ def javaintlist2bytes(barr: JavaArray) -> bytes:
 
 
 def encryptionloop(*, first_iteration_data: bytes, privateseed: bytes = b'\x00' * 32, message: bytes,
-                   outputBytes: int):
+                   output_bytes: int):
     # The private key and the seed are used to create the HMAC key
     privatekey = hmac.new(privateseed, msg=first_iteration_data, digestmod=sha256).digest()
 
     data = b''
     output = b''
-    numPermutations = int(math.ceil(float(outputBytes) / float(32)))
+    permutations = int(math.ceil(float(output_bytes) / float(32)))
     i = 1
-    while i < numPermutations + 1:
+    while i < permutations + 1:
         hasher = hmac.new(privatekey, msg=data, digestmod=sha256)
         if message is not None:
             hasher.update(message)
         hasher.update(i.to_bytes(1, byteorder='big'))
         data = hasher.digest()
-        bytestowrite = min(outputBytes, len(data))
+        bytestowrite = min(output_bytes, len(data))
         output += data[:bytestowrite]
         i += 1
     return output
@@ -104,20 +104,20 @@ def mcrypt1_metadata_decrypt(*, key, encoded: str):
     """
     Decrypts the metadata of a mcrypt1 file.
     :param key: The key used to decrypt the metadata
-    :param encoded: The metadata downloaded from google drive in base64
+    :param encoded: The metadata downloaded from Google Drive in base64
     :return: The decrypted JSON
     """
     # Base64 decoding
     encoded = base64.b64decode(encoded)
     # PKCS5Padding is not natively supported
     unpad = lambda s: s[:-ord(s[len(s) - 1:])]
-    ivSize = encoded[0]
-    if ivSize != 16:
+    iv_size = encoded[0]
+    if iv_size != 16:
         raise Exception("IV Size is not 16")
 
     iv = encoded[1:17]
-    macSize = encoded[17]
-    if macSize != 32:
+    mac_size = encoded[17]
+    if mac_size != 32:
         raise Exception("MAC Size is not 32")
 
     mac = encoded[18:50]
@@ -152,6 +152,7 @@ def get_mcrypt1_name(*, key, name: str, md5: bytes) -> bytes:
     media_hash = hmac_n.digest()
     return media_hash
 
+
 def header_info(header):
     """
     shows all header, information including the feature vector
@@ -175,11 +176,11 @@ def header_info(header):
     string += str("The last two numbers of the user's Jid: {}\n".format(header.info.jidSuffix))
     string += str("Backup version: {}\n".format(header.info.backup_version))
     #string += str("Size of the backup file: {}".format(header.backup_export_file_size))
-    features = [n for n in [*range(5,38), 39] if getattr(header.info, "f_" + str(n)) == True]
+    features = [n for n in [*range(5, 38), 39] if getattr(header.info, "f_" + str(n)) == True]
     if len(features) > 0:
         string += str("Features: {}\n".format(features))
         string += str("Max feature number: {}\n".format(max(features)))
-    else: 
+    else:
         string += str("No feature table found (not a msgstore DB or very old)\n")
-        
+
     return string

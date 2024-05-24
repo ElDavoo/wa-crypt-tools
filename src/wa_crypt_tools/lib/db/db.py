@@ -4,7 +4,8 @@ import logging
 from wa_crypt_tools.lib.key.key import Key
 from wa_crypt_tools.lib.props import Props
 
-l = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
+
 
 class Database(abc.ABC):
     """

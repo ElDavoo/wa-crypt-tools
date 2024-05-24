@@ -17,7 +17,8 @@ __license__ = 'GPLv3'
 __status__ = 'Beta'
 
 import logging
-l = logging.getLogger(__name__)
+
+log = logging.getLogger(__name__)
 
 
 def parsecmdline() -> argparse.Namespace:
@@ -32,31 +33,32 @@ def parsecmdline() -> argparse.Namespace:
                         help='tell the program that the file is a key file')
     return parser.parse_args()
 
+
 def main():
     args = parsecmdline()
 
     # set wa_crypt_tools l to debug
-    l.setLevel(logging.DEBUG)
+    log.setLevel(logging.DEBUG)
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
     ch.setFormatter(CustomFormatter())
-    l.addHandler(ch)
+    log.addHandler(ch)
     # also add to "wa_crypt_tools.lib" logger
     logging.getLogger("wa_crypt_tools.lib").addHandler(ch)
     logging.getLogger("wa_crypt_tools.lib").setLevel(logging.DEBUG)
 
-    l.warning("This script is in beta stage.")
+    log.warning("This script is in beta stage.")
 
-    if (args.key):
+    if args.key:
         key = KeyFactory.from_file(args.encrypted)
         print(key)
         return
     try:
-        DatabaseFactory.from_file(open(args.encrypted,'rb'))
+        DatabaseFactory.from_file(open(args.encrypted, 'rb'))
     except Exception as e:
-        l.error("Error: {}".format(e))
-        return         
-    # TODO
+        log.error("Error: {}".format(e))
+        return
+        # TODO
     # print(db)
 
 

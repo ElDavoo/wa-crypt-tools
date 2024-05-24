@@ -8,10 +8,11 @@ from google.protobuf.message import DecodeError
 
 from wa_crypt_tools.lib.props import Props
 
-l = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 from wa_crypt_tools.lib.db.db import Database
 from wa_crypt_tools.lib.key.key15 import Key15
+
 
 class Database15(Database):
     def __str__(self):
@@ -28,23 +29,23 @@ class Database15(Database):
                 from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
                 from wa_crypt_tools.proto import key_type_pb2 as key_type
             except ImportError as e:
-                l.error("Could not import the proto classes: {}".format(e))
+                log.error("Could not import the proto classes: {}".format(e))
                 if str(e).startswith("cannot import name 'builder' from 'google.protobuf.internal'"):
-                    l.error("You need to upgrade the protobuf library to at least 3.20.0.\n"
-                            "    python -m pip install --upgrade protobuf")
+                    log.error("You need to upgrade the protobuf library to at least 3.20.0.\n"
+                              "    python -m pip install --upgrade protobuf")
                 elif str(e).startswith("no module named"):
-                    l.error("Please download them and put them in the \"proto\" sub folder.")
+                    log.error("Please download them and put them in the \"proto\" sub folder.")
                 raise e
             except AttributeError as e:
-                l.error("Could not import the proto classes: {}\n    ".format(e) +
-                        "Your protobuf library is probably too old.\n    "
-                        "Please upgrade to at least version 3.20.0 , by running:\n    "
-                        "python -m pip install --upgrade protobuf")
+                log.error("Could not import the proto classes: {}\n    ".format(e) +
+                          "Your protobuf library is probably too old.\n    "
+                          "Please upgrade to at least version 3.20.0 , by running:\n    "
+                          "python -m pip install --upgrade protobuf")
                 raise e
 
             self.header = prefix.BackupPrefix()
 
-            l.debug("Parsing database header...")
+            log.debug("Parsing database header...")
 
             try:
 
@@ -62,7 +63,7 @@ class Database15(Database):
                 else:
                     self.file_hash.update(encrypted.read(1))
                 if not msgstore_features_flag:
-                    l.debug("No feature table found (not a msgstore DB or very old)")
+                    log.debug("No feature table found (not a msgstore DB or very old)")
 
                 try:
 
@@ -70,47 +71,46 @@ class Database15(Database):
                     self.file_hash.update(protobuf_raw)
 
                     if self.header.ParseFromString(protobuf_raw) != protobuf_size:
-                        l.error("Protobuf message not fully read. Please report a bug.")
+                        log.error("Protobuf message not fully read. Please report a bug.")
                     else:
 
                         # Checking and printing WA version and phone number
                         version = findall(r"\d(?:\.\d{1,3}){3}", self.header.info.app_version)
                         if len(version) != 1:
-                            l.error('WhatsApp version not found')
+                            log.error('WhatsApp version not found')
                         else:
-                            l.debug("WhatsApp version: {}".format(version[0]))
+                            log.debug("WhatsApp version: {}".format(version[0]))
                         if len(self.header.info.jidSuffix) != 2:
-                            l.error("The phone number end is not 2 characters long")
-                        l.debug("Your phone number ends with {}".format(self.header.info.jidSuffix))
+                            log.error("The phone number end is not 2 characters long")
+                        log.debug("Your phone number ends with {}".format(self.header.info.jidSuffix))
 
                         if len(self.header.c15_iv.IV) != 0:
                             # DB Header is crypt15
                             # if type(key) is not Key15:
                             #    l.error("You are using a crypt14 key file with a crypt15 backup.")
                             if len(self.header.c15_iv.IV) != 16:
-                                l.error("IV is not 16 bytes long but is {} bytes long".format(len(self.header.c15_iv.IV)))
+                                log.error(
+                                    "IV is not 16 bytes long but is {} bytes long".format(len(self.header.c15_iv.IV)))
                             iv = self.header.c15_iv.IV
 
                         elif len(self.header.c14_cipher.IV) != 0:
                             raise ValueError("Crypt14 file in crypt15 constructor!")
                         else:
-                            l.error("Could not parse the IV from the protobuf message. Please report a bug.")
+                            log.error("Could not parse the IV from the protobuf message. Please report a bug.")
                             raise ValueError
-
-
 
                 except DecodeError as e:
 
-                    l.error("Could not parse the protobuf message: {}".format(e))
+                    log.error("Could not parse the protobuf message: {}".format(e))
                     raise e
 
             except OSError as e:
-                l.fatal("Reading database header failed: {}".format(e))
+                log.fatal("Reading database header failed: {}".format(e))
                 raise e
         else:
             if iv:
                 if len(iv) != 16:
-                    l.error("IV is not 16 bytes long but is {} bytes long".format(len(iv)))
+                    log.error("IV is not 16 bytes long but is {} bytes long".format(len(iv)))
                 self.iv = iv
             else:
                 self.iv = urandom(16)
@@ -129,14 +129,14 @@ class Database15(Database):
             # We are probably in a multifile backup, which does not have a checksum.
             is_multifile_backup = True
         else:
-            l.debug("Checksum OK ({}). Decrypting...".format(self.file_hash.hexdigest()))
+            log.debug("Checksum OK ({}). Decrypting...".format(self.file_hash.hexdigest()))
 
         cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)
         try:
             output_decrypted: bytes = cipher.decrypt(encrypted_data)
         except ValueError as e:
-            l.fatal("Decryption failed: {}."
-                    "\n    This probably means your backup is corrupted.".format(e))
+            log.fatal("Decryption failed: {}."
+                      "\n    This probably means your backup is corrupted.".format(e))
             raise e
 
         # Verify the authentication tag
@@ -152,8 +152,8 @@ class Database15(Database):
             else:
                 cipher.verify(authentication_tag)
         except ValueError as e:
-            l.error("Authentication tag mismatch: {}."
-                    "\n    This probably means your backup is corrupted.".format(e))
+            log.error("Authentication tag mismatch: {}."
+                      "\n    This probably means your backup is corrupted.".format(e))
 
         return output_decrypted
 
@@ -186,5 +186,6 @@ class Database15(Database):
         file_hash.update(authentication_tag)
         out += file_hash.digest()
         return out
+
     def get_iv(self) -> bytes:
         return self.iv

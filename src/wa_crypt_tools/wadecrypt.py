@@ -25,17 +25,17 @@ except ModuleNotFoundError:
         if not hasattr(AES, 'MODE_GCM'):
             # pycrypto
             raise ModuleNotFoundError("You installed pycrypto and not pycryptodome(x). "
-            "Pycrypto is old, deprecated and not supported. \n"
-            "Run: python -m pip uninstall pycrypto\n"
-            "And: python -m pip install pycryptodomex\n"
-            "Or:  python -m pip install pycryptodome")
+                                      "Pycrypto is old, deprecated and not supported. \n"
+                                      "Run: python -m pip uninstall pycrypto\n"
+                                      "And: python -m pip install pycryptodomex\n"
+                                      "Or:  python -m pip install pycryptodome")
     except ModuleNotFoundError:
         # crypto (or nothing)
         raise ModuleNotFoundError("You need pycryptodome(x) to run these scripts!\n"
-        "python -m pip install pycryptodome\n"
-        "Or: python -m pip install pycryptodome\n"
-        "You can also remove \"crypto\" if you have it installed\n"
-        "python -m pip uninstall crypto")
+                                  "python -m pip install pycryptodome\n"
+                                  "Or: python -m pip install pycryptodome\n"
+                                  "You can also remove \"crypto\" if you have it installed\n"
+                                  "python -m pip uninstall crypto")
 # noinspection PyPackageRequirements
 # This is from javaobj-py3
 
@@ -56,8 +56,8 @@ __license__ = 'GPLv3'
 __status__ = 'Production'
 
 import logging
-l = logging.getLogger(__name__)
 
+log = logging.getLogger(__name__)
 
 
 def parsecmdline() -> argparse.Namespace:
@@ -92,12 +92,12 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
     z_obj = zlib.decompressobj()
 
     if cipher is None:
-        l.fatal("Could not create a decryption cipher")
+        log.fatal("Could not create a decryption cipher")
 
     try:
 
         if buffer_size < 17:
-            l.info("Invalid buffer size, will use default of {}".format(io.DEFAULT_BUFFER_SIZE))
+            log.info("Invalid buffer size, will use default of {}".format(io.DEFAULT_BUFFER_SIZE))
             buffer_size = io.DEFAULT_BUFFER_SIZE
 
             # Does the thing above but only with DEFAULT_BUFFER_SIZE bytes at a time.
@@ -107,7 +107,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
 
             chunk = encrypted.read(buffer_size)
 
-            l.debug("Reading and decrypting...")
+            log.debug("Reading and decrypting...")
 
             while next_chunk := encrypted.read(buffer_size):
 
@@ -120,7 +120,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
                 try:
                     next_chunk = encrypted.read(buffer_size)
                 except MemoryError:
-                    l.fatal("Out of RAM, please use a smaller buffer size.")
+                    log.fatal("Out of RAM, please use a smaller buffer size.")
 
                 if len(next_chunk) <= 36:
                     # Last bytes read. Three cases:
@@ -147,9 +147,9 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
                             decrypted.write(z_obj.decompress(decrypted_chunk))
                     except zlib.error:
                         if test_decompression(decrypted_chunk):
-                            l.info("Decrypted data is a ZIP file that I will not decompress automatically.")
+                            log.info("Decrypted data is a ZIP file that I will not decompress automatically.")
                         else:
-                            l.error("I can't recognize decrypted data. Decryption not successful.\n    "
+                            log.error("I can't recognize decrypted data. Decryption not successful.\n    "
                                     "The key probably does not match with the encrypted file.")
                         is_zip = False
                         decrypted.write(decrypted_chunk)
@@ -165,7 +165,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
                     if len(jid) == 1:
                         # Confirmed to be crypt12
                         checksum = checksum[:-4]
-                        l.debug("Your phone number ends with {}".format(jid[0]))
+                        log.debug("Your phone number ends with {}".format(jid[0]))
                     else:
                         # Shift everything forward by 4 bytes
                         chunk = checksum[:4]
@@ -178,7 +178,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
                                 else:
                                     decrypted.write(z_obj.decompress(decrypted_chunk))
                             except zlib.error:
-                                l.error("Backup is corrupted.")
+                                log.error("Backup is corrupted.")
                                 decrypted.write(decrypted_chunk)
                         else:
                             decrypted.write(decrypted_chunk)
@@ -188,7 +188,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
                     if file_hash.digest() != checksum[16:]:
                         is_multifile_backup = True
                     else:
-                        l.debug("Checksum OK ({})!".format(file_hash.hexdigest()))
+                        log.debug("Checksum OK ({})!".format(file_hash.hexdigest()))
                     try:
                         if is_multifile_backup:
                             decrypted.write(cipher.decrypt(checksum[:16]))
@@ -196,19 +196,19 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
                         else:
                             cipher.verify(checksum[:16])
                     except ValueError as e:
-                        l.error("Authentication tag mismatch: {}."
+                        log.error("Authentication tag mismatch: {}."
                                 "\n    This probably means your backup is corrupted.".format(e))
                     break
 
                 chunk = next_chunk
 
             if is_zip and not z_obj.eof:
-                l.error("The encrypted database file is truncated (damaged).")
+                log.error("The encrypted database file is truncated (damaged).")
 
         decrypted.flush()
 
     except OSError as e:
-        l.fatal("I/O error: {}".format(e))
+        log.fatal("I/O error: {}".format(e))
 
     finally:
         decrypted.close()
@@ -219,20 +219,20 @@ def main():
     args = parsecmdline()
 
     # set wa_crypt_tools l to debug
-    l.setLevel(logging.DEBUG if args.verbose else logging.INFO)
+    log.setLevel(logging.DEBUG if args.verbose else logging.INFO)
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG if args.verbose else logging.INFO)
     ch.setFormatter(CustomFormatter())
-    l.addHandler(ch)
+    log.addHandler(ch)
     # also add to "wa_crypt_tools.lib" logger
     logging.getLogger("wa_crypt_tools.lib").addHandler(ch)
     logging.getLogger("wa_crypt_tools.lib").setLevel(logging.DEBUG if args.verbose else logging.INFO)
     if args.buffer_size is not None:
         if not 1 < args.buffer_size < maxsize:
-            l.fatal("Invalid buffer size")
+            log.fatal("Invalid buffer size")
     # Get the decryption key from the key file or the hex encoded string.
     key = KeyFactory.new(args.keyfile)
-    l.debug(str(key))
+    log.debug(str(key))
 
     db = DatabaseFactory.from_file(args.encrypted)
     cipher = AES.new(key.get(), AES.MODE_GCM, db.get_iv())
@@ -240,7 +240,8 @@ def main():
     if args.buffer_size is not None:
         chunked_decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, args.buffer_size, args.no_decompress)
     elif args.no_mem:
-        chunked_decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, io.DEFAULT_BUFFER_SIZE, args.no_decompress)
+        chunked_decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, io.DEFAULT_BUFFER_SIZE,
+                        args.no_decompress)
     else:
         output_decrypted: bytearray = db.decrypt(key, args.encrypted.read())
         try:
@@ -251,24 +252,23 @@ def main():
             else:
                 output_file = z_obj.decompress(output_decrypted)
                 if not z_obj.eof:
-                    l.error("The encrypted database file is truncated (damaged).")
+                    log.error("The encrypted database file is truncated (damaged).")
         except zlib.error:
             output_file = output_decrypted
             if test_decompression(output_file[:io.DEFAULT_BUFFER_SIZE]):
-                l.info("Decrypted data is a ZIP file that I will not decompress automatically.")
+                log.info("Decrypted data is a ZIP file that I will not decompress automatically.")
             else:
-                l.error("I can't recognize decrypted data. Decryption not successful.\n    "
+                log.error("I can't recognize decrypted data. Decryption not successful.\n    "
                         "The key probably does not match with the encrypted file.\n    "
                         "Or the backup is simply empty. (check with --force)")
         args.decrypted.write(output_file)
 
-
     if date.today().day == 1 and date.today().month == 4:
-        l.info("Done. Uploading messages to the developer's server...")
+        log.info("Done. Uploading messages to the developer's server...")
         sleep(0.5)
-        l.info("Uploaded. The developer will now read and publish your messages!")
+        log.info("Uploaded. The developer will now read and publish your messages!")
     else:
-        l.info("Done")
+        log.info("Done")
 
 
 if __name__ == "__main__":

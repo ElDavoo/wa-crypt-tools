@@ -181,7 +181,7 @@ Linux:
 
 `PATH="$(pwd):$PATH" protol --in-place --python-out ../src/wa_crypt_tools/proto protoc --proto-path=. *.proto`
 
-Now all of the generated python classes should have their imports fixed.
+Now all the generated python classes should have their imports fixed.
 
 ---
 
