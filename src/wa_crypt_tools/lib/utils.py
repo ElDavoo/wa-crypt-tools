@@ -167,7 +167,7 @@ def header_info(header):
         string += str("Header information in your crypt14 file:\n")
         string += str("Cipher version: {}\n".format(header.c14_cipher.cipher_version.hex()))
         string += str("Key version: {}\n".format(header.c14_cipher.key_version.hex()))
-        string += str("Server satl: {}\n".format(header.c14_cipher.server_salt.hex()))
+        string += str("Server salt: {}\n".format(header.c14_cipher.server_salt.hex()))
         string += str("Google ID: {}\n".format(header.c14_cipher.google_id.hex()))
         string += str("IV: {}\n".format(header.c14_cipher.IV.hex()))
     string += str("Key type: {}\n".format(header.key_type))
