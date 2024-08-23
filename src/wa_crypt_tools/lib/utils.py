@@ -32,12 +32,13 @@ def test_decompression(test_data: bytes) -> bool:
         if len(zlib_obj) < 16:
             l.error("Test decompression: chunk too small")
             return False
+        # Decoding can fail if first two bytes are a bad UTF-8 char
         if zlib_obj[:15].decode('ascii') != 'SQLite format 3':
             l.error("Test decompression: Decryption and decompression ok but not a valid SQLite database")
             return False
         else:
             return True
-    except zlib.error:
+    except (zlib.error, UnicodeDecodeError):
         return False
 
 

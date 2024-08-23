@@ -1,7 +1,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/ElDavoo/wa-crypt-tools/badge.svg?branch=main)](https://coveralls.io/github/ElDavoo/wa-crypt-tools?branch=main)
 
 # WhatsApp Crypt Tools
-Decrypt and encrypt WhatsApp's .crypt12, .crypt14 and .crypt15 files with ease!  
+Decrypt and encrypt WhatsApp and WA Business' .crypt12, .crypt14 and .crypt15 files with ease!  
 For decryption, you NEED **the key file** or the 64-characters long key.  
 The key file is named "key" if the backup is crypt14 or  
 "encrypted_backup.key" if the backup is crypt15 (encrypted E2E backups).  
@@ -112,6 +112,16 @@ NO! What would be the point of encrypting a file otherwise?
 
 See above.
 
+## The program doesn't decrypt my backups and says the backups are corrupted
+
+Your backups are corrupted. You can try disabling all checks with the
+`-f` flag, but expect crashes and/or unreadable output.
+
+## The program doesn't decrypt and says the key is wrong
+
+The key is wrong. You can try disabling all checks with the
+`-f` flag, but expect crashes and/or unreadable output.
+
 ## What is the best setup for decrypting my own databases?
 
 1) Enable end-to-end backups and do NOT use a password, use the 64-letters key option.
@@ -132,12 +142,16 @@ to encrypt the backups.
 Yes, but the code is not documented, so please at this time read the code.  
 
 
-## Not working / crash / etc
+## I really think the program is broken, that my backups are intact and that the key is right
 
-Please open an issue and attach:
+Send me the needed files on Telegram and I will take a look.
+
+If you (understandably) have privacy concerns, open an issue and attach:
 1) Output of the program (both with and without --force)
 2) Hexdump of keyfile
 3) Hexdump of first 512 bytes of encrypted DB
+
+But it will be more difficult to help you.  
 
 ## Where do I get the key(file)?
 On a rooted Android device, you can just copy 
@@ -153,9 +167,13 @@ Issues asking for this will be closed as invalid.**
 
 ### Last tested version (don't expect this to be updated)
 Stable: 
-2.23.16.76  
+2.24.16.76  
 Beta: 
 2.24.18.10
+
+#### Business
+Stable:  
+2.24.16.77
 
 #### Protobuf automatic fix
 
