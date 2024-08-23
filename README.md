@@ -28,8 +28,13 @@ of the program.
 
 You can install this script as a package through pip. Just run:
 ```bash
+python -m pip install wa-crypt-tools
+```
+for the stable version and 
+```bash
 python -m pip install git+https://github.com/ElDavoo/wa-crypt-tools
 ```
+for the development version.  
 
 # Quick start
 
