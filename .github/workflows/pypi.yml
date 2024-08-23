@@ -11,6 +11,7 @@ jobs:
   tests:
     uses: ./.github/workflows/lint-test-coverage.yml
   release:
+    permissions: write-all
     needs:
       - codeql
       - tests
