@@ -5,6 +5,10 @@ on:
     types: [created]
 
 jobs:
+  codeql:
+    uses: ./.github/workflows/codeql-analysis.yml
+  tests:
+    uses: ./.github/workflows/lint-test-coverage.yml
   pypi-publish:
     name: Publish release to PyPI
     runs-on: ubuntu-latest
