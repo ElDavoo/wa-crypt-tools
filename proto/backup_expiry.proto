@@ -41,5 +41,5 @@ message BackupExpiry {
     optional bool f_36 = 36; // alter_message_ephemeral_to_message_ephemeral_remove_column
     optional bool f_37 = 37; // alter_message_ephemeral_setting_to_message_ephemeral_setting_remove_column
     // optional int32 backup_export_file_size = 38; // The size of the backup file, unused
-    optional bool f_39 = 39; // cleaned_db
+    optional bool f_39 = 39; // cleaned_db, does not show in incremental backups
 }

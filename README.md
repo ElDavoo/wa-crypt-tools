@@ -155,7 +155,7 @@ Issues asking for this will be closed as invalid.**
 Stable: 
 2.23.16.76  
 Beta: 
-2.23.18.12
+2.24.18.10
 
 #### Protobuf automatic fix
 
@@ -167,9 +167,11 @@ First, after cloning the repository, do an editable installation of the package 
 
 This will also install the optional dependencies of the package.
 
-Next, download the protobuf compiler from its repository [here](https://github.com/protocolbuffers/protobuf/releases). You can move the protoc program to the `wa-crypt-tools/proto` folder where the .proto files are.
+Next, download the protobuf compiler from its repository [here](https://github.com/protocolbuffers/protobuf/releases). 
+You can move the protoc program to the `wa-crypt-tools/proto` folder where the .proto files are.
  
-Replace the protobuf classes as needed and run `protoc` to generate the python classes. From the `wa-crypt-tools/proto` directory of the project, run:
+Replace the protobuf classes as needed and run `protoc` to generate the python classes. 
+From the `wa-crypt-tools/proto` directory of the project, run:
 
 `./protoc --python_out=../src/wa_crypt_tools/proto --proto_path=. *.proto`
 
