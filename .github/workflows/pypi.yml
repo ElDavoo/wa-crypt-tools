@@ -1,14 +1,31 @@
 name: Upload Python Package to PyPI when a Release is Created
 
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   codeql:
     uses: ./.github/workflows/codeql-analysis.yml
   tests:
     uses: ./.github/workflows/lint-test-coverage.yml
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
   pypi-publish:
     name: Publish release to PyPI
     runs-on: ubuntu-latest
