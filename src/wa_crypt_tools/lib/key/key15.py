@@ -45,8 +45,11 @@ class Key15(Key):
                 self.__key = key
             return
 
+        if not isinstance(keyarray, bytes):
+            raise ValueError("keyarray is not a byte array!")
+
         if len(keyarray) != 32:
-            l.critical("Crypt15 loader trying to load a crypt14 key")
+            raise ValueError("Invalid key length")
         l.debug("Root key: {}".format(keyarray.hex()))
         # Save the root key in the class
         self.__key = keyarray

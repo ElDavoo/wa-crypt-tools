@@ -51,9 +51,20 @@ def main():
     ch.setLevel(logging.DEBUG if args.verbose else logging.INFO)
     ch.setFormatter(CustomFormatter())
     lo.addHandler(ch)
+    # also add to "wa_crypt_tools.lib" logger
+    logging.getLogger("wa_crypt_tools.lib").addHandler(ch)
+    logging.getLogger("wa_crypt_tools.lib").setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
+    hex_key = None
     if args.hex is None:
         lo.warning("Key not specified, a random key will be generated.")
+    else:
+        try:
+            hex_key: bytes = bytes.fromhex(args.hex)
+        except ValueError:
+            lo.critical("Key is not in hexadecimal format")
+            exit(1)
+
 
     if args.output is None:
         args.output = "key" if args.crypt14 else "encrypted_backup.key"
@@ -67,10 +78,15 @@ def main():
             lo.warning("Server salt not specified, a random one will be generated.")
         if args.googleid is None:
             lo.warning("Google id not specified, a random one will be generated.")
-        key: Key14 = Key14(cipher_version=args.cipher_version.to_bytes(2, "big"),
+        try:
+            key: Key14 = Key14(cipher_version=args.cipher_version.to_bytes(2, "big"),
                            key_version=args.key_version.to_bytes(1, "big"),
-                           serversalt=args.server_salt, googleid=args.googleid,
-                           iv=None, key=None)
+                           serversalt=bytes.fromhex(args.server_salt),
+                           googleid=bytes.fromhex(args.googleid),
+                           iv=None,
+                           key=hex_key)
+        except ValueError as e:
+            lo.critical(f"Something was not right: {e}")
     else:
         if args.cipher_version is not None:
             lo.warning("Cipher version specified, but it is not used for crypt15 keys, ignoring.")
@@ -80,8 +96,11 @@ def main():
             lo.warning("Server salt specified, but it is not used for crypt15 keys, ignoring.")
         if args.googleid is not None:
             lo.warning("Google id specified, but it is not used for crypt15 keys, ignoring.")
-        key: Key15 = Key15(keyarray=bytes.fromhex(args.hex) if args.hex is not None else None)
-
+        try:
+            key: Key15 = Key15(keyarray=hex_key)
+        except ValueError as e:
+            lo.critical(f"Error while creating the key: {e}")
+            exit(1)
     # Check if the output file exists
     output_file = Path(args.output)
     print(os.getcwd())
