@@ -81,12 +81,13 @@ def main():
         try:
             key: Key14 = Key14(cipher_version=args.cipher_version.to_bytes(2, "big"),
                            key_version=args.key_version.to_bytes(1, "big"),
-                           serversalt=bytes.fromhex(args.server_salt),
-                           googleid=bytes.fromhex(args.googleid),
+                           serversalt=bytes.fromhex(args.server_salt) if args.server_salt is not None else None,
+                           googleid=bytes.fromhex(args.googleid) if args.googleid is not None else None,
                            iv=None,
                            key=hex_key)
         except ValueError as e:
             lo.critical(f"Something was not right: {e}")
+            exit(1)
     else:
         if args.cipher_version is not None:
             lo.warning("Cipher version specified, but it is not used for crypt15 keys, ignoring.")

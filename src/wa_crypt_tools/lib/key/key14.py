@@ -52,13 +52,13 @@ class Key14(Key):
                 self.__serversalt = urandom(32)
             else:
                 if len(serversalt) != 32:
-                    log.error("Invalid server salt length: {}".format(serversalt.hex()))
+                    raise ValueError("Invalid server salt length: {}".format(serversalt.hex()))
                 self.__serversalt = serversalt
             if googleid is None:
                 self.__googleid = urandom(16)
             else:
                 if len(googleid) != 16:
-                    log.error("Invalid google id length: {}".format(googleid.hex()))
+                    raise ValueError("Invalid google id length: {}".format(googleid.hex()))
                 self.__googleid = googleid
             if hashedgoogleid is None:
                 self.__hashedgoogleid = sha256(self.__googleid).digest()
