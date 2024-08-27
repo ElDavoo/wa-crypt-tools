@@ -28,7 +28,7 @@ def parsecmdline() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Create a key or encrypted_backup.key from a hex input.'
                                                  'The only parameter a encrypted_backup.key stores is the key itself.')
     parser.add_argument('-c14', '--crypt14', action='store_true', default=False, help='Create a traditional key file.')
-    parser.add_argument('-o', '--output', type=argparse.FileType('wb'),
+    parser.add_argument('-o', '--output', type=str,
                         help='The output file')
     parser.add_argument('-y', '--yes', action='store_true', help='Overwrite the output file if it exists.')
     parser.add_argument('-v', '--verbose', action='store_true', help='Prints all messages')
@@ -106,7 +106,7 @@ def main():
     print(os.getcwd())
     if output_file.is_file() and not args.yes:
         lo.fatal("The output file already exists.")
-        return
+        exit(1)
 
     # Write the key file
     key.file_dump(output_file)

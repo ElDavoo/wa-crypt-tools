@@ -30,7 +30,5 @@ class TestCreatekey:
             key_version=b'\x02',
             cipher_version=b'\x00\x01')
         keyb: bytes = key.dump()
-        keyb_digest = sha512(keyb).digest()
         with open("tests/res/key", 'rb') as f:
-            orig_check = sha512(f.read()).digest()
-        assert keyb_digest == orig_check
+            assert keyb == f.read()
