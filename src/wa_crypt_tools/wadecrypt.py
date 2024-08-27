@@ -87,7 +87,9 @@ def parsecmdline() -> argparse.Namespace:
 
 
 def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 0, no_decompress: bool = False):
-    """Does the actual decryption."""
+    """
+    Does the actual decryption chunking bytes, so the file does not get loaded into RAM.
+    """
 
     z_obj = zlib.decompressobj()
 
