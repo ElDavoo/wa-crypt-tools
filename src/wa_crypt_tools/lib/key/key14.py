@@ -15,6 +15,7 @@ log = logging.getLogger(__name__)
 class Key14(Key):
     # These constants are only used with crypt12/14 keys.
     __SUPPORTED_CIPHER_VERSION = b'\x00\x01'
+    __SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02', b'\x03']
 
     def __init__(self, keyarray: bytes = None,
                  cipher_version: bytes = None, key_version: bytes = None,
@@ -45,8 +46,10 @@ class Key14(Key):
                     log.error("Invalid cipher version: {}".format(cipher_version.hex()))
                 self.__cipher_version = cipher_version
             if key_version is None:
-                self.__key_version = b'\x01'
+                self.__key_version = self.__SUPPORTED_KEY_VERSIONS[-1]
             else:
+                if key_version not in self.__SUPPORTED_KEY_VERSIONS:
+                    log.error("Invalid key version: {}".format(key_version.hex()))
                 self.__key_version = key_version
             if serversalt is None:
                 self.__serversalt = urandom(32)
@@ -89,7 +92,16 @@ class Key14(Key):
                       .format(keyarray[:len(self.__SUPPORTED_CIPHER_VERSION)].hex()))
         index = len(self.__SUPPORTED_CIPHER_VERSION)
 
-        self.__key_version = keyarray[index:index+1]
+        # Check if the keyfile has a supported key version
+        version_supported = False
+        for v in self.__SUPPORTED_KEY_VERSIONS:
+            if v == keyarray[index:index + len(self.__SUPPORTED_KEY_VERSIONS[0])]:
+                version_supported = True
+                self.__key_version = v
+                break
+        if not version_supported:
+            log.error('Invalid keyfile: Unsupported key version {}'
+                      .format(keyarray[index:index + len(self.__SUPPORTED_KEY_VERSIONS[0])].hex()))
 
         self.__serversalt = keyarray[3:35]
 
