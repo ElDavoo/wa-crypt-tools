@@ -168,6 +168,33 @@ you can just transcribe and use it in lieu of the key file parameter.
 **There are other ways, but it is not in the scope of this project 
 to tell you.  
 Issues asking for this will be closed as invalid.**  
+
+## How can I cite this software?
+There was no paper or thesis written about this software, but you can cite this online repository.
+Please don't say "et al." as there is (for now) only one author.
+### CITATION.cff
+See the [CITATION.cff](CITATION.cff) file for citation information.
+### BibTeX
+```
+@misc{wa-crypt-tools,
+  author = {ElDavoo},
+  title = {WhatsApp Crypt Tools},
+  year = {2022},
+  month = {06},
+  howpublished = {\url{https://github.com/ElDavoo/wa-crypt-tools}
+}
+```
+### BibLaTeX
+```
+@online{wa-crypt-tools,
+  author = {ElDavoo},
+  title = {WhatsApp Crypt Tools},
+  year = {2022},
+  month = {06},
+  url = {https://github.com/ElDavoo/wa-crypt-tools}
+}
+```
+
 ### I will happily accept pull requests for the currently open issues. :)
 
 ### Last tested version (don't expect this to be updated)
@@ -230,6 +257,12 @@ Anyone else that I forgot to mention!
 
  Anyone else that helped!  
 
+#### Research papers that used this software
+- [Injection Attacks Against End-to-End Encrypted Applications](https://ieeexplore.ieee.org/abstract/document/10646849)
+- [Forensic Analysis of WhatsApp Disappearing Message on
+Unrooted Android Using Mobile Device Forensics
+Methodology NIST SP 800-101r1](https://catalog.lib.kyushu-u.ac.jp/opac_download_md/7172316/pp516-524.pdf)
+- [ANALISIS FORENSIK APLIKASI PENIPUAN BERBASIS ANDROID MENGGUNAKAN METODE NIST] (https://jurnal.umt.ac.id/index.php/jika/article/view/10575) (bad boys you didn't cite me :P )
 
 ### Stargazers over time
 

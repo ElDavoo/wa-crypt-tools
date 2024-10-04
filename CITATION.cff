@@ -2,18 +2,17 @@
 # Visit https://bit.ly/cffinit to generate yours today!
 
 cff-version: 1.2.0
-title: WhatsApp Crypt14 - Crypt15 Decryper
+title: wa-crypt-tools
 message: >-
-  If you use this software, please cite it using the
-  metadata from this file.
+  Please don't say "et al.", I'm the only author.
 type: software
 authors:
   - given-names: Davide
     family-names: Palma
-    email: github@davidepalma.it
-repository-code: >-
-  https://github.com/ElDavoo/WhatsApp-Crypt14-Crypt15-Decrypter
-abstract: Decrypts WhatsApp .crypt12, .crypt14 and .crypt15 files
+    email: posta@davidepalma.it
+    orcid: 'https://orcid.org/0000-0003-1931-7836'
+repository-code: 'https://github.com/ElDavoo/wa-crypt-tools'
+abstract: 'Manage WhatsApp .crypt12, .crypt14 and .crypt15 files.'
 keywords:
   - WhatsApp
   - crypt12
