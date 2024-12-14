@@ -4,7 +4,7 @@ from hashlib import sha512
 from wa_crypt_tools.lib.key.key15 import Key15
 from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 
-from tests.utils.utils import Propen, cmp_files, rmifound
+from tests.utils.utils import Propen, cmp_files, rm_if_found
 
 
 class TestWaCreateKey:
@@ -17,7 +17,7 @@ class TestWaCreateKey:
             key: Key15 = KeyFactory.from_file("encrypted_backup.key")
         finally:
             # cleanup
-            rmifound("encrypted_backup.key")
+            rm_if_found("encrypted_backup.key")
 
     def test_hex_key(self):
         assert not exists("encrypted_backup.key")
@@ -30,7 +30,7 @@ class TestWaCreateKey:
             assert "Key file \"encrypted_backup.key\" created." in out
             assert cmp_files("encrypted_backup.key", "tests/res/encrypted_backup.key")
         finally:
-            rmifound("encrypted_backup.key")
+            rm_if_found("encrypted_backup.key")
 
     def test_invalid_hex_key(self):
         assert not exists("encrypted_backup.key")
@@ -54,7 +54,7 @@ class TestWaCreateKey:
             assert "Key file \"custom.key\" created." in out
             assert exists("custom.key")
         finally:
-            rmifound("custom.key")
+            rm_if_found("custom.key")
 
     def test_not_overwrite_file(self):
         assert not exists("encrypted_backup.key")
@@ -69,7 +69,7 @@ class TestWaCreateKey:
                 assert chksum == sha512(f.read()).digest()
         finally:
             # cleanup
-            rmifound("encrypted_backup.key")
+            rm_if_found("encrypted_backup.key")
 
     def test_overwrite_file(self):
         assert not exists("encrypted_backup.key")
@@ -84,7 +84,7 @@ class TestWaCreateKey:
                 assert chksum != sha512(f.read()).digest()
         finally:
             # cleanup
-            rmifound("encrypted_backup.key")
+            rm_if_found("encrypted_backup.key")
 
     def test_crypt14_key(self):
         assert not exists("key")
@@ -99,7 +99,7 @@ class TestWaCreateKey:
             assert "Key file \"key\" created." in out
             assert cmp_files("key", "tests/res/key")
         finally:
-            rmifound("key")
+            rm_if_found("key")
 
     def call_wacreatekey_14(self, arguments):
         assert not exists("key")
@@ -109,7 +109,7 @@ class TestWaCreateKey:
             key = KeyFactory.from_file("key")
             return out
         finally:
-            rmifound("key")
+            rm_if_found("key")
 
     def test_crypt14_key_not_all_parameters(self):
         arguments=["wacreatekey", "-c14", "--hex",
@@ -153,7 +153,7 @@ class TestWaCreateKey:
             assert "Something was not right" in out
             assert not exists("key")
         finally:
-            rmifound("key")
+            rm_if_found("key")
 
     def test_crypt14_invalid_google_id(self):
         assert not exists("key")
@@ -167,7 +167,7 @@ class TestWaCreateKey:
             assert ret != 0
             assert "Something was not right" in out
         finally:
-            rmifound("key")
+            rm_if_found("key")
         assert not exists("key")
 
     def test_crypt14_invalid_google_id_length(self):
@@ -183,7 +183,7 @@ class TestWaCreateKey:
             # assert "Invalid google id length" in out
             assert not exists("key")
         finally:
-            rmifound("key")
+            rm_if_found("key")
 
     def test_crypt14_invalid_key_version(self):
         assert not exists("key")
@@ -198,7 +198,7 @@ class TestWaCreateKey:
             #assert "usage:" in out
             assert not exists("key")
         finally:
-            rmifound("key")
+            rm_if_found("key")
 
     def test_crypt14_invalid_cipher_version(self):
         assert not exists("key")

@@ -16,7 +16,7 @@ def cmp_files(file1: str, file2: str):
         orig_check = sha512(f.read()).digest()
     return keyb_digest == orig_check
 
-def rmifound(file: str):
+def rm_if_found(file: str):
     if not os.path.exists(file):
         return
     if not os.path.isfile(file):

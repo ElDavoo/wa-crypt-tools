@@ -201,11 +201,11 @@ See the [CITATION.cff](CITATION.cff) file for citation information.
 Stable: 
 2.24.16.76  
 Beta: 
-2.24.18.10
+2.24.26.11
 
 #### Business
 Stable:  
-2.24.16.77
+2.24.23.78
 
 #### Protobuf automatic fix
 
