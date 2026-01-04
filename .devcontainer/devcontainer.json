@@ -1,5 +1,8 @@
 {
   "image": "mcr.microsoft.com/devcontainers/python:3.12",
   "features": {
-  }
+  },
+  "mounts": [
+    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached,readonly"
+  ]
 }

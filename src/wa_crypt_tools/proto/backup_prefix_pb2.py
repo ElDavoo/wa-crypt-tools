@@ -4,7 +4,7 @@ from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import runtime_version as _runtime_version
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
-_runtime_version.ValidateProtobufRuntimeVersion(_runtime_version.Domain.PUBLIC, 5, 29, 1, '', 'backup_prefix.proto')
+_runtime_version.ValidateProtobufRuntimeVersion(_runtime_version.Domain.PUBLIC, 5, 29, 5, '', 'backup_prefix.proto')
 _sym_db = _symbol_database.Default()
 from . import C14_cipher_pb2 as C14__cipher__pb2
 from . import C15_IV_pb2 as C15__IV__pb2

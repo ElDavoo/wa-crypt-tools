@@ -36,6 +36,8 @@ python -m pip install git+https://github.com/ElDavoo/wa-crypt-tools
 ```
 for the development version.  
 
+You might have to create a virtual environment to avoid conflicts with other packages.  
+
 # Quick start
 
 ## Decrypt a file with wadecrypt
