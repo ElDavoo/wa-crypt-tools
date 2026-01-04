@@ -6,7 +6,7 @@ from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
 _runtime_version.ValidateProtobufRuntimeVersion(_runtime_version.Domain.PUBLIC, 5, 29, 5, '', 'C15_IV.proto')
 _sym_db = _symbol_database.Default()
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0cC15_IV.proto"\x14\n\x06C15_IV\x12\n\n\x02IV\x18\x01 \x01(\x0cb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0cC15_IV.proto"\x14\n\x06C15_IV\x12\n\n\x02IV\x18\x01 \x01(\x0cb\x08editionsp\xe8\x07')
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'C15_IV_pb2', _globals)

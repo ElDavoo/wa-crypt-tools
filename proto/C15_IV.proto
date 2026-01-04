@@ -1,4 +1,4 @@
-syntax = "proto3";
+edition = "2023";
 
 // In crypt15 files only the IV is stored.
 message C15_IV {

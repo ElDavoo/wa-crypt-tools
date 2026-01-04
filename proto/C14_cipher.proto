@@ -1,4 +1,4 @@
-syntax = "proto3";
+edition = "2023";
 
 // crypt14 cipher files.
 message C14_cipher {
