@@ -1,4 +1,6 @@
-import os
+import platform
+import time
+from pathlib import Path
 from hashlib import sha512
 from subprocess import Popen, STDOUT, PIPE
 
@@ -17,11 +19,18 @@ def cmp_files(file1: str, file2: str):
     return keyb_digest == orig_check
 
 def rm_if_found(file: str):
-    if not os.path.exists(file):
+    path = Path(file)
+    if not path.exists() or not path.is_file():
         return
-    if not os.path.isfile(file):
-        return
-    try:
-        os.remove(file)
-    except FileNotFoundError:
-        pass
+
+    # On Windows, retry if file is locked by subprocess
+    retries = 3 if platform.system() == 'Windows' else 1
+    for attempt in range(retries):
+        try:
+            path.unlink(missing_ok=True)
+            return
+        except PermissionError:
+            if attempt < retries - 1:
+                time.sleep(0.1 * (attempt + 1))
+            else:
+                raise
