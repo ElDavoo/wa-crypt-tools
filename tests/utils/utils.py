@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 from hashlib import sha512
 from subprocess import Popen, STDOUT, PIPE
 
@@ -17,11 +17,6 @@ def cmp_files(file1: str, file2: str):
     return keyb_digest == orig_check
 
 def rm_if_found(file: str):
-    if not os.path.exists(file):
-        return
-    if not os.path.isfile(file):
-        return
-    try:
-        os.remove(file)
-    except FileNotFoundError:
-        pass
+    path = Path(file)
+    if path.is_file():
+        path.unlink(missing_ok=True)

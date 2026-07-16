@@ -31,16 +31,18 @@ class KeyFactory:
         l.debug("Reading keyfile...")
 
         # Try to open the keyfile.
+        # The stream must be closed explicitly: javaobj keeps references to it,
+        # and a lingering open handle prevents deleting the file on Windows.
         try:
-            key_file_stream = open(file, 'rb')
-            try:
-                # Deserialize the byte object written in the file
-                jarr: javaobj.beans.JavaArray = javaobj.load(key_file_stream).data
-                # Convert from a list of Int8 to a byte array
-                keyfile: bytes = javaintlist2bytes(jarr)
+            with open(file, 'rb') as key_file_stream:
+                try:
+                    # Deserialize the byte object written in the file
+                    jarr: javaobj.beans.JavaArray = javaobj.load(key_file_stream).data
+                    # Convert from a list of Int8 to a byte array
+                    keyfile: bytes = javaintlist2bytes(jarr)
 
-            except (ValueError, RuntimeError) as e:
-                l.critical("The keyfile is not a valid Java object: {}".format(e))
+                except (ValueError, RuntimeError) as e:
+                    l.critical("The keyfile is not a valid Java object: {}".format(e))
 
         except OSError:
             l.info("The keyfile could not be opened.")

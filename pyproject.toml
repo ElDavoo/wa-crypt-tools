@@ -44,3 +44,9 @@ wainfo = "wa_crypt_tools.wainfo:main"
 proto = [
     "protoletariat"
 ]
+test = [
+    "pytest >= 8.0.0",
+    "pytest-cov >= 4.0.0",
+    "flake8 >= 7.0.0",
+    "coveralls >= 3.3.0"
+]
