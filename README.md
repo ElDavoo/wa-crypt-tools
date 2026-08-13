@@ -270,4 +270,4 @@ Methodology NIST SP 800-101r1](https://catalog.lib.kyushu-u.ac.jp/opac_download_
 
 ### Stargazers over time
 
-[![Star History Chart](https://api.star-history.com/svg?repos=ElDavoo/wa-crypt-tools&type=Date)](https://star-history.com/#ElDavoo/wa-crypt-tools&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=ElDavoo/wa-crypt-tools&type=Date)](https://star-history.dera.page/#ElDavoo/wa-crypt-tools&Date)
