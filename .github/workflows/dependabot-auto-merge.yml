@@ -1,0 +1,50 @@
+name: Dependabot auto-merge
+
+# Turns on GitHub's own auto-merge for Dependabot PRs. Nothing is merged here and now: the
+# merge only happens once every required check on the PR is green, which is what makes this
+# safe -- the lint/test/coverage matrix and CodeQL are the gate, not this workflow.
+#
+# That gate only exists because the default branch has a ruleset marking those checks
+# required. Without it every PR is mergeable the moment it opens, auto-merge has nothing to
+# wait for, and the fallback below would merge each bump unread. If the ruleset is ever
+# removed, remove this workflow with it.
+on: pull_request_target
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# Every Dependabot PR, including major bumps. This repo's CI runs the full suite on five
+# Python versions across Ubuntu and Windows, which is a better signal about whether a bump
+# is safe than the semver label on it. Note the matrix does not cover the pinned versions in
+# requirements.txt -- CI installs from pyproject.toml -- so a pin-only bump is merged on the
+# strength of the constraint in pyproject.toml still holding, not on having been run.
+jobs:
+  auto-merge:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Enable auto-merge
+        run: |
+          set -euo pipefail
+
+          # GitHub refuses enablePullRequestAutoMerge on a PR that is already mergeable with
+          # every required check green -- "Pull request is in clean status" -- because there is
+          # nothing left to wait for. A run that lands after CI has finished hits exactly that.
+          # Merging outright is the same outcome auto-merge would have reached a moment earlier.
+          #
+          # Matched on the message rather than falling back on any failure, deliberately. A bare
+          # `|| gh pr merge` would turn every other reason auto-merge can be refused -- a
+          # permission, a protection rule -- into an immediate merge of a PR whose checks nobody
+          # waited for, which is the one thing this workflow must never do.
+          if ! error=$(gh pr merge --auto --squash "$PR_URL" 2>&1); then
+            printf '%s\n' "$error"
+            case "$error" in
+              *"clean status"*) gh pr merge --squash "$PR_URL" ;;
+              *) exit 1 ;;
+            esac
+          fi
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
