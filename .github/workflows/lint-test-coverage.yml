@@ -23,9 +23,11 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        persist-credentials: false
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v7
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
@@ -33,7 +35,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install flake8 pytest codecov pytest-cov coveralls
-        python -m pip install -e .[test]
+        python -m pip install -e '.[test]'
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
@@ -44,11 +46,50 @@ jobs:
       run: |
         python -m pytest --cov
     - name: Coveralls
-      uses: coverallsapp/github-action@v2
+      uses: coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329 # v2
       if: github.event_name != 'pull_request'
       env:
         COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # actionlint type-checks every ${{ }} expression against the event payload and runs shellcheck
+  # over each `run:` block; zizmor audits the same files for the supply-chain and permissions
+  # mistakes that shellcheck has no opinion about. Between them they are the only test these
+  # workflows have -- a mistake in one is otherwise found when a release quietly does nothing.
+  #
+  # Both are downloaded and checksum-pinned rather than taken from an action: a workflow that
+  # exists to insist every action is pinned to a hash should not fetch its own linters unpinned.
+  #
+  # zizmor runs --offline: the online audits agree with the offline ones on this repository, and
+  # a gate that needs a token and the network is a gate that fails for reasons of its own.
+  workflows:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        persist-credentials: false
+
+    - name: Check the workflows
+      env:
+        ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        ZIZMOR_SHA256: dd96df044a6e8538d5f423790f453bdd03d49e5b2bcc38214acc41a2f1297839
+      run: |
+        set -euo pipefail
+
+        curl -fsSL -o /tmp/actionlint.tar.gz \
+          https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+        echo "${ACTIONLINT_SHA256}  /tmp/actionlint.tar.gz" | sha256sum -c -
+        tar -xzf /tmp/actionlint.tar.gz -C /tmp actionlint
+        /tmp/actionlint -color
+
+        curl -fsSL -o /tmp/zizmor.tar.gz \
+          https://github.com/zizmorcore/zizmor/releases/download/v1.29.0/zizmor-x86_64-unknown-linux-gnu.tar.gz
+        echo "${ZIZMOR_SHA256}  /tmp/zizmor.tar.gz" | sha256sum -c -
+        tar -xzf /tmp/zizmor.tar.gz -C /tmp zizmor
+        /tmp/zizmor --offline --color=always .github/workflows/
+
   # One stable check for the whole matrix to hang the branch ruleset off.
   #
   # Requiring the ten matrix contexts by name meant the ruleset silently drifted from the
@@ -62,11 +103,13 @@ jobs:
   # when it is supposed to bite.
   all-green:
     if: always()
-    needs: [job]
+    needs: [job, workflows]
     runs-on: ubuntu-latest
 
     steps:
       - name: Check matrix result
         run: |
-          echo "matrix result: ${{ needs.job.result }}"
-          [ "${{ needs.job.result }}" = success ]
+          echo "matrix result:   ${{ needs.job.result }}"
+          echo "workflows result: ${{ needs.workflows.result }}"
+          [ "${{ needs.job.result }}" = success ] \
+            && [ "${{ needs.workflows.result }}" = success ]

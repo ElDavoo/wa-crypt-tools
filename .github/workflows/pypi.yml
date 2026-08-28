@@ -5,31 +5,40 @@ on:
     tags:
       - 'v*'
 
+# A called workflow is capped by what the caller grants, so each call is given exactly what
+# that workflow declares for itself and nothing else.
+permissions: {}
+
 jobs:
   codeql:
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
     uses: ./.github/workflows/codeql-analysis.yml
   tests:
+    permissions:
+      contents: read
     uses: ./.github/workflows/lint-test-coverage.yml
   release:
-    permissions: write-all
+    # Creating the release is all this job does, so contents: write is all it gets.
+    permissions:
+      contents: write
     needs:
       - codeql
       - tests
     name: Create Release
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
+      # actions/create-release was archived in 2021 and is unmaintained. `gh` is preinstalled
+      # on the runner and does the same job, so the replacement drops a dependency rather than
+      # swapping it for another one. Note the title is now "Release v1.2.3" rather than
+      # "Release refs/tags/v1.2.3": github.ref_name is the tag, github.ref was the full ref.
       - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Release $TAG" --notes ""
   pypi-publish:
     needs: release
     name: Publish release to PyPI
@@ -41,9 +50,11 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.x"
       - name: Install dependencies
@@ -54,4 +65,4 @@ jobs:
         run: |
           python -m build
       - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
