@@ -8,11 +8,26 @@ name: Dependabot auto-merge
 # required. Without it every PR is mergeable the moment it opens, auto-merge has nothing to
 # wait for, and the fallback below would merge each bump unread. If the ruleset is ever
 # removed, remove this workflow with it.
-on: pull_request_target
+on:
+  pull_request_target:
+  # GitHub turns auto-merge back off by itself when the base branch moves under a PR, and
+  # the pull_request_target run has long since finished by then -- so the PR is left green,
+  # mergeable and armed by nobody. #221 was stranded exactly that way the minute #224 merged:
+  # both touched lint-test-coverage.yml, and the timeline records auto_merge_disabled one
+  # minute after auto_squash_enabled. Every push to the default branch re-arms whatever is
+  # still open, which is the only thing that closes that window.
+  push:
+    branches: [main]
 
 permissions:
   contents: write
   pull-requests: write
+
+# Serialised: a merge here is itself a push to main, which starts the next run. Letting those
+# overlap means two runs arming the same PR at once.
+concurrency:
+  group: dependabot-auto-merge
+  cancel-in-progress: false
 
 # Every Dependabot PR, including major bumps. This repo's CI runs the full suite on five
 # Python versions across Ubuntu and Windows, which is a better signal about whether a bump
@@ -21,7 +36,7 @@ permissions:
 # strength of the constraint in pyproject.toml still holding, not on having been run.
 jobs:
   auto-merge:
-    if: github.actor == 'dependabot[bot]'
+    if: github.event_name == 'push' || github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
 
     steps:
@@ -29,22 +44,45 @@ jobs:
         run: |
           set -euo pipefail
 
-          # GitHub refuses enablePullRequestAutoMerge on a PR that is already mergeable with
-          # every required check green -- "Pull request is in clean status" -- because there is
-          # nothing left to wait for. A run that lands after CI has finished hits exactly that.
-          # Merging outright is the same outcome auto-merge would have reached a moment earlier.
-          #
-          # Matched on the message rather than falling back on any failure, deliberately. A bare
-          # `|| gh pr merge` would turn every other reason auto-merge can be refused -- a
-          # permission, a protection rule -- into an immediate merge of a PR whose checks nobody
-          # waited for, which is the one thing this workflow must never do.
-          if ! error=$(gh pr merge --auto --squash "$PR_URL" 2>&1); then
-            printf '%s\n' "$error"
-            case "$error" in
-              *"clean status"*) gh pr merge --squash "$PR_URL" ;;
-              *) exit 1 ;;
-            esac
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            prs=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open \
+                    --author 'app/dependabot' --json url --jq '.[].url')
+          else
+            prs=$PR_URL
           fi
+
+          if [ -z "$prs" ]; then
+            echo "no open Dependabot PRs"
+            exit 0
+          fi
+
+          while read -r pr; do
+            [ -n "$pr" ] || continue
+            echo "::group::$pr"
+
+            # GitHub refuses enablePullRequestAutoMerge on a PR that is already mergeable with
+            # every required check green -- "Pull request is in clean status" -- because there is
+            # nothing left to wait for. A run that lands after CI has finished hits that.
+            # Merging outright is the same outcome auto-merge would have reached a moment earlier.
+            #
+            # Matched on the message rather than falling back on any failure, deliberately. A bare
+            # `|| gh pr merge` would turn every other reason auto-merge can be refused -- a
+            # permission, a protection rule -- into an immediate merge of a PR whose checks nobody
+            # waited for, which is the one thing this workflow must never do.
+            #
+            # A conflicted PR is skipped rather than fatal: on the push path one Dependabot PR
+            # that needs a rebase would otherwise abort the loop before the others are armed.
+            if ! error=$(gh pr merge --auto --squash "$pr" 2>&1); then
+              printf '%s\n' "$error"
+              case "$error" in
+                *"clean status"*) gh pr merge --squash "$pr" ;;
+                *[Cc]onflict*|*"not mergeable"*) echo "skipping: needs a rebase" ;;
+                *) exit 1 ;;
+              esac
+            fi
+
+            echo "::endgroup::"
+          done <<< "$prs"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
