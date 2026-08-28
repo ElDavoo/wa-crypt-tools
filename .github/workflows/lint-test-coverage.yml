@@ -49,3 +49,24 @@ jobs:
       env:
         COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # One stable check for the whole matrix to hang the branch ruleset off.
+  #
+  # Requiring the ten matrix contexts by name meant the ruleset silently drifted from the
+  # matrix in both directions: drop a Python version and every PR waits forever on a context
+  # nothing reports any more, indistinguishable from CI being slow; add one and it is not
+  # required, so a PR whose only failure is the newest Python still merges. `needs` follows
+  # the matrix on its own, so this name is the only thing the ruleset has to know.
+  #
+  # `if: always()` is load-bearing. Without it this job is skipped when the matrix fails, and
+  # GitHub reads a skipped required check as satisfied -- turning the gate into a no-op exactly
+  # when it is supposed to bite.
+  all-green:
+    if: always()
+    needs: [job]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check matrix result
+        run: |
+          echo "matrix result: ${{ needs.job.result }}"
+          [ "${{ needs.job.result }}" = success ]
