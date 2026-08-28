@@ -8,7 +8,11 @@ name: Dependabot auto-merge
 # required. Without it every PR is mergeable the moment it opens, auto-merge has nothing to
 # wait for, and the fallback below would merge each bump unread. If the ruleset is ever
 # removed, remove this workflow with it.
-on:
+# pull_request_target is required, not incidental: Dependabot's
+# own pull_request events hand the job a read-only token, so it could not arm anything. What makes
+# the trigger dangerous elsewhere is checking out and running the PR's code with a write token --
+# this workflow never checks the PR out at all, and runs nothing from it.
+on:  # zizmor: ignore[dangerous-triggers]
   pull_request_target:
   # GitHub turns auto-merge back off by itself when the base branch moves under a PR, and
   # the pull_request_target run has long since finished by then -- so the PR is left green,
@@ -36,7 +40,7 @@ concurrency:
 # strength of the constraint in pyproject.toml still holding, not on having been run.
 jobs:
   auto-merge:
-    if: github.event_name == 'push' || github.actor == 'dependabot[bot]'
+    if: github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
 
     steps:
