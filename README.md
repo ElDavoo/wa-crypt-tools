@@ -267,7 +267,3 @@ Anyone else that I forgot to mention!
 Unrooted Android Using Mobile Device Forensics
 Methodology NIST SP 800-101r1](https://catalog.lib.kyushu-u.ac.jp/opac_download_md/7172316/pp516-524.pdf)
 - [ANALISIS FORENSIK APLIKASI PENIPUAN BERBASIS ANDROID MENGGUNAKAN METODE NIST] (https://jurnal.umt.ac.id/index.php/jika/article/view/10575) (bad boys you didn't cite me :P )
-
-### Stargazers over time
-
-[![Star History Chart](https://api.star-history.com/svg?repos=ElDavoo/wa-crypt-tools&type=Date)](https://star-history.com/#ElDavoo/wa-crypt-tools&Date)
