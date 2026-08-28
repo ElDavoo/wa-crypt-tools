@@ -213,13 +213,15 @@ Stable:
 
 #### Protobuf automatic fix
 
-You can install the proto optional dependencies to use `protoletariat` and fix the proto imports automatically.
+`protoc` generates absolute imports (`import foo_pb2 as foo__pb2`), which do not
+resolve from inside a package. `proto/fix_imports.py` rewrites them into relative
+imports (`from . import foo_pb2 as foo__pb2`). It needs no dependencies beyond the
+standard library.
 
-First, after cloning the repository, do an editable installation of the package (possibily in a virtual environment) with:
+First, after cloning the repository, do an editable installation of the package
+(possibly in a virtual environment) with:
 
-`pip install -e .[proto]`
-
-This will also install the optional dependencies of the package.
+`pip install -e .`
 
 Next, download the protobuf compiler from its repository [here](https://github.com/protocolbuffers/protobuf/releases). 
 You can move the protoc program to the `wa-crypt-tools/proto` folder where the .proto files are.
@@ -231,13 +233,18 @@ From the `wa-crypt-tools/proto` directory of the project, run:
 
 After generating the protobuf python classes through `protoc`, from that same directory run:
 
-`protol --in-place --python-out ..\src\wa_crypt_tools\proto protoc --proto-path=. *.proto`
-
-Linux:  
-
-`PATH="$(pwd):$PATH" protol --in-place --python-out ../src/wa_crypt_tools/proto protoc --proto-path=. *.proto`
+`python fix_imports.py ../src/wa_crypt_tools/proto`
 
 Now all the generated python classes should have their imports fixed.
+
+Note that `protoc` and the `protobuf` runtime must be version-matched: code generated
+by `protoc` vX.Y asserts a runtime of at least the corresponding `protobuf` X.Y at
+import time. `protoc` 29.5 pairs with `protobuf` 5.29.5, `protoc` 36.0 with 7.36.0.
+
+This step previously used [protoletariat](https://github.com/cpcloud/protoletariat)
+(`protol`). That project is archived and pins `protobuf<6`, which silently downgraded
+the runtime. `fix_imports.py` only rewrites the import lines, so unlike `protol` it
+leaves the rest of the generated files exactly as `protoc` wrote them.
 
 ---
 
