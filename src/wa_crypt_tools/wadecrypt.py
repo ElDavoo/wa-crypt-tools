@@ -43,6 +43,7 @@ except ModuleNotFoundError:
 # noinspection PyPackageRequirements
 
 import io
+from pathlib import Path
 from re import findall
 from sys import maxsize
 from time import sleep
@@ -70,7 +71,10 @@ def parsecmdline() -> argparse.Namespace:
                              'Default: encrypted_backup.key')
     parser.add_argument('encrypted', nargs='?', type=argparse.FileType('rb'), default="msgstore.db.crypt15",
                         help='The encrypted crypt12, 14 or 15 file. Default: msgstore.db.crypt15')
-    parser.add_argument('decrypted', nargs='?', type=argparse.FileType('wb'), default="msgstore.db",
+    # Deliberately not argparse.FileType('wb'): that opens the file while the arguments are
+    # still being parsed, so a run that fails for any reason -- an unreadable key, a file
+    # that is not a backup -- would already have truncated whatever was at that path.
+    parser.add_argument('decrypted', nargs='?', type=str, default="msgstore.db",
                         help='The decrypted output file. Default: msgstore.db')
     parser.add_argument('-nm', '--no-mem', action='store_true',
                         help='Does not load files in RAM, stresses the disk more. '
@@ -85,6 +89,8 @@ def parsecmdline() -> argparse.Namespace:
     parser.add_argument('-f', '--force', action='store_true',
                         help='Write the output even if an integrity check fails. '
                              'Default: stop on the first failed check')
+    parser.add_argument('-y', '--yes', action='store_true',
+                        help='Overwrite the output file if it exists.')
 
     return parser.parse_args()
 
@@ -265,6 +271,11 @@ def main():
 
 def decrypt(args):
     """Decrypts the database, honouring --force for the checks that can be survived."""
+    # Before anything else, and before the output is opened: refusing after the fact would
+    # mean the file had already been emptied.
+    if Path(args.decrypted).is_file() and not args.yes:
+        log.fatal("The output file already exists. Use --yes to overwrite it.")
+        exit(1)
     if args.buffer_size is not None:
         if not 1 < args.buffer_size < maxsize:
             raise WaCryptError("Invalid buffer size: {}".format(args.buffer_size))
@@ -282,8 +293,9 @@ def decrypt(args):
     if args.buffer_size is not None or args.no_mem:
         buffer_size = args.buffer_size if args.buffer_size is not None else io.DEFAULT_BUFFER_SIZE
         try:
-            chunked_decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, buffer_size,
-                            args.no_decompress)
+            with open(args.decrypted, 'wb') as f:
+                chunked_decrypt(db.file_hash, cipher, args.encrypted, f, buffer_size,
+                                args.no_decompress)
         except IntegrityError as e:
             # The output was already streamed to disk, so there is nothing to write here:
             # --force only decides whether a partial file is an error or not.
@@ -311,7 +323,8 @@ def decrypt(args):
             log.error("I can't recognize decrypted data. Decryption not successful.\n    "
                       "The key probably does not match with the encrypted file.\n    "
                       "Or the backup is simply empty. (check with --force)")
-    args.decrypted.write(output_file)
+    with open(args.decrypted, 'wb') as f:
+        f.write(output_file)
 
 
 def forced(args, error: IntegrityError):

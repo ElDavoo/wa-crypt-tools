@@ -30,11 +30,11 @@ logged its failure and then continued anyway.
   take the `key` argument they ignored.
 - `waencrypt` installs its log handler on the library logger, so library messages are
   formatted like every other tool's.
-- **`waencrypt` refuses to overwrite an existing output file**, and takes `-y`/`--yes` to do
-  it anyway, matching `wacreatekey`. The output was an `argparse.FileType('wb')`, which is
-  opened while the arguments are still being parsed: pointing the tool at an existing backup
-  emptied it before any check had run, and a run that then failed -- an unusable key, say --
-  left nothing behind.
+- **`wadecrypt` and `waencrypt` refuse to overwrite an existing output file**, and take
+  `-y`/`--yes` to do it anyway, matching `wacreatekey`. The output was an
+  `argparse.FileType('wb')`, which is opened while the arguments are still being parsed:
+  pointing either tool at an existing file emptied it before any check had run, and a run
+  that then failed -- an unusable key, say -- left nothing behind.
 
 ## Version 0.0.9
 

@@ -44,10 +44,11 @@ You might have to create a virtual environment to avoid conflicts with other pac
 
 ## Decrypt a file with wadecrypt
 ```
-usage: wadecrypt [-h] [-nm] [-bs BUFFER_SIZE] [-nd] [-v] [-f] [keyfile] [encrypted] [decrypted]
+usage: wadecrypt [-h] [-nm] [-bs BUFFER_SIZE] [-nd] [-v] [-f] [-y] [keyfile] [encrypted] [decrypted]
 ```
 
 So, for decrypting a crypt12/14/15, we give the program the key file, the encrypted file and the name of the output file.
+It will not write over a file that already exists; pass `-y`/`--yes` if that is what you want.
 
 ### Example
 
