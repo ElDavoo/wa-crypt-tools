@@ -28,7 +28,7 @@ class TestEncryption:
         key = KeyFactory.new("tests/res/encrypted_backup.key")
         props = Props(wa_version="2.22.5.13", jid="67", features=[5, 7, 8, 13, 14, 19, 22, 25, 28, 30, 31, 32, 36, 37],
                       max_feature=37)
-        db = Database15(key=key, iv=bytes.fromhex("C395EE009CF8B68AC0EA760550F6559C"))
+        db = Database15(iv=bytes.fromhex("C395EE009CF8B68AC0EA760550F6559C"))
         with open("tests/res/msgstore.db", 'rb') as f:
             orig = f.read()
         data = db.encrypt(
@@ -45,7 +45,7 @@ class TestEncryption:
         key = KeyFactory.new("tests/res/key")
         props = Props(wa_version="2.22.5.13", jid="67", features=[5, 7, 8, 13, 14, 19, 22, 25, 28, 30, 31, 32, 36, 37],
                       max_feature=37)
-        db = Database14(key=key, iv=bytes.fromhex("EA53CEAE36ECAB50BC331AEB62491625"))
+        db = Database14(iv=bytes.fromhex("EA53CEAE36ECAB50BC331AEB62491625"))
         with open("tests/res/msgstore.db", 'rb') as f:
             orig = f.read()
         data = db.encrypt(
@@ -61,7 +61,7 @@ class TestEncryption:
     def test_encryption14_noexpiry(self):
         key = KeyFactory.new("tests/res/key")
         props = Props(wa_version="2.22.5.13", jid="67", features=None)
-        db = Database14(key=key, iv=bytes.fromhex("EA53CEAE36ECAB50BC331AEB62491625"))
+        db = Database14(iv=bytes.fromhex("EA53CEAE36ECAB50BC331AEB62491625"))
         with open("tests/res/msgstore.db", 'rb') as f:
             orig = f.read()
         data = db.encrypt(

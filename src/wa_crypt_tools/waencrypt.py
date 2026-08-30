@@ -12,7 +12,8 @@ from wa_crypt_tools.lib.db.db15 import Database15
 from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
 from wa_crypt_tools.lib.key.key import Key
 from wa_crypt_tools.lib.key.keyfactory import KeyFactory
-from wa_crypt_tools.lib.logformat import CustomFormatter
+from wa_crypt_tools.lib.errors import IntegrityError, WaCryptError
+from wa_crypt_tools.lib.logformat import setup_logging
 from wa_crypt_tools.lib.props import Props
 
 log = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ def parsecmdline() -> argparse.Namespace:
     parser.add_argument('encrypted', nargs='?', type=argparse.FileType('wb'), default="msgstore.db.crypt15",
                         help='The encrypted crypt15 or crypt14 file. Default: msgstore.db.crypt15')
     parser.add_argument('-f', '--force', action='store_true',
-                        help='Makes errors non fatal. Default: false')
+                        help='Carry on when an integrity check fails. Default: stop')
     parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
     parser.add_argument('--enable-features', type=int, nargs='*', default=C.DEFAULT_FEATURE_LIST,
                         help='Enables the specified features. ')
@@ -61,14 +62,20 @@ def main():
     """Main function"""
     # Parse the command line arguments
     args = parsecmdline()
-    # set wa_crypt_tools l to debug
-    log.setLevel(logging.DEBUG if args.verbose else logging.INFO)
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG if args.verbose else logging.INFO)
-    ch.setFormatter(CustomFormatter())
-    log.addHandler(ch)
+    setup_logging(log, verbose=args.verbose)
     log.warning("This script is in beta stage")
 
+    try:
+        encrypt(args)
+    except IntegrityError as e:
+        log.critical("{}\n    Use --force to carry on anyway.".format(e))
+        exit(1)
+    except WaCryptError as e:
+        log.critical(str(e))
+        exit(1)
+
+
+def encrypt(args):
     # Read the key file
     key = KeyFactory.new(args.keyfile)
     # If specified, use the IV from the command line
@@ -81,14 +88,20 @@ def main():
         props = Props(wa_version=args.wa_version, jid=args.jid, max_feature=args.max_feature,
                       features=args.enable_features, backup_version=args.backup_version)
     else:
-        reference = DatabaseFactory.from_file(args.reference)
+        try:
+            reference = DatabaseFactory.from_file(args.reference)
+        except IntegrityError as e:
+            if not args.force:
+                raise
+            log.error("{}\n    Continuing anyway because --force was given.".format(e))
+            reference = e.data
         iv: bytes = reference.get_iv()
         props = reference.props
     data = args.decrypted.read()
     if args.type == 15:
-        db = Database15(key=key, iv=iv)
+        db = Database15(iv=iv)
     elif args.type == 14:
-        db = Database14(key=key, iv=iv)
+        db = Database14(iv=iv)
     else:
         db = Database12(key=key, iv=iv)
     if args.no_compress:

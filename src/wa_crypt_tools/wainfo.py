@@ -5,7 +5,8 @@ This script prints info on WhatsApp's DB files.
 
 from __future__ import annotations
 
-from wa_crypt_tools.lib.logformat import CustomFormatter
+from wa_crypt_tools.lib.errors import IntegrityError, WaCryptError
+from wa_crypt_tools.lib.logformat import setup_logging
 from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
 from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 
@@ -37,29 +38,26 @@ def parsecmdline() -> argparse.Namespace:
 def main():
     args = parsecmdline()
 
-    # set wa_crypt_tools l to debug
-    log.setLevel(logging.DEBUG)
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
-    ch.setFormatter(CustomFormatter())
-    log.addHandler(ch)
-    # also add to "wa_crypt_tools.lib" logger
-    logging.getLogger("wa_crypt_tools.lib").addHandler(ch)
-    logging.getLogger("wa_crypt_tools.lib").setLevel(logging.DEBUG)
+    setup_logging(log, verbose=True)
 
     log.warning("This script is in beta stage.")
 
-    if args.key:
-        key = KeyFactory.from_file(args.encrypted)
-        print(key)
-        return
     try:
-        DatabaseFactory.from_file(open(args.encrypted, 'rb'))
-    except Exception as e:
-        log.error("Error: {}".format(e))
-        return
-        # TODO
-    # print(db)
+        if args.key:
+            print(KeyFactory.from_file(args.encrypted))
+            return
+        with open(args.encrypted, 'rb') as f:
+            print(DatabaseFactory.from_file(f))
+    except IntegrityError as e:
+        # This tool only reports on a file, so show what could be read off it and say why
+        # it is suspect, rather than refusing to print anything.
+        log.error(str(e))
+        if e.data is not None:
+            print(e.data)
+        exit(1)
+    except WaCryptError as e:
+        log.critical(str(e))
+        exit(1)
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ from javaobj.v2.beans import JavaArray, JavaClassDesc, ClassDescType
 import logging
 
 from wa_crypt_tools.lib.constants import C
+from wa_crypt_tools.lib.errors import HeaderError, IntegrityError, InvalidKeyError
 
 # FIXME a "utils" file shouldn't have its own logger
 log = logging.getLogger(__name__)
@@ -57,18 +58,15 @@ def create_jba(out: bytes) -> JavaByteArray:
 def hexstring2bytes(string: str) -> bytes:
     """Converts a hex string into a bytes array"""
     if len(string) != 64:
-        log.critical("The key file specified does not exist.\n    "
-                     "If you tried to specify the key directly, note it should be "
-                     "64 characters long and not {} characters long.".format(len(string)))
+        raise InvalidKeyError("The key file specified does not exist.\n    "
+                              "If you tried to specify the key directly, note it should be "
+                              "64 characters long and not {} characters long.".format(len(string)))
 
-    barr = None
     try:
         barr = bytes.fromhex(string)
     except ValueError as e:
-        log.critical("Couldn't convert the hex string.\n    "
-                     "Exception: {}".format(e))
-    if len(barr) != 32:
-        log.error("The key is not 32 bytes long but {} bytes long.".format(len(barr)))
+        raise InvalidKeyError("Couldn't convert the hex string.\n    "
+                              "Exception: {}".format(e)) from e
     return barr
 
 
@@ -114,12 +112,12 @@ def mcrypt1_metadata_decrypt(*, key, encoded: str):
     unpad = lambda s: s[:-ord(s[len(s) - 1:])]
     iv_size = encoded[0]
     if iv_size != 16:
-        raise Exception("IV Size is not 16")
+        raise HeaderError("IV Size is not 16")
 
     iv = encoded[1:17]
     mac_size = encoded[17]
     if mac_size != 32:
-        raise Exception("MAC Size is not 32")
+        raise HeaderError("MAC Size is not 32")
 
     mac = encoded[18:50]
     encrypted_metadata = encoded[50:]
@@ -129,7 +127,7 @@ def mcrypt1_metadata_decrypt(*, key, encoded: str):
     hmac_auth.update(encrypted_metadata)
     hmac_auth = hmac_auth.digest()
     if hmac_auth != mac:
-        raise ValueError("MAC does not match")
+        raise IntegrityError("MAC does not match")
     # Decryption part
     cipher = AES.new(key.get_metadata_encryption(), AES.MODE_CBC, iv)
     decrypted_metadata = cipher.decrypt(encrypted_metadata)

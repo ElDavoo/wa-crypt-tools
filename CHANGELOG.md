@@ -1,5 +1,36 @@
 # Changelog
 
+## Version 0.2.0
+
+The library now raises instead of logging and carrying on. This is a breaking change, and
+the point of it: since version 0.0.9 moved to the `logging` framework, `log.error(...)` had
+replaced a custom logger whose `e()` exited the program, so every check in the library
+logged its failure and then continued anyway.
+
+- **`decrypt()` no longer returns unauthenticated plaintext.** A failed authentication tag
+  now raises `IntegrityError`, which carries the plaintext in its `data` attribute for
+  callers that decide to go on with it. Version 6.1 had claimed the tag was checked; it had
+  stopped being enforced.
+- New exception hierarchy in `wa_crypt_tools.lib.errors`, all deriving from `ValueError`:
+  `WaCryptError`, `InvalidKeyError`, `HeaderError`, `DecryptionError`, `IntegrityError`.
+- `KeyFactory.new`, `KeyFactory.from_file` and `DatabaseFactory.from_file` raise instead of
+  returning `None`. An unusable key no longer surfaces later as an `AttributeError`.
+- **`--force` works again** in `wadecrypt` and `waencrypt`: an integrity failure stops the
+  program, and `--force` writes the output anyway. It had been accepted and ignored.
+- The tools now exit non-zero when they fail. Scripts that only checked the exit code were
+  told everything went fine.
+- A 64-character non-hex key argument reported `TypeError: object of type 'NoneType' has no
+  len()`; it now says the key is invalid.
+- `wa_crypt_tools` exports the factories, the classes and the errors at the top level, so
+  `from wa_crypt_tools import DatabaseFactory, IntegrityError` is the supported entry point.
+- Files that are not backups are rejected: the crypt12 reader checks its cipher version
+  again, instead of accepting any file long enough and reporting nonsense.
+- Removed the duplicated crypt14/15 header parser from `Database14`/`Database15`, which was
+  dead code; `DatabaseFactory` owns the one copy that runs. Their constructors no longer
+  take the `key` argument they ignored.
+- `waencrypt` installs its log handler on the library logger, so library messages are
+  formatted like every other tool's.
+
 ## Version 0.0.9
 
 - Code refactored as a library, with lots of files, classes and methods

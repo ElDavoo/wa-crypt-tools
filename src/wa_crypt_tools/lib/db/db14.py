@@ -1,12 +1,11 @@
 import logging
 from hashlib import md5
 from os import urandom
-from re import findall
 
 from Cryptodome.Cipher import AES
-from google.protobuf.message import DecodeError
 
 from wa_crypt_tools.lib.db.db import Database
+from wa_crypt_tools.lib.errors import DecryptionError, IntegrityError
 from wa_crypt_tools.lib.key.key import Key
 from wa_crypt_tools.lib.key.key14 import Key14
 from wa_crypt_tools.lib.props import Props
@@ -16,129 +15,17 @@ log = logging.getLogger(__name__)
 
 class Database14(Database):
 
-    def __init__(self, key: Key14 = None, encrypted=None, file_hash=None,
-                 cipher_version: bytes = None, key_version: bytes = None, serversalt: bytes = None,
-                 googleid: bytes = None, iv: bytes = None,
-                 props: Props = None):
+    def __init__(self, *, iv: bytes = None, props: Props = None):
+        # DatabaseFactory overwrites this with the hash of the header bytes it consumed;
+        # a database built for encryption starts with an empty one.
+        self.file_hash = md5()
         self.props = props
-        if encrypted and file_hash:
-            try:
-                from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
-                from wa_crypt_tools.proto import key_type_pb2 as key_type
-            except ImportError as e:
-                log.error("Could not import the proto classes: {}".format(e))
-                if str(e).startswith("cannot import name 'builder' from 'google.protobuf.internal'"):
-                    log.error("You need to upgrade the protobuf library to at least 3.20.0.\n"
-                              "    python -m pip install --upgrade protobuf")
-                elif str(e).startswith("no module named"):
-                    log.error("Please download them and put them in the \"proto\" sub folder.")
-                raise e
-            except AttributeError as e:
-                log.error("Could not import the proto classes: {}\n    ".format(e) +
-                          "Your protobuf library is probably too old.\n    "
-                          "Please upgrade to at least version 3.20.0 , by running:\n    "
-                          "python -m pip install --upgrade protobuf")
-                raise e
-
-            self.header = prefix.BackupPrefix()
-
-            log.debug("Parsing database header...")
-
-            try:
-
-                # The first byte is the size of the upcoming protobuf message
-                protobuf_size = encrypted.read(1)
-                file_hash.update(protobuf_size)
-                protobuf_size = int.from_bytes(protobuf_size, byteorder='big')
-
-                # A 0x01 as a second byte indicates the presence of the feature table in the protobuf.
-                # It is optional and present only in msgstore database, although
-                # I found some old msgstore backups without it, so it is optional.
-                msgstore_features_flag = encrypted.peek(1)[0]
-                if msgstore_features_flag != 1:
-                    msgstore_features_flag = 0
-                else:
-                    file_hash.update(encrypted.read(1))
-                if not msgstore_features_flag:
-                    log.debug("No feature table found (not a msgstore DB or very old)")
-                self.__msgstore_features_flag = msgstore_features_flag
-                try:
-
-                    protobuf_raw = encrypted.read(protobuf_size)
-                    file_hash.update(protobuf_raw)
-
-                    if self.header.ParseFromString(protobuf_raw) != protobuf_size:
-                        log.error("Protobuf message not fully read. Please report a bug.")
-                    else:
-
-                        # Checking and printing WA version and phone number
-                        self.__version = findall(r"\d(?:\.\d{1,3}){3}", self.header.info.app_version)
-                        if len(self.__version) != 1:
-                            log.error('WhatsApp version not found')
-                        else:
-                            log.debug("WhatsApp version: {}".format(self.__version[0]))
-                        if len(self.header.info.jidSuffix) != 2:
-                            log.error("The phone number end is not 2 characters long")
-                        log.debug("Your phone number ends with {}".format(self.header.info.jidSuffix))
-
-                        if len(self.header.c15_iv.IV) != 0:
-                            # DB Header is crypt15
-                            # if type(key) is not Key15:
-                            #    log.error("You are using a crypt14 key file with a crypt15 backup.")
-                            raise ValueError("Crypt15 file in crypt14 constructor!")
-
-                        elif len(self.header.c14_cipher.IV) != 0:
-
-                            # DB Header is crypt14
-                            # if type(key) is not Key14:
-                            #    log.fatal("You are using a crypt15 key file with a crypt14 backup.")
-
-                            # if key.cipher_version != p.c14_cipher.version.cipher_version:
-                            #    log.error("Cipher version mismatch: {} != {}"
-                            #    .format(key.cipher_version, p.c14_cipher.cipher_version))
-
-                            # Fix bytes to string encoding
-                            # key.key_version = (key.key_version[0] + 48).to_bytes(1, byteorder='big')
-                            # if key.key_version != p.c14_cipher.key_version:
-                            #     if key.key_version > p.c14_cipher.key_version:
-                            #         log.error("Key version mismatch: {} != {} .\n    "
-                            #             .format(key.key_version, p.c14_cipher.key_version) +
-                            #             "Your backup is too old for this key file.\n    " +
-                            #             "Please try using a newer backup.")
-                            #     elif key.key_version < p.c14_cipher.key_version:
-                            #         log.error("Key version mismatch: {} != {} .\n    "
-                            #             .format(key.key_version, p.c14_cipher.key_version) +
-                            #             "Your backup is too new for this key file.\n    " +
-                            #             "Please try using an older backup, or getting the new key.")
-                            #     else:
-                            #         log.error("Key version mismatch: {} != {} (?)"
-                            #             .format(key.key_version, p.c14_cipher.key_version))
-                            # if key.get_serversalt() != p.c14_cipher.server_salt:
-                            #     log.error("Server salt mismatch: {} != {}".format(key.get_serversalt(), p.c14_cipher.server_salt))
-                            # if key.get_googleid() != p.c14_cipher.google_id:
-                            #     log.error("Google ID mismatch: {} != {}".format(key.get_googleid(), p.c14_cipher.google_id))
-                            if len(self.header.c14_cipher.IV) != 16:
-                                log.error("IV is not 16 bytes long but is {} bytes long".format(
-                                    len(self.header.c14_cipher.IV)))
-                            self.__iv = self.header.c14_cipher.IV
-
-                        else:
-                            log.error("Could not parse the IV from the protobuf message. Please report a bug.")
-                            raise ValueError
-
-
-                except DecodeError as e:
-
-                    print(e)
-
-            except OSError as e:
-                log.fatal("Reading database header failed: {}".format(e))
+        if iv:
+            if len(iv) != 16:
+                raise IntegrityError("IV is not 16 bytes long but is {} bytes long".format(len(iv)))
+            self.iv = iv
         else:
-            if iv:
-                self.__iv = iv
-            else:
-                self.__iv = urandom(16)
-
+            self.iv = urandom(16)
 
     def encrypt(self, key: Key, props: Props, decrypted: bytes) -> bytes:
         """Encrypts the database using the provided key"""
@@ -152,7 +39,7 @@ class Database14(Database):
         cipher.key_version = "2".encode()
         cipher.server_salt = key.get_serversalt()
         cipher.google_id = key.get_googleid()
-        cipher.IV = self.__iv
+        cipher.IV = self.iv
         from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
         from wa_crypt_tools.proto import key_type_pb2 as key_type
         prefix = prefix.BackupPrefix()
@@ -170,7 +57,7 @@ class Database14(Database):
             file_hash.update(b'\x01')
         out += prefix
         file_hash.update(prefix)
-        cipher = AES.new(key.get(), AES.MODE_GCM, self.__iv)
+        cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)
         encrypted_data, authentication_tag = cipher.encrypt_and_digest(decrypted)
         out += encrypted_data
         file_hash.update(encrypted_data)
@@ -189,7 +76,7 @@ class Database14(Database):
 
 
     def get_iv(self) -> bytes:
-        return self.__iv
+        return self.iv
 
 
     def decrypt(self, key: Key14, encrypted: bytes) -> bytes:
@@ -208,13 +95,12 @@ class Database14(Database):
         else:
             log.debug("Checksum OK ({}). Decrypting...".format(self.file_hash.hexdigest()))
 
-        cipher = AES.new(key.get(), AES.MODE_GCM, self.__iv)
+        cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)
         try:
             output_decrypted: bytes = cipher.decrypt(encrypted_data)
         except ValueError as e:
-            log.fatal("Decryption failed: {}."
-                      "\n    This probably means your backup is corrupted.".format(e))
-            raise e
+            raise DecryptionError("Decryption failed: {}."
+                                  "\n    This probably means your backup is corrupted.".format(e)) from e
 
         # Verify the authentication tag
         try:
@@ -229,7 +115,8 @@ class Database14(Database):
             else:
                 cipher.verify(authentication_tag)
         except ValueError as e:
-            log.error("Authentication tag mismatch: {}."
-                      "\n    This probably means your backup is corrupted.".format(e))
+            raise IntegrityError("Authentication tag mismatch: {}."
+                                 "\n    This probably means your backup is corrupted."
+                                 .format(e), data=output_decrypted) from e
 
         return output_decrypted

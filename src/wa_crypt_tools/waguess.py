@@ -12,7 +12,8 @@ from time import sleep
 
 from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.lib.key.keyfactory import KeyFactory
-from wa_crypt_tools.lib.logformat import CustomFormatter
+from wa_crypt_tools.lib.errors import DecryptionError, HeaderError, WaCryptError
+from wa_crypt_tools.lib.logformat import setup_logging
 from wa_crypt_tools.lib.utils import test_decompression
 
 log = logging.getLogger(__name__)
@@ -132,8 +133,8 @@ def guess_offsets(key: bytes, encrypted: io.BufferedReader, def_iv_offset: int,
 
     db_header = encrypted.read(C.HEADER_SIZE)
     if len(db_header) < C.HEADER_SIZE:
-        log.fatal("The encrypted database is too small.\n    "
-                  "Did you swap the keyfile and the encrypted database file by mistake?")
+        raise HeaderError("The encrypted database is too small.\n    "
+                          "Did you swap the keyfile and the encrypted database file by mistake?")
 
     try:
         if db_header[:15].decode('ascii') == 'SQLite format 3':
@@ -195,7 +196,7 @@ def decrypt(cipher, encrypted, decrypted):
     z_obj = zlib.decompressobj()
 
     if cipher is None:
-        log.fatal("Could not create a decryption cipher")
+        raise DecryptionError("Could not create a decryption cipher")
 
     try:
 
@@ -208,10 +209,9 @@ def decrypt(cipher, encrypted, decrypted):
             try:
                 output_decrypted: bytearray = cipher.decrypt(encrypted_data)
             except ValueError as e:
-                log.fatal("Decryption failed: {}."
-                          "\n    This probably means your backup is corrupted.".format(e))
-                # Dead code to make pycharm warning go away
-                exit(1)
+                raise DecryptionError("Decryption failed: {}."
+                                      "\n    This probably means your backup is corrupted."
+                                      .format(e)) from e
 
             try:
                 output_file = z_obj.decompress(output_decrypted)
@@ -224,17 +224,17 @@ def decrypt(cipher, encrypted, decrypted):
                 else:
                     log.error("I can't recognize decrypted data. Decryption not successful.\n    "
                               "The key probably does not match with the encrypted file.\n    "
-                              "Or the backup is simply empty. (check with --force)")
+                              "Or the backup is simply empty.")
 
             decrypted.write(output_file)
 
-        except MemoryError:
-            log.fatal("Out of RAM, please use -nm.")
+        except MemoryError as e:
+            raise DecryptionError("Out of RAM, please use -nm.") from e
 
         decrypted.flush()
 
     except OSError as e:
-        log.fatal("I/O error: {}".format(e))
+        raise DecryptionError("I/O error: {}".format(e)) from e
 
     finally:
         decrypted.close()
@@ -244,24 +244,12 @@ def decrypt(cipher, encrypted, decrypted):
 def main():
     args = parsecmdline()
 
-    # set wa_crypt_tools l to debug
-    log.setLevel(logging.DEBUG if args.verbose else logging.INFO)
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG if args.verbose else logging.INFO)
-    ch.setFormatter(CustomFormatter())
-    log.addHandler(ch)
-    if not (0 < args.data_offset < C.HEADER_SIZE - 128):
-        log.fatal("The data offset must be between 1 and {}".format(C.HEADER_SIZE - 129))
-    if not (0 < args.iv_offset < C.HEADER_SIZE - 128):
-        log.fatal("The IV offset must be between 1 and {}".format(C.HEADER_SIZE - 129))
-    # Get the decryption key from the key file or the hex encoded string.
-    key = KeyFactory.new(args.keyfile)
-    log.debug(str(key))
-
-    cipher = guess_offsets(key=key.get(), encrypted=args.encrypted,
-                           def_iv_offset=args.iv_offset, def_data_offset=args.data_offset)
-
-    decrypt(cipher, args.encrypted, args.decrypted)
+    setup_logging(log, verbose=args.verbose)
+    try:
+        guess(args)
+    except WaCryptError as e:
+        log.critical(str(e))
+        exit(1)
 
     if date.today().day == 1 and date.today().month == 4:
         log.info("Done. Uploading messages to the developer's server...")
@@ -269,6 +257,27 @@ def main():
         log.info("Uploaded. The developer will now read and publish your messages!")
     else:
         log.info("Done")
+
+
+def guess(args):
+    """Finds the offsets by brute force, then decrypts with what it found."""
+    if not (0 < args.data_offset < C.HEADER_SIZE - 128):
+        raise WaCryptError("The data offset must be between 1 and {}".format(C.HEADER_SIZE - 129))
+    if not (0 < args.iv_offset < C.HEADER_SIZE - 128):
+        raise WaCryptError("The IV offset must be between 1 and {}".format(C.HEADER_SIZE - 129))
+
+    key = KeyFactory.new(args.keyfile)
+    log.debug(str(key))
+
+    # The guessing loops report failure by returning None rather than raising: they run once
+    # per candidate offset, and an exception per candidate would be both slow and wrong.
+    cipher = guess_offsets(key=key.get(), encrypted=args.encrypted,
+                           def_iv_offset=args.iv_offset, def_data_offset=args.data_offset)
+    if cipher is None:
+        raise DecryptionError("Could not guess the offsets: the key does not match this "
+                              "backup, or the file is not a WhatsApp database.")
+
+    decrypt(cipher, args.encrypted, args.decrypted)
 
 
 if __name__ == '__main__':

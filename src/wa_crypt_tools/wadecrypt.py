@@ -5,9 +5,10 @@ This script decrypts WhatsApp's DB files encrypted with Crypt12, Crypt14 or Cryp
 
 from __future__ import annotations
 
-from wa_crypt_tools.lib.logformat import CustomFormatter
+from wa_crypt_tools.lib.logformat import setup_logging
 from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
+from wa_crypt_tools.lib.errors import DecryptionError, HeaderError, IntegrityError, WaCryptError
 from wa_crypt_tools.lib.utils import test_decompression
 
 # AES import party!
@@ -81,7 +82,9 @@ def parsecmdline() -> argparse.Namespace:
                         help='Does not decompress the decrypted data. '
                              'Default: decompresses the decrypted data')
     parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
-    parser.add_argument('-f', '--force', action='store_true', help='Does nothing, but it is here for compatibility')
+    parser.add_argument('-f', '--force', action='store_true',
+                        help='Write the output even if an integrity check fails. '
+                             'Default: stop on the first failed check')
 
     return parser.parse_args()
 
@@ -93,8 +96,13 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
 
     z_obj = zlib.decompressobj()
 
+    # Problems that leave the written output suspect but complete. They are raised together
+    # once the file has been flushed and closed -- the bytes are already on disk by the time
+    # we find out, so there is nothing to hand back through IntegrityError.data here.
+    integrity_problems: list[str] = []
+
     if cipher is None:
-        log.fatal("Could not create a decryption cipher")
+        raise DecryptionError("Could not create a decryption cipher")
 
     try:
 
@@ -114,7 +122,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
         log.debug("Reading and decrypting...")
 
         if not chunk:
-            log.error("Encrypted file is empty or truncated.")
+            raise HeaderError("Encrypted file is empty or truncated.")
         else:
             while True:
                 # We will need to manage two chunks at a time, because we might have
@@ -203,78 +211,49 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
                         else:
                             cipher.verify(checksum[:16])
                     except ValueError as e:
-                        log.error("Authentication tag mismatch: {}."
-                                  "\n    This probably means your backup is corrupted.".format(e))
+                        integrity_problems.append("Authentication tag mismatch: {}."
+                                                  "\n    This probably means your backup is corrupted."
+                                                  .format(e))
                     break
 
                 # If there is no more data, we should already have seen a checksum.
                 if not next_chunk:
-                    log.error("The encrypted database file is truncated (no checksum found).")
+                    integrity_problems.append("The encrypted database file is truncated "
+                                              "(no checksum found).")
                     break
 
                 # Move the sliding window forward.
                 chunk = next_chunk
 
         if is_zip and not no_decompress and not z_obj.eof:
-            log.error("The encrypted database file is truncated (damaged).")
+            integrity_problems.append("The encrypted database file is truncated (damaged).")
 
         decrypted.flush()
 
     except OSError as e:
-        log.fatal("I/O error: {}".format(e))
+        raise DecryptionError("I/O error: {}".format(e)) from e
 
     finally:
         decrypted.close()
         encrypted.close()
 
+    if integrity_problems:
+        raise IntegrityError("\n    ".join(integrity_problems))
+
 
 def main():
     args = parsecmdline()
 
-    # set wa_crypt_tools l to debug
-    log.setLevel(logging.DEBUG if args.verbose else logging.INFO)
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG if args.verbose else logging.INFO)
-    ch.setFormatter(CustomFormatter())
-    log.addHandler(ch)
-    # also add to "wa_crypt_tools.lib" logger
-    logging.getLogger("wa_crypt_tools.lib").addHandler(ch)
-    logging.getLogger("wa_crypt_tools.lib").setLevel(logging.DEBUG if args.verbose else logging.INFO)
-    if args.buffer_size is not None:
-        if not 1 < args.buffer_size < maxsize:
-            log.fatal("Invalid buffer size")
-    # Get the decryption key from the key file or the hex encoded string.
-    key = KeyFactory.new(args.keyfile)
-    log.debug(str(key))
-
-    db = DatabaseFactory.from_file(args.encrypted)
-    cipher = AES.new(key.get(), AES.MODE_GCM, db.get_iv())
-
-    if args.buffer_size is not None:
-        chunked_decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, args.buffer_size, args.no_decompress)
-    elif args.no_mem:
-        chunked_decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, io.DEFAULT_BUFFER_SIZE,
-                        args.no_decompress)
-    else:
-        output_decrypted: bytearray = db.decrypt(key, args.encrypted.read())
-        try:
-
-            z_obj = zlib.decompressobj()
-            if args.no_decompress:
-                output_file = output_decrypted
-            else:
-                output_file = z_obj.decompress(output_decrypted)
-                if not z_obj.eof:
-                    log.error("The encrypted database file is truncated (damaged).")
-        except zlib.error:
-            output_file = output_decrypted
-            if test_decompression(output_file[:io.DEFAULT_BUFFER_SIZE]):
-                log.info("Decrypted data is a ZIP file that I will not decompress automatically.")
-            else:
-                log.error("I can't recognize decrypted data. Decryption not successful.\n    "
-                        "The key probably does not match with the encrypted file.\n    "
-                        "Or the backup is simply empty. (check with --force)")
-        args.decrypted.write(output_file)
+    setup_logging(log, verbose=args.verbose)
+    try:
+        decrypt(args)
+    except IntegrityError as e:
+        # Only reached when --force was not given: the forced path handles these itself.
+        log.critical("{}\n    Use --force to write the output anyway.".format(e))
+        exit(1)
+    except WaCryptError as e:
+        log.critical(str(e))
+        exit(1)
 
     if date.today().day == 1 and date.today().month == 4:
         log.info("Done. Uploading messages to the developer's server...")
@@ -282,6 +261,65 @@ def main():
         log.info("Uploaded. The developer will now read and publish your messages!")
     else:
         log.info("Done")
+
+
+def decrypt(args):
+    """Decrypts the database, honouring --force for the checks that can be survived."""
+    if args.buffer_size is not None:
+        if not 1 < args.buffer_size < maxsize:
+            raise WaCryptError("Invalid buffer size: {}".format(args.buffer_size))
+    # Get the decryption key from the key file or the hex encoded string.
+    key = KeyFactory.new(args.keyfile)
+    log.debug(str(key))
+
+    try:
+        db = DatabaseFactory.from_file(args.encrypted)
+    except IntegrityError as e:
+        db = forced(args, e)
+
+    cipher = AES.new(key.get(), AES.MODE_GCM, db.get_iv())
+
+    if args.buffer_size is not None or args.no_mem:
+        buffer_size = args.buffer_size if args.buffer_size is not None else io.DEFAULT_BUFFER_SIZE
+        try:
+            chunked_decrypt(db.file_hash, cipher, args.encrypted, args.decrypted, buffer_size,
+                            args.no_decompress)
+        except IntegrityError as e:
+            # The output was already streamed to disk, so there is nothing to write here:
+            # --force only decides whether a partial file is an error or not.
+            forced(args, e)
+        return
+
+    try:
+        output_decrypted: bytes = db.decrypt(key, args.encrypted.read())
+    except IntegrityError as e:
+        output_decrypted = forced(args, e)
+
+    try:
+        z_obj = zlib.decompressobj()
+        if args.no_decompress:
+            output_file = output_decrypted
+        else:
+            output_file = z_obj.decompress(output_decrypted)
+            if not z_obj.eof:
+                log.error("The encrypted database file is truncated (damaged).")
+    except zlib.error:
+        output_file = output_decrypted
+        if test_decompression(output_file[:io.DEFAULT_BUFFER_SIZE]):
+            log.info("Decrypted data is a ZIP file that I will not decompress automatically.")
+        else:
+            log.error("I can't recognize decrypted data. Decryption not successful.\n    "
+                      "The key probably does not match with the encrypted file.\n    "
+                      "Or the backup is simply empty. (check with --force)")
+    args.decrypted.write(output_file)
+
+
+def forced(args, error: IntegrityError):
+    """Re-raises unless --force was given, in which case it hands back the salvaged result."""
+    if not args.force:
+        raise error
+    log.error("{}\n    Continuing anyway because --force was given.".format(error))
+    return error.data
 
 
 if __name__ == "__main__":

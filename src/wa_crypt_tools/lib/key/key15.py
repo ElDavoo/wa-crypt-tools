@@ -7,6 +7,7 @@ from javaobj import JavaObjectMarshaller
 
 from wa_crypt_tools.lib.utils import create_jba, encryptionloop
 
+from wa_crypt_tools.lib.errors import InvalidKeyError
 from wa_crypt_tools.lib.key.key import Key
 import logging
 
@@ -41,15 +42,15 @@ class Key15(Key):
                 self.__key = urandom(32)
             else:
                 if len(key) != 32:
-                    log.error("Invalid key length: {}".format(key.hex()))
+                    raise InvalidKeyError("Invalid key length: {}".format(key.hex()))
                 self.__key = key
             return
 
         if not isinstance(keyarray, bytes):
-            raise ValueError("keyarray is not a byte array!")
+            raise InvalidKeyError("keyarray is not a byte array!")
 
         if len(keyarray) != 32:
-            raise ValueError("Invalid key length")
+            raise InvalidKeyError("Invalid key length: {} bytes, expected 32".format(len(keyarray)))
         log.debug("Root key: {}".format(keyarray.hex()))
         # Save the root key in the class
         self.__key = keyarray

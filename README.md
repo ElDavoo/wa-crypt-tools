@@ -111,6 +111,54 @@ For usage, run the tool with `-h` option.
 4) `waguess` - Hacky way to try decrypt backups
 5) `wainfo` - Get info about a backup 
 
+# Use as a library
+
+Everything the tools do is available through `import wa_crypt_tools`.
+
+```python
+from wa_crypt_tools import DatabaseFactory, KeyFactory, IntegrityError
+import zlib
+
+key = KeyFactory.new("encrypted_backup.key")   # a key file, or the 64-character key itself
+
+with open("msgstore.db.crypt15", "rb") as f:
+    # Reads the header and leaves the stream at the start of the ciphertext.
+    db = DatabaseFactory.from_file(f)
+    plaintext = db.decrypt(key, f.read())
+
+# The payload is usually zlib-compressed; a multi-file backup is a ZIP instead.
+open("msgstore.db", "wb").write(zlib.decompress(plaintext))
+```
+
+The version -- crypt12, crypt14 or crypt15 -- is worked out by the factories from the key
+and the file header. You do not pick a class.
+
+## Errors
+
+Every error the library raises derives from `WaCryptError`, itself a `ValueError`:
+
+| Exception | Means |
+| --- | --- |
+| `InvalidKeyError` | the key file or hex key cannot be used |
+| `HeaderError` | the header is missing, truncated or unparsable |
+| `DecryptionError` | the cipher failed |
+| `IntegrityError` | a check failed, but a result was produced anyway |
+
+`IntegrityError` is the one worth handling on purpose. A backup whose authentication tag
+does not match still yields plaintext, and the library refuses to hand it back as if it were
+fine -- but it attaches it to the exception, so you can use it knowingly:
+
+```python
+try:
+    plaintext = db.decrypt(key, f.read())
+except IntegrityError as e:
+    # The tag did not match: the backup is corrupt, or the key is not the right one.
+    # e.data holds the plaintext anyway. This is what the tools' --force writes out.
+    plaintext = e.data
+```
+
+Nothing returns `None` to signal failure, so there is no return value to check.
+
 # FAQ
 
 ## Can I decrypt a backup without a key file?
@@ -123,13 +171,13 @@ See above.
 
 ## The program doesn't decrypt my backups and says the backups are corrupted
 
-Your backups are corrupted. You can try disabling all checks with the
-`-f` flag, but expect crashes and/or unreadable output.
+Your backups are corrupted. `wadecrypt` stops on the first failed check; pass `-f` and it
+will write the output anyway, but expect unreadable output. What `-f` writes has failed its
+authentication check, so nothing vouches for it being your data.
 
 ## The program doesn't decrypt and says the key is wrong
 
-The key is wrong. You can try disabling all checks with the
-`-f` flag, but expect crashes and/or unreadable output.
+The key is wrong. As above, `-f` writes the output regardless, with the same caveat.
 
 ## What is the best setup for decrypting my own databases?
 

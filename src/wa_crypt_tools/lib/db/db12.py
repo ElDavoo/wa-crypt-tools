@@ -9,6 +9,7 @@ import logging
 
 from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.lib.db.db import Database
+from wa_crypt_tools.lib.errors import DecryptionError, IntegrityError, InvalidKeyError
 from wa_crypt_tools.lib.key.key14 import Key14
 from wa_crypt_tools.lib.props import Props
 
@@ -42,33 +43,39 @@ class Database12(Database):
         if encrypted and key:
             self.cipher_version = encrypted.read(2)
             if self.cipher_version != key.get_cipher_version():
-                log.error("Cipher version mismatch: {} != {}".format(self.cipher_version, key.get_cipher_version()))
-                raise ValueError
+                raise IntegrityError("Cipher version mismatch: {} != {}"
+                                     .format(self.cipher_version, key.get_cipher_version()))
             self.file_hash.update(self.cipher_version)
 
             self.key_version = encrypted.read(1)
             if self.key_version != key.get_key_version():
-                log.error("Key version mismatch: {} != {}".format(self.key_version, key.get_key_version()))
-                raise ValueError
+                raise IntegrityError("Key version mismatch: {} != {}"
+                                     .format(self.key_version, key.get_key_version()))
             self.file_hash.update(self.key_version)
 
             self.serversalt = encrypted.read(32)
             if self.serversalt != key.get_serversalt():
-                log.error("Server salt mismatch: {} != {}".format(self.serversalt, key.get_serversalt()))
-                raise ValueError
+                raise IntegrityError("Server salt mismatch: {} != {}"
+                                     .format(self.serversalt, key.get_serversalt()))
             self.file_hash.update(self.serversalt)
 
             self.googleid = encrypted.read(16)
             if self.googleid != key.get_googleid():
-                log.error("Google ID mismatch: {} != {}".format(self.googleid, key.get_googleid()))
+                raise IntegrityError("Google ID mismatch: {} != {}"
+                                     .format(self.googleid, key.get_googleid()))
             self.file_hash.update(self.googleid)
 
             self.iv = encrypted.read(16)
             self.file_hash.update(self.iv)
         elif encrypted:
             self.cipher_version = encrypted.read(2)
-            # if test_bytes != key.get_cipher_version():
-            #    quit_12()
+            # A crypt12 header has no magic of its own, so this is the only thing telling a
+            # real one apart from any other file that happens to be long enough. Without it
+            # DatabaseFactory's crypt12 fallback accepts arbitrary input and reports garbage.
+            if self.cipher_version != C.SUPPORTED_CIPHER_VERSION:
+                raise IntegrityError("Unsupported cipher version: {}.\n    "
+                                     "This does not look like a crypt12, 14 or 15 database."
+                                     .format(self.cipher_version.hex()))
             self.file_hash.update(self.cipher_version)
 
             self.key_version = encrypted.read(1)
@@ -108,8 +115,7 @@ class Database12(Database):
                     self.cipher_version = cipher_version
                     self.file_hash.update(self.cipher_version)
                 else:
-                    log.error("Unsupported cipher version provided!")
-                    raise ValueError
+                    raise InvalidKeyError("Unsupported cipher version provided: {}".format(cipher_version.hex()))
             else:
                 self.cipher_version = C.SUPPORTED_CIPHER_VERSION
                 self.file_hash.update(self.cipher_version)
@@ -119,7 +125,7 @@ class Database12(Database):
                     self.key_version = key_version
                     self.file_hash.update(self.key_version)
                 else:
-                    log.error("Unsupported key version provided!")
+                    raise InvalidKeyError("Unsupported key version provided: {}".format(key_version.hex()))
             else:
                 self.key_version = C.SUPPORTED_KEY_VERSIONS[-1]
                 self.file_hash.update(self.key_version)
@@ -178,9 +184,8 @@ class Database12(Database):
         try:
             output_decrypted: bytes = cipher.decrypt(encrypted_data)
         except ValueError as e:
-            log.fatal("Decryption failed: {}."
-                      "\n    This probably means your backup is corrupted.".format(e))
-            raise e
+            raise DecryptionError("Decryption failed: {}."
+                                  "\n    This probably means your backup is corrupted.".format(e)) from e
 
         # Verify the authentication tag
         try:
@@ -195,8 +200,9 @@ class Database12(Database):
             else:
                 cipher.verify(authentication_tag)
         except ValueError as e:
-            log.error("Authentication tag mismatch: {}."
-                      "\n    This probably means your backup is corrupted.".format(e))
+            raise IntegrityError("Authentication tag mismatch: {}."
+                                 "\n    This probably means your backup is corrupted."
+                                 .format(e), data=output_decrypted) from e
 
         return output_decrypted
 

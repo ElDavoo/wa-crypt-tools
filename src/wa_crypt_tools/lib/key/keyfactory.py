@@ -2,6 +2,7 @@ from pathlib import Path
 
 import javaobj.v2 as javaobj
 
+from wa_crypt_tools.lib.errors import InvalidKeyError
 from wa_crypt_tools.lib.key.key14 import Key14
 from wa_crypt_tools.lib.key.key15 import Key15
 
@@ -17,36 +18,27 @@ class KeyFactory:
         try:
             return KeyFactory.from_file(file)
         except OSError:
-            try:
-                return KeyFactory.from_hex(str(file))
-            except ValueError:
-                log.critical("The key file specified does not exist.\n    "
-                             "If you tried to specify the key directly, note it should be "
-                             "64 characters long and not {} characters long.".format(len(str(file))))
+            # Only a genuine open() failure gets here: the argument is not a file we can
+            # read, so try it as a raw hex key instead. InvalidKeyError is not an OSError
+            # precisely so that an unreadable *keyfile* is not retried as a hex string.
+            return KeyFactory.from_hex(str(file))
 
     @staticmethod
     def from_file(file: Path):
-        keyfile: bytes = b''
-
         log.debug("Reading keyfile...")
 
         # Try to open the keyfile.
         # The stream must be closed explicitly: javaobj keeps references to it,
         # and a lingering open handle prevents deleting the file on Windows.
-        try:
-            with open(file, 'rb') as key_file_stream:
-                try:
-                    # Deserialize the byte object written in the file
-                    jarr: javaobj.beans.JavaArray = javaobj.load(key_file_stream).data
-                    # Convert from a list of Int8 to a byte array
-                    keyfile: bytes = javaintlist2bytes(jarr)
+        with open(file, 'rb') as key_file_stream:
+            try:
+                # Deserialize the byte object written in the file
+                jarr: javaobj.beans.JavaArray = javaobj.load(key_file_stream).data
+                # Convert from a list of Int8 to a byte array
+                keyfile: bytes = javaintlist2bytes(jarr)
 
-                except (ValueError, RuntimeError) as e:
-                    log.critical("The keyfile is not a valid Java object: {}".format(e))
-
-        except OSError:
-            log.info("The keyfile could not be opened.")
-            raise OSError
+            except (ValueError, RuntimeError) as e:
+                raise InvalidKeyError("The keyfile is not a valid Java object: {}".format(e)) from e
 
         # We guess the key type from its length
         if len(keyfile) == 131:
@@ -54,13 +46,17 @@ class KeyFactory:
         elif len(keyfile) == 32:
             return Key15(keyarray=keyfile)
         else:
-            log.critical("Unrecognized key file format.")
+            raise InvalidKeyError("Unrecognized key file format: the key is {} bytes long, "
+                                  "expected 131 (crypt14) or 32 (crypt15).".format(len(keyfile)))
 
     @staticmethod
     def from_hex(hexstring: str) -> Key15:
         if hexstring is None or len(hexstring) != 64:
-            raise ValueError("The key is invalid or of the wrong length.")
+            raise InvalidKeyError("The key file specified does not exist, and it is not a valid key either.\n    "
+                                  "If you tried to specify the key directly, note it should be "
+                                  "64 characters long and not {} characters long."
+                                  .format(0 if hexstring is None else len(hexstring)))
         barr: bytes = hexstring2bytes(hexstring)
-        if barr is None or len(barr) != 32:
-            raise ValueError("The key is invalid or of the wrong length.")
+        if len(barr) != 32:
+            raise InvalidKeyError("The key is invalid or of the wrong length.")
         return Key15(keyarray=barr)

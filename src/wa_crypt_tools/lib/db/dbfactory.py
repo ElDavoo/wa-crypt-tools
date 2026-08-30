@@ -2,10 +2,10 @@ import logging
 
 from google.protobuf.message import DecodeError
 
-from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.lib.db.db12 import Database12
 from wa_crypt_tools.lib.db.db14 import Database14
 from wa_crypt_tools.lib.db.db15 import Database15
+from wa_crypt_tools.lib.errors import HeaderError, IntegrityError
 from wa_crypt_tools.lib.props import Props
 from wa_crypt_tools.lib.utils import header_info
 
@@ -13,6 +13,15 @@ log = logging.getLogger(__name__)
 
 from hashlib import md5
 from re import findall
+
+
+class _NotCrypt1415(Exception):
+    """
+    Internal signal: this header is not a crypt14/15 one, so the file should be retried as a
+    crypt12. It deliberately does not derive from WaCryptError -- from_file catches it itself
+    to pick the format, and a real header error must never be mistaken for this and swallowed
+    into a bogus crypt12 attempt.
+    """
 
 
 class DatabaseFactory:
@@ -64,85 +73,55 @@ class DatabaseFactory:
                 file_hash.update(protobuf_raw)
 
                 if header.ParseFromString(protobuf_raw) != protobuf_size:
-                    log.error("Protobuf message not fully read. Please report a bug.")
+                    raise HeaderError("Protobuf message not fully read: the header claims {} bytes. "
+                                      "Please report a bug.".format(protobuf_size))
+
+                # Checking and printing WA version and phone number. Neither is used for
+                # anything cryptographic, so a surprise here is worth a message and no more.
+                version = findall(r"\d(?:\.\d{1,3}){3}", header.info.app_version)
+                if len(version) != 1:
+                    log.error('WhatsApp version not found')
                 else:
+                    log.debug("WhatsApp version: {}".format(version[0]))
+                if len(header.info.jidSuffix) != 2:
+                    log.error("The phone number end is not 2 characters long")
+                log.debug("Your phone number ends with {}".format(header.info.jidSuffix))
 
-                    # Checking and printing WA version and phone number
-                    version = findall(r"\d(?:\.\d{1,3}){3}", header.info.app_version)
-                    if len(version) != 1:
-                        log.error('WhatsApp version not found')
-                    else:
-                        log.debug("WhatsApp version: {}".format(version[0]))
-                    if len(header.info.jidSuffix) != 2:
-                        log.error("The phone number end is not 2 characters long")
-                    log.debug("Your phone number ends with {}".format(header.info.jidSuffix))
+                if len(header.c15_iv.IV) != 0:
+                    # DB Header is crypt15
+                    iv = header.c15_iv.IV
+                    is_crypt15 = True
+                elif len(header.c14_cipher.IV) != 0:
+                    # DB Header is crypt14
+                    iv = header.c14_cipher.IV
+                    is_crypt15 = False
+                else:
+                    # Not a crypt14/15 header at all: fall back to crypt12 below.
+                    raise _NotCrypt1415
 
-                    if len(header.c15_iv.IV) != 0:
-                        # DB Header is crypt15
-                        # if type(key) is not Key15:
-                        #    l.error("You are using a crypt14 key file with a crypt15 backup.")
-                        if len(header.c15_iv.IV) != 16:
-                            log.error("IV is not 16 bytes long but is {} bytes long".format(len(header.c15_iv.IV)))
-                        iv = header.c15_iv.IV
+                # We are done here
+                log.debug(header_info(header))
 
-                    elif len(header.c14_cipher.IV) != 0:
+                props = Props(v_features=header.info)
+                # The database is built even when the IV is the wrong length, so that --force
+                # has something to go on with; the caller gets it through IntegrityError.data.
+                db = Database15(props=props) if is_crypt15 else Database14(props=props)
+                db.iv = iv
+                db.file_hash = file_hash
+                if len(iv) != 16:
+                    raise IntegrityError("IV is not 16 bytes long but is {} bytes long"
+                                         .format(len(iv)), data=db)
+                return db
 
-                        # DB Header is crypt14
-                        # if type(key) is not Key14:
-                        #    l.fatal("You are using a crypt15 key file with a crypt14 backup.")
-
-                        # if key.cipher_version != p.c14_cipher.version.cipher_version:
-                        #    l.error("Cipher version mismatch: {} != {}"
-                        #    .format(key.cipher_version, p.c14_cipher.cipher_version))
-
-                        # Fix bytes to string encoding key.key_version = (key.key_version[0] + 48).to_bytes(1,
-                        # byteorder='big') if key.key_version != p.c14_cipher.key_version: if key.key_version >
-                        # p.c14_cipher.key_version: l.error("Key version mismatch: {} != {} .\n    " .format(
-                        # key.key_version, p.c14_cipher.key_version) + "Your backup is too old for this key file.\n
-                        # " + "Please try using a newer backup.") elif key.key_version < p.c14_cipher.key_version:
-                        # l.error("Key version mismatch: {} != {} .\n    " .format(key.key_version,
-                        # p.c14_cipher.key_version) + "Your backup is too new for this key file.\n    " + "Please try
-                        # using an older backup, or getting the new key.") else: l.error("Key version mismatch: {} !=
-                        # {} (?)" .format(key.key_version, p.c14_cipher.key_version)) if key.get_serversalt() !=
-                        # p.c14_cipher.server_salt: l.error("Server salt mismatch: {} != {}".format(
-                        # key.get_serversalt(), p.c14_cipher.server_salt)) if key.get_googleid() !=
-                        # p.c14_cipher.google_id: l.error("Google ID mismatch: {} != {}".format(key.get_googleid(),
-                        # p.c14_cipher.google_id))
-                        if len(header.c14_cipher.IV) != 16:
-                            log.error(
-                                "IV is not 16 bytes long but is {} bytes long".format(len(header.c14_cipher.IV)))
-                        iv = header.c14_cipher.IV
-
-                    else:
-                        log.error("Could not parse the IV from the protobuf message. Please report a bug.")
-                        raise DecodeError
-
-                    # We are done here
-                    log.debug(header_info(header))
-
-                    props = Props(v_features=header.info)
-                    if header.c15_iv.IV:
-                        db = Database15(iv=iv, props=props)
-                        db.file_hash = file_hash
-                        return db
-                    elif header.c14_cipher.IV:
-                        db = Database14(iv=iv, props=props)
-                        db.file_hash = file_hash
-                        return db
-                    else:
-                        log.error("Could not parse the IV from the protobuf message. Please report a bug.")
-                        raise DecodeError
-
-            except DecodeError:
+            except (DecodeError, _NotCrypt1415):
 
                 # try again as a crypt12
                 log.debug("Could not parse the protobuf message as a crypt14/15. Trying as a crypt12...")
                 try:
                     encrypted.seek(0)
                 except OSError as e:
-                    log.fatal("Could not reset the file pointer: {}".format(e))
-                    raise e
+                    raise HeaderError("Could not reset the file pointer: {}".format(e)) from e
                 return Database12(encrypted=encrypted)
 
         except OSError as e:
-            log.fatal("Reading database header failed: {}".format(e))
+            raise HeaderError("Reading database header failed: {}".format(e)) from e
