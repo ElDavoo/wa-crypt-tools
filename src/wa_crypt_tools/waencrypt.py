@@ -3,6 +3,7 @@ import hashlib
 import os
 import zlib
 import logging
+from pathlib import Path
 
 from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.lib.db.db import Database
@@ -28,10 +29,15 @@ def parsecmdline() -> argparse.Namespace:
                              'Default: encrypted_backup.key')
     parser.add_argument('decrypted', nargs='?', type=argparse.FileType('rb'), default="msgstore.db",
                         help='The input file. Default: msgstore.db')
-    parser.add_argument('encrypted', nargs='?', type=argparse.FileType('wb'), default="msgstore.db.crypt15",
+    # Deliberately not argparse.FileType('wb'): that opens the file while the arguments are
+    # still being parsed, so a run that fails for any reason -- an unreadable key, the wrong
+    # --type -- would already have truncated whatever was at that path.
+    parser.add_argument('encrypted', nargs='?', type=str, default="msgstore.db.crypt15",
                         help='The encrypted crypt15 or crypt14 file. Default: msgstore.db.crypt15')
     parser.add_argument('-f', '--force', action='store_true',
                         help='Carry on when an integrity check fails. Default: stop')
+    parser.add_argument('-y', '--yes', action='store_true',
+                        help='Overwrite the output file if it exists.')
     parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
     parser.add_argument('--enable-features', type=int, nargs='*', default=C.DEFAULT_FEATURE_LIST,
                         help='Enables the specified features. ')
@@ -76,6 +82,11 @@ def main():
 
 
 def encrypt(args):
+    # Before anything else, and before the output is opened: refusing after the fact would
+    # mean the file had already been emptied.
+    if Path(args.encrypted).is_file() and not args.yes:
+        log.fatal("The output file already exists. Use --yes to overwrite it.")
+        exit(1)
     # Read the key file
     key = KeyFactory.new(args.keyfile)
     # If specified, use the IV from the command line
@@ -109,11 +120,10 @@ def encrypt(args):
     else:
         compressed = zlib.compress(data, 1)
         encrypted = db.encrypt(key, props, compressed)
-    args.encrypted.write(encrypted)
-    # Close the files
+    with open(args.encrypted, 'wb') as f:
+        f.write(encrypted)
     log.info("Done!")
     args.decrypted.close()
-    args.encrypted.close()
 
 
 if __name__ == '__main__':

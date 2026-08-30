@@ -60,11 +60,14 @@ wadecrypt.py:271        : [I] Done
 ## Encrypt a file with waencrypt (BETA)
 
 ```
-usage: waencrypt [-h] [-f] [-v] [--enable-features [ENABLE_FEATURES ...]] [--max-feature MAX_FEATURE]
+usage: waencrypt [-h] [-f] [-y] [-v] [--enable-features [ENABLE_FEATURES ...]] [--max-feature MAX_FEATURE]
                  [--multi-file] [--type {12,14,15}] [--iv IV] [--reference REFERENCE] [--noparse]
                  [--wa-version WA_VERSION] [--jid JID] [--backup-version BACKUP_VERSION] [--no-compress]
                  [keyfile] [decrypted] [encrypted]
 ```
+
+`waencrypt` will not write over a file that already exists; pass `-y`/`--yes` if that is what
+you want.
 
 Encryption is more complex and untested: it is advised to use another encrypted file 
 from the same account, which we will call "reference".  

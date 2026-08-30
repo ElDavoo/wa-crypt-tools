@@ -126,8 +126,10 @@ tests/res/test9.zip <out>` with the last 16 bytes then dropped.
   `tests/tools-invocation/test_waencrypt.py`: `Props(v_features=...)` never sets `max_feature`, so
   `get_features()` -- which only `Database14.encrypt` calls -- raises `AttributeError`. Drop the
   marker when `props.py` is fixed. `--multi-file` and `--noparse` are declared and never read.
-  A failed run still truncates the output file to zero first, because argparse's `FileType('wb')`
-  opens it before anything is validated.
+  The `encrypted` positional is deliberately a plain `str` and not an `argparse.FileType('wb')`:
+  that type opens the file during parsing, so it was emptied before any check had run. The
+  existence guard at the top of `encrypt()` only works while it stays a path. `wadecrypt` still
+  has the `FileType('wb')` shape for its own output.
 - CI (`.github/workflows/lint-test-coverage.yml`) runs the matrix Python 3.10–3.14 on Ubuntu and
   Windows. On Windows, file handles must be closed before deletion — `KeyFactory.from_file` opens
   the keyfile in a `with` block for exactly this reason.
