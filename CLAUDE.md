@@ -128,7 +128,11 @@ are ignored in place with the reason at the point of use, and both should stay: 
 fix checkouts must persist the push token because that is what they push with, and the CI-failure
 stage really is a `workflow_run`. Everything else passes as written, so a new finding is a real
 one. Note that actionlint only runs shellcheck when shellcheck is on `PATH` — a local run without
-it is quieter than CI.
+it is quieter than CI. Two shellcheck-through-actionlint traps cost a red run each: a suppression
+has to sit immediately above the command it applies to, because a file-level one at the top of a
+`run:` block is silently ignored, and nothing may follow `# shellcheck disable=...` on its line
+or the directive fails to parse. A literal backtick inside single quotes reads as an expression,
+so the workflows pass one through a `tick='`'` variable.
 
 `agent-plan.yml` opens with a `screen` job, which is local and not part of the upstream template.
 Most issues filed here are the "Can't decrypt" template submitted with every placeholder line

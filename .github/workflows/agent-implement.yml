@@ -142,14 +142,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE: ${{ inputs.issue }}
         run: |
-          # $owner and $name below belong to GraphQL and to jq, not to the shell: expanding
-          # them here is the bug, not the fix. A trailing comment on the directive line makes
-          # shellcheck ignore the whole directive, so the reason lives above it.
-          # shellcheck disable=SC2016
           set -euo pipefail
 
           # Body and provenance in one query, so the text checked is the text used. Asking for
           # them separately leaves a window in which the body read is not the body vouched for.
+          #
+          # $owner and $name are GraphQL's variables, not the shell's, and expanding them here
+          # is the bug rather than the fix. The suppression has to sit immediately above the
+          # command: actionlint feeds each `run:` block to shellcheck in a form where a
+          # file-level directive at the top has no effect, silently.
+          # shellcheck disable=SC2016
           gh api graphql -f query='
             query($owner:String!,$name:String!,$num:Int!){
               repository(owner:$owner,name:$name){
@@ -190,6 +192,9 @@ jobs:
           esac
 
           if [ "$trusted" != true ]; then
+            # The backtick reaches the text through a variable: inside single quotes shellcheck
+            # reads one as an expression that will not expand. Same idiom as agent-fix.yml.
+            tick='`'
             {
               printf 'The plan on this issue was last edited by someone without write access to '
               printf 'this repository, so it is no longer the plan that was approved. Nothing '
@@ -197,7 +202,7 @@ jobs:
               printf 'The body is instructions to an agent that holds a push token, so it is '
               printf 'only taken from the plan stage or from someone who could make the change '
               printf 'themselves. A maintainer can restore or rewrite the plan and re-dispatch '
-              printf '`Agent · implement` from the Actions tab.\n'
+              printf '%sAgent · implement%s from the Actions tab.\n' "$tick" "$tick"
             } > /tmp/untrusted.md
             gh issue comment "$ISSUE" --body-file /tmp/untrusted.md
             gh issue edit "$ISSUE" --add-label 'agent:stuck' --remove-label 'agent:planned'

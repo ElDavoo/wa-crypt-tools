@@ -207,11 +207,15 @@ jobs:
           set -euo pipefail
           # Not locked. This is the one automatic close that a real person plausibly triggers by
           # submitting the form before filling it in, and they need to be able to say so.
+          #
+          # The backtick goes through a variable: shellcheck reads one inside single quotes as
+          # an expression that will not expand, and the whole step is prose in markdown.
+          tick='`'
           {
             printf 'Closing this automatically: the issue is the template with none of it '
             printf 'filled in, so there is nothing here to act on.\n\n'
             printf 'If you meant to report a problem, open a new issue and include what the '
-            printf 'template asks for: the command you ran, the full output with `-v`, and '
+            printf 'template asks for: the command you ran, the full output with %s-v%s, and ' "$tick" "$tick"
             printf 'which backup format you have. Without those there is nothing to look at.\n\n'
             printf 'Note that this project is not WhatsApp. It decrypts a backup file you '
             printf 'already have, using a 64-character key you already have; it cannot recover '
