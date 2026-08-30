@@ -68,11 +68,9 @@ class Database14(Database):
 
 
     def __str__(self):
-        return f"""cipher_version: {self.cipher_version}
-    key_version: {self.key_version}
-    serversalt: {self.serversalt}
-    googleid: {self.googleid}
-    iv: {self.iv}"""
+        # A crypt14 header carries none of the key fields Database12 prints: they live in
+        # the key file, and the only thing this class holds of its own is the IV.
+        return "Database14(iv: {})".format(self.iv.hex())
 
 
     def get_iv(self) -> bytes:

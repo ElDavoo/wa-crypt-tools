@@ -1,2 +1,12 @@
 [run]
-omit=*/tests/*,*/proto/*
+# Without "source" coverage only reports files that happened to be imported, which pulls in
+# the whole stdlib and makes TOTAL meaningless. Scoped here, TOTAL is the package's own
+# number, wa*.py entry points included.
+source = src/wa_crypt_tools
+# tests/tools-invocation/ runs the console scripts as subprocesses. Each one measures itself
+# into its own data file, which pytest-cov combines at the end; see conftest.py for the
+# COVERAGE_PROCESS_START half of it. Without this the entry points all report 0%.
+parallel = true
+omit =
+    */tests/*
+    */proto/*

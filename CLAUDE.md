@@ -22,6 +22,11 @@ python -m pytest --cov          # with coverage (as CI runs it)
 python -m pytest tests/test_decrypt.py::TestDecryption::test_decryption15   # single test
 ```
 
+The full suite takes around two and a half minutes: `tests/tools-invocation/` runs the console
+scripts as subprocesses, and `waguess` brute-forces offsets over a 240 KB backup for each of the
+three formats.
+
+
 Without the venv on `PATH`, the 14 `tools-invocation` tests fail with
 `FileNotFoundError: 'wacreatekey'` while everything else passes.
 
@@ -97,14 +102,32 @@ what users actually see; `-v` switches to DEBUG. Modules use `log = logging.getL
 Version-specific behavior belongs in a `DatabaseXX`/`KeyXX` class plus a factory branch; changes
 to the base classes or to `lib/utils.py` affect all three formats, so exercise crypt12, 14 and 15
 when touching them (`tests/res/` has a fixture backup in each format, all decrypting to the same
-`msgstore.db`).
+`msgstore.db`). `tests/res/stickers.backup.crypt15` is the other shape a backup comes in: a
+multi-file one, so its plaintext is a ZIP (`test9.zip`) rather than a zlib'd SQLite database and
+it has no trailing md5, which puts the tag where the checksum would be. It was made with
+`waencrypt --no-compress --iv 000102030405060708090a0b0c0d0e0f tests/res/encrypted_backup.key
+tests/res/test9.zip <out>` with the last 16 bytes then dropped.
 
 ## Notes
 
 - Protobuf generated code lives in `src/wa_crypt_tools/proto/` and is excluded from coverage
-  along with `tests/` (`.coveragerc`). The `.coveragerc` does not scope `source`, so the reported
-  TOTAL includes stdlib files and reads far lower than the real per-module numbers.
-- `waencrypt` is beta; only crypt15 with a reference file is well tested.
+  along with `tests/` (`.coveragerc`). `source` is scoped to `src/wa_crypt_tools`, so the reported
+  TOTAL is the package's own number (~94%): `lib/` sits around 97%, the `wa*.py` entry points
+  between 81% and 97%.
+- `tests/tools-invocation/` shells out to the console scripts, and those subprocesses are measured
+  too. It takes three pieces together and breaks silently — as 0% on every `wa*.py` — if any one
+  of them goes: `parallel = true` in `.coveragerc`, the root `conftest.py` exporting
+  `COVERAGE_PROCESS_START` when `--cov` is on, and the `.pth` file that `coverage` (pinned
+  `>= 7.16.0` in the `test` extra for it) installs into site-packages to call
+  `coverage.process_startup()`. All five tools have invocation tests; what is left uncovered is
+  mostly the pycryptodome/pycryptodomex import fallback in `wadecrypt.py` and `waguess.py`, which
+  cannot run in an environment where the suite runs at all.
+- `waencrypt` is beta. `--type 14 --reference` is a known failure, marked `xfail(strict=True)` in
+  `tests/tools-invocation/test_waencrypt.py`: `Props(v_features=...)` never sets `max_feature`, so
+  `get_features()` -- which only `Database14.encrypt` calls -- raises `AttributeError`. Drop the
+  marker when `props.py` is fixed. `--multi-file` and `--noparse` are declared and never read.
+  A failed run still truncates the output file to zero first, because argparse's `FileType('wb')`
+  opens it before anything is validated.
 - CI (`.github/workflows/lint-test-coverage.yml`) runs the matrix Python 3.10–3.14 on Ubuntu and
   Windows. On Windows, file handles must be closed before deletion — `KeyFactory.from_file` opens
   the keyfile in a `with` block for exactly this reason.

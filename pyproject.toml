@@ -44,6 +44,9 @@ wainfo = "wa_crypt_tools.wainfo:main"
 test = [
     "pytest >= 8.0.0",
     "pytest-cov >= 4.0.0",
+    # Subprocess coverage for tests/tools-invocation/ relies on the .pth file coverage
+    # installs into site-packages; see conftest.py. Pinned to a version known to ship it.
+    "coverage >= 7.16.0",
     "flake8 >= 7.0.0",
     "coveralls >= 3.3.0"
 ]

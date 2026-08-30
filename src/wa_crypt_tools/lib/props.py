@@ -48,7 +48,7 @@ class Props:
         return features
 
     def get_wa_version(self) -> str:
-        return self.props.version
+        return self.props.app_version
 
     def get_jid(self) -> str:
         return self.props.jidSuffix
