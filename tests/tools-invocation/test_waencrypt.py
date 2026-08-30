@@ -101,6 +101,47 @@ class TestReference:
         assert ret == 0, out
 
 
+class TestExistingOutput:
+    """
+    waencrypt refuses to write over a file that is already there.
+
+    The output used to be an argparse.FileType('wb'), which opens it while the arguments are
+    still being parsed: pointing the tool at an existing backup emptied it before a single
+    check had run, and a run that then failed left nothing behind.
+    """
+
+    def teardown_method(self):
+        cleanup()
+
+    def write_something(self):
+        with open(OUT, 'wb') as f:
+            f.write(b'PRECIOUS')
+
+    def test_an_existing_output_stops_the_run(self):
+        self.write_something()
+        out, ret = Propen("waencrypt {} {} {}".format(KEY15, PLAIN, OUT))
+        assert ret != 0
+        assert "output file already exists" in out
+        with open(OUT, 'rb') as f:
+            assert f.read() == b'PRECIOUS'
+
+    def test_yes_overwrites_it(self):
+        self.write_something()
+        out, ret = Propen("waencrypt --yes {} {} {}".format(KEY15, PLAIN, OUT))
+        assert ret == 0, out
+        out, ret = Propen("wadecrypt {} {} {}".format(KEY15, OUT, ROUNDTRIP))
+        assert ret == 0, out
+        assert cmp_files(ROUNDTRIP, PLAIN)
+
+    def test_a_run_that_fails_leaves_the_output_alone(self):
+        # Even with --yes: the file is opened only once there is something to write to it.
+        self.write_something()
+        out, ret = Propen("waencrypt --yes tests/res/test.json {} {}".format(PLAIN, OUT))
+        assert ret != 0
+        with open(OUT, 'rb') as f:
+            assert f.read() == b'PRECIOUS'
+
+
 class TestFailures:
     def teardown_method(self):
         cleanup()
