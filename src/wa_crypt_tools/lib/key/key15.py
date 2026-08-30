@@ -10,7 +10,7 @@ from wa_crypt_tools.lib.utils import create_jba, encryptionloop
 from wa_crypt_tools.lib.key.key import Key
 import logging
 
-l = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
 class Key15(Key):
@@ -41,7 +41,7 @@ class Key15(Key):
                 self.__key = urandom(32)
             else:
                 if len(key) != 32:
-                    l.error("Invalid key length: {}".format(key.hex()))
+                    log.error("Invalid key length: {}".format(key.hex()))
                 self.__key = key
             return
 
@@ -50,11 +50,11 @@ class Key15(Key):
 
         if len(keyarray) != 32:
             raise ValueError("Invalid key length")
-        l.debug("Root key: {}".format(keyarray.hex()))
+        log.debug("Root key: {}".format(keyarray.hex()))
         # Save the root key in the class
         self.__key = keyarray
 
-        l.info("Crypt15 / Raw key loaded")
+        log.info("Crypt15 / Raw key loaded")
 
     def get(self) -> bytes:
         """
