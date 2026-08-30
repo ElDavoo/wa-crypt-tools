@@ -134,9 +134,17 @@ jobs:
             `spam` closes and locks the issue. `unrelated` only labels it for the maintainer.
 
             Return the verdict only.
+          # max-turns 3, not 1: the action counts the structured-output reply as a turn of its
+          # own and fails the step with "reported a successful result after 2 turns, exceeding
+          # the configured maximum of 1". Seen on issue #234, where Decide read the failure as
+          # `keep` and the issue went through unscreened -- which is the safe direction, and
+          # still not the intended one.
+          #
+          # Nothing may be commented inside this block: it is a folded scalar, so a `#` line
+          # would be passed to the CLI as an argument.
           claude_args: >-
             --model claude-sonnet-5
-            --max-turns 1
+            --max-turns 3
             --allowedTools ""
             --disallowedTools "Read,Write,Edit,Glob,Grep,Task,Bash,WebFetch,WebSearch"
             --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["spam","unrelated","keep"],"description":"How to treat this issue"},"reason":{"type":"string","description":"One sentence, addressed to nobody in particular, on why"}},"required":["verdict","reason"]}'
