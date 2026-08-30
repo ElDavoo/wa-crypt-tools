@@ -1,0 +1,125 @@
+name: Agent · fix CI
+
+# The red-CI leg of the loop. CI finished failing on an agent branch, so gather what failed and
+# hand it to the shared fix stage. See README.md.
+#
+# CUSTOMISE: `workflows:` below must name YOUR CI workflow, exactly as its `name:` reads. This
+# is the one setting in the pipeline that cannot be a variable -- `workflow_run.workflows` is
+# matched before any expression is evaluated, so it takes a literal and nothing else. Get it
+# wrong and there is no error: the trigger simply never fires, and red CI on an agent branch is
+# met with silence.
+#
+# `workflow_run` rather than a check on the pull request, because this needs the logs, and the
+# logs only exist once the run has finished. It runs in the context of the default branch, which
+# is also what makes it safe to give it secrets: the version of this file that executes is the
+# one on main, never the one on the branch being fixed.
+
+# workflow_run is what this stage is: it needs a finished run's logs, which no pull_request
+# event can reach. The trigger's hazard -- privileged execution against branch content -- does
+# not apply, because a workflow_run job always runs the copy of this file on the default branch,
+# and nothing here checks out or executes the branch under test.
+on: # zizmor: ignore[dangerous-triggers]
+  workflow_run:
+    workflows: ["Lint, tests, coverage"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  context:
+    # Reading only: which pull request the failed run belongs to, and the failed job's logs.
+    permissions:
+      contents: read
+      actions: read
+      issues: read
+      pull-requests: read
+    if: >-
+      github.event.workflow_run.conclusion == 'failure'
+      && startsWith(github.event.workflow_run.head_branch, 'agent/issue-')
+    runs-on: ubuntu-latest
+    outputs:
+      pr: ${{ steps.find.outputs.pr }}
+      issue: ${{ steps.find.outputs.issue }}
+      author: ${{ steps.find.outputs.author }}
+      logs: ${{ steps.logs.outputs.text }}
+      go: ${{ steps.find.outputs.go }}
+
+    steps:
+      - name: Find the pull request and the issue behind it
+        id: find
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          issue=${BRANCH#agent/issue-}
+          pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -z "$pr" ]; then
+            echo "::notice::No open pull request for $BRANCH — nothing to fix."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A stuck or stopped branch is left alone, and so is a draft: drafting is how the
+          # pipeline hands a branch to a human, and picking it back up would undo that.
+          state=$(gh pr view "$pr" --json isDraft,labels --jq '[(.isDraft|tostring)] + [.labels[].name] | join(",")')
+          case ",$state," in
+            *,true,*|*,agent:stop,*|*,agent:stuck,*)
+              echo "::notice::PR #$pr is draft or stopped — leaving it alone."
+              echo "go=false" >> "$GITHUB_OUTPUT"
+              exit 0 ;;
+          esac
+          author=$(gh issue view "$issue" --json author --jq .author.login)
+          {
+            echo "pr=$pr"
+            echo "issue=$issue"
+            echo "author=$author"
+            echo "go=true"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Collect the failed job logs
+        id: logs
+        if: steps.find.outputs.go == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          set -euo pipefail
+          # Truncated to the tail, and hard: a workflow_call input is a string on the event
+          # payload, and a full Gradle log is far larger than that can carry. The tail is where
+          # the failure is; the head is SDK downloads.
+          gh run view "$RUN_ID" --log-failed 2>/dev/null | tail -c 30000 > /tmp/failed.log || true
+          if [ ! -s /tmp/failed.log ]; then
+            printf 'Could not download the failed job logs. Run: %s\n' "$RUN_URL" > /tmp/failed.log
+          fi
+          {
+            printf 'text<<CI_LOG_EOF\n'
+            cat /tmp/failed.log
+            printf '\nCI_LOG_EOF\n'
+          } >> "$GITHUB_OUTPUT"
+
+  fix:
+    # Needed here even though nothing in this file runs the action: a called workflow cannot
+    # request a permission its caller lacks, and agent-fix.yml needs id-token for the OIDC
+    # token. Getting this wrong does not fail a job -- it fails the run at startup, with no
+    # jobs, no logs and no annotation to read.
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+      pull-requests: write
+    needs: [context]
+    if: needs.context.outputs.go == 'true'
+    uses: ./.github/workflows/agent-fix.yml
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      AGENT_PUSH_TOKEN: ${{ secrets.AGENT_PUSH_TOKEN }}
+    with:
+      pr: ${{ needs.context.outputs.pr }}
+      issue: ${{ needs.context.outputs.issue }}
+      author: ${{ needs.context.outputs.author }}
+      reason: ci
+      payload: ${{ needs.context.outputs.logs }}

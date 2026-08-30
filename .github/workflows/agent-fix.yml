@@ -1,0 +1,315 @@
+name: Agent · fix
+
+# The shared fix stage, called by agent-fix-ci.yml (a red CI run) and by
+# agent-review.yml (a review that requested changes). One implementation, two callers: the two
+# legs differ only in what context they hand over, and a change to how fixing works should not
+# have to be made twice. See README.md.
+#
+# There is no loop anywhere in this pipeline. This workflow pushes one commit and returns; the
+# push re-triggers CI and the review stage, and whichever of them is still unhappy calls
+# back here. The round counter is what makes that terminate.
+
+on:
+  workflow_call:
+    inputs:
+      pr:
+        description: Pull request number
+        required: true
+        type: string
+      issue:
+        description: Issue number the branch was opened for
+        required: true
+        type: string
+      author:
+        description: Login of the issue author (decides whether the approval gate applies)
+        required: true
+        type: string
+      reason:
+        description: ci | review
+        required: true
+        type: string
+      payload:
+        description: Failed job logs, or the unresolved review findings. Pre-truncated by the caller.
+        required: true
+        type: string
+    # Declared rather than inherited. `secrets: inherit` would hand this workflow every secret
+    # the caller holds -- here that includes the PyPI and Coveralls tokens, which the fix stage
+    # has no business being able to read.
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN:
+        required: true
+      AGENT_PUSH_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+  # The action fetches a GitHub OIDC token on every run, including the OAuth path, and
+  # fails after three retries without this. claude.yml has carried it since day one.
+  id-token: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  # Same predicate as the plan stage: could the issue's author have pushed this change
+  # themselves? See the comment on agent-plan.yml's triage job.
+  triage:
+    runs-on: ubuntu-latest
+    outputs:
+      trusted: ${{ steps.who.outputs.trusted }}
+    steps:
+      - name: Can the author write to this repository
+        id: who
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTHOR: ${{ inputs.author }}
+        run: |
+          set -euo pipefail
+          perm=$(gh api "repos/${GITHUB_REPOSITORY}/collaborators/${AUTHOR}/permission" \
+                 --jq .permission 2>/dev/null || echo none)
+          case "$perm" in
+            admin|maintain|write) trusted=true ;;
+            *)                    trusted=false ;;
+          esac
+          echo "${AUTHOR}: ${perm} -> trusted=${trusted}"
+          echo "trusted=${trusted}" >> "$GITHUB_OUTPUT"
+
+  gate:
+    needs: [triage]
+    if: needs.triage.outputs.trusted != 'true'
+    runs-on: ubuntu-latest
+    environment: agent-approval
+    steps:
+      - name: Record the approval
+        env:
+          APPROVER: ${{ github.actor }}
+          PR: ${{ inputs.pr }}
+        run: echo "Approved by $APPROVER for PR $PR"
+
+  fix:
+    needs: [gate]
+    if: always() && needs.gate.result != 'failure' && needs.gate.result != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Both callers can fire for the same branch at once -- a red CI run and a review that
+    # requested changes are independent events and routinely arrive together. Without this they
+    # race, and the second push is rejected as a non-fast-forward. Queued rather than cancelled,
+    # because a fix cancelled mid-push leaves the branch half-written.
+    concurrency:
+      group: agent-fix-${{ inputs.issue }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout the agent branch
+        # zizmor: ignore[artipacked]
+        # The persisted credential is the point here: this stage commits and pushes the branch,
+        # and it must be the PAT rather than GITHUB_TOKEN or the push triggers no CI at all.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          token: ${{ secrets.AGENT_PUSH_TOKEN }}
+          ref: agent/issue-${{ inputs.issue }}
+          fetch-depth: 0
+
+      - name: Honour the kill switch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ inputs.pr }}
+        run: |
+          set -euo pipefail
+          labels=$(gh pr view "$PR" --json labels --jq '[.labels[].name] | join(",")')
+          echo "labels: $labels"
+          case ",$labels," in
+            *,agent:stop,*|*,agent:stuck,*) echo "::notice::Stopped by label" ; exit 1 ;;
+          esac
+
+      # Rounds are counted in pushes by the agent, deliberately, not in CI runs. The instrumented
+      # matrix is the one job here that fails for reasons unrelated to the diff, and a flaky
+      # emulator must not be able to spend the budget of a branch that was fine.
+      - name: Count the round
+        id: round
+        run: |
+          set -euo pipefail
+          commits=$(git rev-list --count origin/main..HEAD)
+          round=$(( commits ))          # the implement commit is 1, so this run is fix round $commits
+          echo "round=$round" >> "$GITHUB_OUTPUT"
+          # Round 9 is the escalation round; 10 is the last. See README.md.
+          if [ "$round" -gt 10 ]; then echo "stuck=true"  >> "$GITHUB_OUTPUT"
+          else                         echo "stuck=false" >> "$GITHUB_OUTPUT"; fi
+          if [ "$round" -eq 9 ]; then  echo "escalate=true"  >> "$GITHUB_OUTPUT"
+          else                         echo "escalate=false" >> "$GITHUB_OUTPUT"; fi
+          echo "fix round $round"
+
+      # Drafting is not cosmetic: it disarms auto-merge, which is exactly the property wanted at
+      # the moment the loop admits it cannot converge.
+      - name: Give up
+        if: steps.round.outputs.stuck == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.AGENT_PUSH_TOKEN }}
+          PR: ${{ inputs.pr }}
+          ISSUE: ${{ inputs.issue }}
+          REASON: ${{ inputs.reason }}
+          PAYLOAD: ${{ inputs.payload }}
+        run: |
+          set -euo pipefail
+          # Markdown fences and inline code are written as %s arguments rather than inline, so
+          # that nothing in this script is a backtick shellcheck has to reason about.
+          tick='`'
+          fence='~~~'
+          {
+            printf '## stuck after 10 fix rounds\n\n'
+            printf 'Auto-merge is disarmed and this pull request is now a draft. Nothing '
+            printf 'automated will touch it again until the %sagent:stuck%s label comes off.\n\n' "$tick" "$tick"
+            printf 'What was tried, newest last:\n\n'
+            git log --reverse --format='- %h %s' origin/main..HEAD
+            printf '\n### the failure it could not get past (%s)\n\n' "$REASON"
+            printf '%s\n' "$fence"
+            printf '%s\n' "$PAYLOAD" | tail -n 80
+            printf '%s\n' "$fence"
+          } > /tmp/stuck.md
+          gh pr comment "$PR" --body-file /tmp/stuck.md
+          gh pr ready --undo "$PR"
+          gh pr edit "$PR" --add-label 'agent:stuck'
+          gh issue edit "$ISSUE" --add-label 'agent:stuck' --remove-label 'agent:working'
+
+      # Supplied by this repository, not by the pipeline. See .github/actions/project-setup.
+      - name: Set up the toolchain
+        if: steps.round.outputs.stuck != 'true'
+        uses: ./.github/actions/project-setup
+
+      - name: Write the context out
+        if: steps.round.outputs.stuck != 'true'
+        env:
+          PAYLOAD: ${{ inputs.payload }}
+        run: printf '%s\n' "$PAYLOAD" > /tmp/failure.txt
+
+      # Rounds 1-8 and 10: fix the failure in front of you.
+      - name: Fix
+        id: fix
+        if: steps.round.outputs.stuck != 'true' && steps.round.outputs.escalate != 'true'
+        continue-on-error: true
+        uses: anthropics/claude-code-action@1f291e1cfe0f5fc21db2aef19af844591600ade7 # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            This is fix round ${{ steps.round.outputs.round }} of 10 on pull request
+            #${{ inputs.pr }}, for issue #${{ inputs.issue }}. The branch is checked out.
+
+            ${{ inputs.reason == 'ci' && 'CI failed. The failed jobs'' logs are in /tmp/failure.txt.' || 'The code review requested changes. The blocking findings are in /tmp/failure.txt.' }}
+
+            Read CLAUDE.md first. A CI failure in a mature repository is more often a documented
+            gate than a bug, and CLAUDE.md is where the reason behind each gate is written down.
+
+            Diagnose the failure before you change anything. Then make the smallest change that
+            fixes the cause, and re-run this repository's own checks:
+
+                .github/scripts/agent-gates.sh
+
+            Do not weaken a gate to pass it. Lowering a coverage floor, adding a lint
+            suppression or baseline, deleting a failing assertion, or skipping a test is not a
+            fix and will be rejected by review.
+
+            Do not commit or push. Leave your work in the working tree.
+          claude_args: >-
+            --max-turns 120
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash"
+            --disallowedTools "Bash(gh:*),Bash(curl:*),Bash(wget:*),Bash(nc:*),Bash(ssh:*),Bash(scp:*),Bash(git push:*),Bash(git remote:*),Bash(git config:*),WebFetch,WebSearch"
+
+      # Round 9. Handed the whole history rather than the latest failure, told the approach is
+      # not working, and allowed to revert -- because the way these loops actually fail is an
+      # agent applying variations of a fix that never addressed the cause, and eight rounds of
+      # that look exactly like eight rounds of progress from inside any single round.
+      - name: Fix (escalation round)
+        id: escalate
+        if: steps.round.outputs.stuck != 'true' && steps.round.outputs.escalate == 'true'
+        continue-on-error: true
+        uses: anthropics/claude-code-action@1f291e1cfe0f5fc21db2aef19af844591600ade7 # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Pull request #${{ inputs.pr }} (issue #${{ inputs.issue }}) has failed eight fix
+            rounds. This is the escalation round. One round remains after this one, and then
+            the pipeline gives up and hands the branch to a human.
+
+            Assume the approach taken so far is wrong. Eight attempts that each looked
+            reasonable and each failed is evidence about the diagnosis, not about the effort.
+
+            Before writing anything:
+            1. Read the full attempt history: `git log --reverse -p origin/main..HEAD`.
+            2. Read the latest failure in /tmp/failure.txt.
+            3. Write down, explicitly, what every previous round believed the cause was, and
+               what the evidence now says about that belief.
+            4. Read CLAUDE.md for the area you are working in. This repository documents the
+               non-obvious reason behind most of its constraints, and a loop that cannot
+               converge is very often one fighting a documented invariant it has not read.
+
+            You may revert. `git revert`, or resetting the working tree back toward the first
+            commit on this branch and taking a different route, is a legitimate and often
+            correct move here — much more so than a ninth variation on the same patch.
+
+            Then implement the different approach and run this repository's own checks:
+
+                .github/scripts/agent-gates.sh
+
+            Do not weaken a gate to pass it. If the honest conclusion is that this issue cannot
+            be implemented as planned, say so plainly in your summary and change nothing —
+            being handed to a human with a clear explanation is a better outcome than a tenth
+            round of noise.
+
+            Do not commit or push. Leave your work in the working tree.
+          claude_args: >-
+            --max-turns 200
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash"
+            --disallowedTools "Bash(gh:*),Bash(curl:*),Bash(wget:*),Bash(nc:*),Bash(ssh:*),Bash(scp:*),Bash(git push:*),Bash(git remote:*),Bash(git config:*),WebFetch,WebSearch"
+
+      # Exactly one of the two fix steps runs; the other is skipped, and a skipped step's
+      # outcome is 'skipped', never 'failure'. So testing for 'failure' on both is the whole
+      # condition — no need to know which round this was.
+      - name: Record a stall
+        if: steps.fix.outcome == 'failure' || steps.escalate.outcome == 'failure'
+        uses: ./.github/actions/agent-stall
+        with:
+          issue: ${{ inputs.issue }}
+          pr: ${{ inputs.pr }}
+          stage: fix
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Stop here
+        if: steps.fix.outcome == 'failure' || steps.escalate.outcome == 'failure'
+        run: exit 1
+
+      - name: Local gates (recorded, not enforced)
+        if: steps.round.outputs.stuck != 'true'
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          [ -x .github/scripts/agent-gates.sh ] && .github/scripts/agent-gates.sh || true
+
+      - name: Commit and push
+        if: steps.round.outputs.stuck != 'true'
+        env:
+          ROUND: ${{ steps.round.outputs.round }}
+          REASON: ${{ inputs.reason }}
+          ISSUE: ${{ inputs.issue }}
+        run: |
+          set -euo pipefail
+          # Scratch identity: these commits are squashed away at merge, and GitHub attributes
+          # the squash to the pull request's author. CUSTOMISE if you want a different name in
+          # the branch history.
+          git config user.name  'agent'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo "::warning::Round ${ROUND} changed nothing. Leaving the branch as it is; the next failure will escalate the round count."
+            exit 0
+          fi
+          # Scratch history: the pull request squash-merges under its own title and body, so
+          # none of these subjects reach main.
+          git commit -m "fix round ${ROUND} (${REASON})"
+
+          # Rebase onto current main before pushing, for the reason spelled out in
+          # agent-implement.yml: a branch whose workflow files differ from the default branch
+          # cannot be pushed by a token without `workflow` scope, and main moving during a run
+          # is enough to cause that. Rebasing also keeps the round counter honest, since it
+          # counts commits in origin/main..HEAD.
+          git fetch --quiet origin main
+          git rebase origin/main
+          git push --force-with-lease origin "HEAD:agent/issue-${ISSUE}"

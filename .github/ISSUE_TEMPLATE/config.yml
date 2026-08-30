@@ -1,0 +1,3 @@
+# Blank issues stay on: the templates here exist to offer the `no-agent` opt-out, not to make
+# anyone fill in a form before reporting something.
+blank_issues_enabled: true

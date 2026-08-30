@@ -1,0 +1,28 @@
+name: Project setup
+description: >
+  Whatever this repository needs on a runner before an agent can build or test it — a language
+  toolchain, an SDK, a package manager, caches. The implement and fix stages call this action
+  by this exact path, so it has to exist and it has to be named `project-setup`.
+
+  Here that is CPython plus an editable install with the test extras, matching what
+  "Lint, tests, coverage" does. Agents only ever run on ubuntu-latest, so this installs into the
+  runner's own interpreter rather than a venv — the tools-invocation tests shell out to the
+  console scripts by bare name, and pip's script directory is already on PATH there.
+
+runs:
+  using: composite
+  steps:
+    # 3.10 is the floor the matrix supports. The agent runs the gates on one version only; a
+    # break that is specific to a newer Python is CI's job to find, and the fix loop reads it
+    # out of those logs.
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+
+    - name: Install the package and its test dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install flake8 pytest pytest-cov
+        python -m pip install -e '.[test]'

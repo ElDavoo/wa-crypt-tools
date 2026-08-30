@@ -1,0 +1,73 @@
+name: Record an agent stall
+description: >
+  Turn a Claude run that did not finish into an explicit, visible state: the `agent:stalled`
+  label plus a comment carrying a machine-readable marker naming the run. agent-retry.yml reads
+  that marker to know what to re-run.
+
+  This exists because the alternative is silence. A stage that dies before it pushes emits no
+  event, and this pipeline advances on events — so the branch simply stops, with the round
+  counter untouched (it counts pushes, so a run that never pushed spends nothing) and therefore
+  no path to `agent:stuck` either. Nothing is broken and nothing is happening, which is the
+  worst of the states a pipeline can be in.
+
+inputs:
+  issue:
+    description: Issue number to label and comment on
+    required: true
+  pr:
+    description: Pull request number, when the stall happened on a branch
+    required: false
+    default: ''
+  stage:
+    description: Which stage stalled, for the comment
+    required: true
+  token:
+    description: Token with issues:write and pull-requests:write
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Record the stall
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        ISSUE: ${{ inputs.issue }}
+        PR: ${{ inputs.pr }}
+        STAGE: ${{ inputs.stage }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        RUN_ID: ${{ github.run_id }}
+      run: |
+        set -euo pipefail
+
+        # The marker is the contract with agent-retry.yml: it names the run to re-run, which is
+        # the only handle that works for every stage. A plan stage runs against main with no
+        # branch to find it by, and the fix stage is a reusable workflow that cannot be
+        # dispatched directly -- re-running the run that stalled sidesteps both.
+        #
+        # It also names the stage, and that is not decoration. Every stage comments here, on the
+        # issue, because the issue is the one place all of them can reach -- so the markers of a
+        # long-lived issue are a mixed pile. Counting the pile is counting how eventful the issue
+        # was, not how stuck any one stage is: one plan stall, one implement stall and one review
+        # stall would exhaust a three-attempt budget with nothing having stalled twice. The stage
+        # is what lets the sweeper count only the stalls that are actually repeating.
+        {
+          printf '### the %s stage stopped before it finished\n\n' "$STAGE"
+          printf 'Claude did not complete this run. Nothing was pushed, so the branch is '
+          printf 'exactly as it was; no fix round was spent.\n\n'
+          printf 'agent-retry.yml sweeps every five hours and will re-run this up to three '
+          printf 'times. That recovers a usage limit, which resets on its own, and nothing '
+          printf 'else: a permission denial or a bad prompt fails identically every time and '
+          printf 'costs fifteen hours before it says so. If the run below ends in a '
+          printf '`permission_denials_count` above zero, or in an `is_error` with the stage '
+          printf 'having spent turns, read it now rather than waiting for the sweep.\n\n'
+          printf 'Run: %s\n\n' "$RUN_URL"
+          printf '<!-- agent-stall run=%s stage=%s -->\n' "$RUN_ID" "$STAGE"
+        } > /tmp/stall.md
+
+        gh issue comment "$ISSUE" --body-file /tmp/stall.md
+        gh issue edit "$ISSUE" --add-label 'agent:stalled'
+
+        if [ -n "$PR" ]; then
+          gh pr edit "$PR" --add-label 'agent:stalled'
+        fi
