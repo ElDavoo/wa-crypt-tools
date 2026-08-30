@@ -21,8 +21,10 @@ on:
     # workflow file as it was, so it cannot pick up a fix to this file.
     types: [opened, synchronize, reopened]
 
-permissions:
-  contents: read
+# Granted per job rather than here: a workflow-level block hands the same token to the gate
+# as to the stage that runs the agent, and the gate exists precisely to decide whether the
+# agent should run at all.
+permissions: {}
 
 concurrency:
   group: agent-review-${{ github.event.pull_request.number }}

@@ -122,7 +122,9 @@ in `agent-plan.yml`, `agent-implement.yml` and `agent-review.yml`.
 matched before expressions are evaluated, so renaming that workflow without editing this one
 disables the whole red-CI leg silently.
 
-The workflows are linted by CI's own `workflows` job (actionlint + zizmor). Two zizmor findings
+The workflows carry `permissions: {}` at the top and grant each job only what it needs, which is
+upstream's model — the approval gate must not hold the token the stage it gates does. They are
+linted by CI's own `workflows` job (actionlint + zizmor). Two zizmor findings
 are ignored in place with the reason at the point of use, and both should stay: the implement and
 fix checkouts must persist the push token because that is what they push with, and the CI-failure
 stage really is a `workflow_run`. Everything else passes as written, so a new finding is a real

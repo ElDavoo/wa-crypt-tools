@@ -32,9 +32,10 @@ on:
         required: false
         type: string
 
-# Write lives on the implement job alone; triage and the approval gate run on read.
-permissions:
-  contents: read
+# Granted per job rather than here: a workflow-level block hands the same token to the gate
+# as to the stage that runs the agent, and the gate exists precisely to decide whether the
+# agent should run at all.
+permissions: {}
 
 concurrency:
   group: agent-issue-${{ inputs.issue }}
@@ -44,6 +45,8 @@ jobs:
   # Same predicate as the plan stage: could the issue's author have pushed this change
   # themselves? See the comment on agent-plan.yml's triage job.
   triage:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     outputs:
       trusted: ${{ steps.who.outputs.trusted }}
@@ -65,6 +68,8 @@ jobs:
           echo "trusted=${trusted}" >> "$GITHUB_OUTPUT"
 
   gate:
+    permissions:
+      contents: read
     needs: [triage]
     if: needs.triage.outputs.trusted != 'true'
     runs-on: ubuntu-latest

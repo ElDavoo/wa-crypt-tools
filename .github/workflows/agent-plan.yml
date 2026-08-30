@@ -18,10 +18,10 @@ on:
   issues:
     types: [opened]
 
-# Only the job that actually runs the agent gets more than read. The triage and gate jobs see
-# the same issue and hold nothing that could rewrite it.
-permissions:
-  contents: read
+# Granted per job rather than here: a workflow-level block hands the same token to the gate
+# as to the stage that runs the agent, and the gate exists precisely to decide whether the
+# agent should run at all.
+permissions: {}
 
 # Per issue, never cancelling. Two events for one issue should serialise rather than race, and
 # a cancelled stage that had already edited the body would leave a half-planned issue behind.
@@ -277,6 +277,8 @@ jobs:
   #
   # It is a job rather than a condition because it costs an API call, and `if:` cannot make one.
   triage:
+    permissions:
+      contents: read
     needs: [screen]
     # Everything downstream hangs off this job, so a screened-out issue stops the whole chain
     # here: gate needs triage, and plan needs both.
@@ -307,6 +309,8 @@ jobs:
   # out and no issue text has reached a prompt. That ordering is the entire security argument
   # for the pipeline; see README.md.
   gate:
+    permissions:
+      contents: read
     needs: [triage]
     if: needs.triage.outputs.trusted != 'true'
     runs-on: ubuntu-latest

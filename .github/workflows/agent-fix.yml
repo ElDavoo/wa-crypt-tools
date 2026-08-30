@@ -41,18 +41,17 @@ on:
       AGENT_PUSH_TOKEN:
         required: true
 
-permissions:
-  contents: read
-  # The action fetches a GitHub OIDC token on every run, including the OAuth path, and
-  # fails after three retries without this. claude.yml has carried it since day one.
-  id-token: write
-  issues: write
-  pull-requests: write
+# Granted per job rather than here: a workflow-level block hands the same token to the gate
+# as to the stage that runs the agent, and the gate exists precisely to decide whether the
+# agent should run at all.
+permissions: {}
 
 jobs:
   # Same predicate as the plan stage: could the issue's author have pushed this change
   # themselves? See the comment on agent-plan.yml's triage job.
   triage:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     outputs:
       trusted: ${{ steps.who.outputs.trusted }}
@@ -74,6 +73,8 @@ jobs:
           echo "trusted=${trusted}" >> "$GITHUB_OUTPUT"
 
   gate:
+    permissions:
+      contents: read
     needs: [triage]
     if: needs.triage.outputs.trusted != 'true'
     runs-on: ubuntu-latest
@@ -86,6 +87,13 @@ jobs:
         run: echo "Approved by $APPROVER for PR $PR"
 
   fix:
+    permissions:
+      contents: read
+      # The action fetches a GitHub OIDC token on every run, including the OAuth path, and
+      # fails after three retries without this. claude.yml has carried it since day one.
+      id-token: write
+      issues: write
+      pull-requests: write
     needs: [gate]
     if: always() && needs.gate.result != 'failure' && needs.gate.result != 'cancelled'
     runs-on: ubuntu-latest
