@@ -142,7 +142,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE: ${{ inputs.issue }}
         run: |
-          # shellcheck disable=SC2016  # $owner/$name are GraphQL's variables, not the shell's
+          # $owner and $name below belong to GraphQL and to jq, not to the shell: expanding
+          # them here is the bug, not the fix. A trailing comment on the directive line makes
+          # shellcheck ignore the whole directive, so the reason lives above it.
+          # shellcheck disable=SC2016
           set -euo pipefail
 
           # Body and provenance in one query, so the text checked is the text used. Asking for

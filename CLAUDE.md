@@ -109,3 +109,33 @@ when touching them (`tests/res/` has a fixture backup in each format, all decryp
 - CI (`.github/workflows/lint-test-coverage.yml`) runs the matrix Python 3.10–3.14 on Ubuntu and
   Windows. On Windows, file handles must be closed before deletion — `KeyFactory.from_file` opens
   the keyfile in a `with` block for exactly this reason.
+
+## The agent pipeline
+
+`.github/workflows/agent-*.yml` turn an issue into a merged pull request unattended: plan,
+implement, review, fix against CI, squash merge. It is a copy of `ElDavoo/agent-pipeline`, whose
+README is the reference for how the stages, the trust gate and the labels work. Three files here
+are the project-specific parts of it — `.github/actions/project-setup/` (toolchain),
+`.github/scripts/agent-gates.sh` (the checks an agent must pass before pushing) and the prompts
+in `agent-plan.yml`, `agent-implement.yml` and `agent-review.yml`.
+
+`agent-fix-ci.yml` names `"Lint, tests, coverage"` as a literal. `workflow_run.workflows` is
+matched before expressions are evaluated, so renaming that workflow without editing this one
+disables the whole red-CI leg silently.
+
+The workflows are linted by CI's own `workflows` job (actionlint + zizmor). Two zizmor findings
+are ignored in place with the reason at the point of use, and both should stay: the implement and
+fix checkouts must persist the push token because that is what they push with, and the CI-failure
+stage really is a `workflow_run`. Everything else passes as written, so a new finding is a real
+one. Note that actionlint only runs shellcheck when shellcheck is on `PATH` — a local run without
+it is quieter than CI.
+
+`agent-plan.yml` opens with a `screen` job, which is local and not part of the upstream template.
+Most issues filed here are the "Can't decrypt" template submitted with every placeholder line
+untouched, titled with a phone number or a first name. `.github/scripts/screen_issue.py`
+subtracts the issue templates from the body and measures what is left; an empty one is closed,
+and a pasted `whatsapp-consumer://` pairing link is closed and locked, because it is a live
+credential for the reporter's own account. Only what survives that costs a model call, and only
+`spam` from that model closes anything — its `unrelated` verdict labels and stops, because on the
+issues already closed here it called a genuine question about re-encrypting to crypt14
+unrelated.

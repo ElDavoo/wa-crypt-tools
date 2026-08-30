@@ -128,13 +128,19 @@ jobs:
             catch a change breaking, and it is the standard you are holding this to.
 
             Block on, and only on:
-            - a correctness bug, including a broken invariant CLAUDE.md names (SessionRepository's
-              idempotence and its no-counting-across-a-boot rule; the widget composed-tree shape;
-              device-identity keying on the last two octets; day bucketing by ZoneId);
-            - a gate weakened rather than satisfied — a lowered coverage floor, a new lint.xml
-              suppression, a lint baseline, a deleted or defanged assertion;
-            - a user-visible string added to `values/` but not to every translated locale;
-            - a schema change without a migration;
+            - a correctness bug, including a broken invariant CLAUDE.md names: version dispatch
+              living anywhere but the two factories; the header md5 accumulated into
+              `db.file_hash`, which is what lets a re-encryption reproduce the original file
+              byte for byte; `Key15`'s HMAC derivation agreeing with
+              `utils/WA_HMACSHA256_Loop.java`; `KeyFactory.from_file` closing the key file
+              before it returns, which is the only reason the suite passes on Windows;
+            - a change to the `Database`/`Key` base classes or to `lib/utils.py` that is
+              exercised against only one of crypt12, crypt14 and crypt15 — `tests/res/` has a
+              fixture in all three, all decrypting to the same `msgstore.db`;
+            - regenerated protobuf that skipped `fix_imports.py`, or generated code whose
+              protoc version no longer matches the pinned `protobuf` runtime;
+            - a gate weakened rather than satisfied — a deleted or defanged assertion, a test
+              marked skipped, a lint selection narrowed;
             - work that does not actually implement the issue, or that quietly does more than
               the issue asked;
             - a missing test for behaviour the repository would normally pin.
