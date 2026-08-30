@@ -281,7 +281,9 @@ jobs:
         continue-on-error: true
         run: |
           set -uo pipefail
-          [ -x .github/scripts/agent-gates.sh ] && .github/scripts/agent-gates.sh || true
+          if [ -x .github/scripts/agent-gates.sh ]; then
+            .github/scripts/agent-gates.sh || true
+          fi
 
       - name: Commit and push
         if: steps.round.outputs.stuck != 'true'

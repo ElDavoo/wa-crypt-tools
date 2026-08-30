@@ -142,6 +142,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE: ${{ inputs.issue }}
         run: |
+          # shellcheck disable=SC2016  # $owner/$name are GraphQL's variables, not the shell's
           set -euo pipefail
 
           # Body and provenance in one query, so the text checked is the text used. Asking for
