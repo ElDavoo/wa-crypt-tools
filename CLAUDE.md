@@ -92,8 +92,7 @@ header; `lib/constants.py: C` holds the defaults used when no reference is given
 **Entry points** (`src/wa_crypt_tools/wa*.py`) are thin argparse wrappers over the factories —
 one per console script in `pyproject.toml`. Each installs `lib/logformat.py: CustomFormatter` on
 both the root logger and the `wa_crypt_tools.lib` logger, so library-level `log.error(...)` is
-what users actually see; `-v` switches to DEBUG. Modules use `log = logging.getLogger(__name__)`
-(a few older ones use `l`).
+what users actually see; `-v` switches to DEBUG. Modules use `log = logging.getLogger(__name__)`.
 
 Version-specific behavior belongs in a `DatabaseXX`/`KeyXX` class plus a factory branch; changes
 to the base classes or to `lib/utils.py` affect all three formats, so exercise crypt12, 14 and 15
