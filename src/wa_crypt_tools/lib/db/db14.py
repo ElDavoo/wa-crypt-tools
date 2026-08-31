@@ -4,6 +4,7 @@ from os import urandom
 
 from Cryptodome.Cipher import AES
 
+from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.lib.db.db import Database
 from wa_crypt_tools.lib.errors import DecryptionError, IntegrityError
 from wa_crypt_tools.lib.key.key import Key
@@ -33,10 +34,17 @@ class Database14(Database):
         from wa_crypt_tools.proto import key_type_pb2 as key_type
 
         cipher = C14_cipher.C14_cipher()
+        if self.prefix is not None:
+            # Start from the key data the reference carried, for the same reason the header
+            # below starts from the reference's own: this message has a field nothing else
+            # can supply. key_version is the header's, in ASCII, and the key file's raw byte
+            # is a different encoding of it -- so overwriting it with a constant silently
+            # rewrote the header of any backup that did not happen to say '2'.
+            cipher.CopyFrom(self.prefix.wa_provided_key_data)
+        else:
+            cipher.key_version = C.DEFAULT_C14_KEY_VERSION
         # TODO which ones take priority? Key or self values?
         cipher.backup_cipher_header = key.get_cipher_version()
-        #FIXME
-        cipher.key_version = "2".encode()
         cipher.server_salt = key.get_serversalt()
         cipher.google_id_salt = key.get_googleid()
         cipher.encryption_iv = self.iv

@@ -187,9 +187,27 @@ either. Note `FieldDescriptor.label` is gone in protobuf 7 -- use `is_repeated`.
 start from that prefix rather than an empty one. Real backups carry an unknown varint field 6
 this schema has no name for, and protobuf preserves it across a parse and a `CopyFrom` -- so
 carrying the header through keeps it, where rebuilding from `Props` alone dropped 2 bytes and
-made byte-identical output impossible. Only msgstore backups have the feature-table flag, so
-writing it unconditionally (as `Database15` did) made every other backup a byte too long. Both
-fall back to the old behaviour when there is no reference to copy.
+made byte-identical output impossible. In crypt15 only msgstore backups have the feature-table
+flag, so writing it unconditionally (as `Database15` did) made every other backup a byte too
+long. Both fall back to the old behaviour when there is no reference to copy. Note the flag is
+crypt15-specific: on a 2.26 crypt14 device *every* backup carries the `0x01` byte, msgstore or
+not, which is why the rule has to be "copy what the source had" rather than "write it for
+msgstore". Also, `dbfactory.py` and `utils.py: header_info` print the same "No feature table
+found" sentence for two different things -- the missing `0x01` byte and a header with no
+`*_migration_finished` flags -- so `wainfo` will say it about a file that does have the byte.
+
+**crypt14 has a fourth thing that must hold: the header's own `key_version`.** `C14_cipher`
+carries a key version that nothing else can supply -- the key file stores the same number as a
+raw byte (`b'\x02'`) while the header spells it in ASCII (`b'2'`), so neither is derivable from
+the other. `Database14.encrypt` used to write a hardcoded `b'2'`, and because it built the
+submessage from scratch and assigned it with `wa_provided_key_data.CopyFrom(cipher)`, that
+constant overwrote the reference's value *after* the outer `CopyFrom` meant to preserve it. It
+now starts the submessage from `self.prefix.wa_provided_key_data` and only falls back to
+`C.DEFAULT_C14_KEY_VERSION` when there is no reference, which also keeps any unmodelled field
+nested in there. Every backup off a 2.26 device says `'2'`, so this was invisible until a
+header saying otherwise was built on purpose -- it re-encrypted to a file differing at byte 13
+while reporting success. `key_type_deprecated` is still set unconditionally, which is correct:
+a crypt14 key is WA-provided by definition.
 
 An incremental backup (`msgstore-increment-*.crypt15`) is a third shape: its plaintext is a
 ZIP of JSON changesets, but a *compressed* one, so the ZIP header only appears after

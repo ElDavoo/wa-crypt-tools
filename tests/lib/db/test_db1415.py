@@ -83,3 +83,37 @@ class TestStr:
         # to print one died with an AttributeError.
         iv = bytes(range(16))
         assert str(Database14(iv=iv)) == "Database14(iv: {})".format(iv.hex())
+
+
+class TestCrypt14KeyVersionIsCarriedThrough:
+    """
+    The crypt14 header carries its own key_version, and it is not derivable from anything
+    else: the key file stores the version as a raw byte (b'\\x02') while the header spells it
+    in ASCII (b'2'), so neither can be computed from the other. Database14.encrypt used to
+    write a hardcoded b'2' -- after the CopyFrom that exists precisely to preserve the parsed
+    header -- which silently rewrote the field on any backup that said anything else.
+    """
+
+    @staticmethod
+    def written_header(db: Database14, key) -> "object":
+        """The header Database14.encrypt actually wrote, parsed back out."""
+        from wa_crypt_tools.lib.props import Props
+        data = db.encrypt(key, Props(wa_version="2.22.5.13", jid="67", features=None), b'payload')
+        return DatabaseFactory.from_file(as_stream(data)).prefix
+
+    def test_a_reference_key_version_survives_re_encryption(self):
+        key = KeyFactory.new("tests/res/key")
+        reference = DatabaseFactory.from_file(as_stream(read("tests/res/msgstore.db.crypt14")))
+        reference.prefix.wa_provided_key_data.key_version = b'1'
+
+        db = Database14(iv=bytes(range(16)))
+        db.prefix = reference.prefix
+        db.feature_table = reference.feature_table
+
+        assert self.written_header(db, key).wa_provided_key_data.key_version == b'1'
+
+    def test_a_backup_written_without_a_reference_still_says_2(self):
+        # Nothing to copy from, so the default stands -- which is what every crypt14 fixture
+        # in tests/res and every backup off a current device carries.
+        header = self.written_header(Database14(iv=bytes(range(16))), KeyFactory.new("tests/res/key"))
+        assert header.wa_provided_key_data.key_version == b'2'
