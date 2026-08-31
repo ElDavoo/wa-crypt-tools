@@ -124,6 +124,27 @@ tests/res/test9.zip <out>` with the last 16 bytes then dropped. Note `--no-compr
 *raw* ZIP, so it exercises the multi-file reader but not the guessing logic, which sees a real
 multi-file backup as a compressed one (see below).
 
+**The `*-2.26.*` fixtures are real backups**, off a WhatsApp 2.26.34.7 device, and are what
+`tests/lib/db/test_current_format.py` runs on: `msgstore-2.26.db.crypt15` (a current msgstore),
+`wa-2.26.db.crypt15` (a backup that is not a msgstore, so no `0x01` feature-table byte, and it
+carries `backup_encrypted_hash`), and `msgstore-increment-2.26.crypt15` (an incremental backup,
+whose payload is a compressed ZIP of JSON changesets). They exist because reconstructions kept
+missing what real backups do -- `key_type_new` went unnoticed in every 2.26 backup until a
+byte-for-byte comparison went looking for it, and the older fixtures cannot catch its like.
+
+Each keeps its original header byte for byte apart from what belongs to its owner, and the
+payload is the real database with the schema kept and every row deleted. To rebuild them from a
+device: decrypt with the real key; for a SQLite payload `DELETE FROM` every table in
+`sqlite_master` then `VACUUM INTO` a new file; for the increment, rewrite each ZIP entry keeping
+its name and top-level JSON keys with empty values, and empty `messages.bin`; then parse the
+original header, set `jid_suffix` to `"00"`, blank `device_model`/`lid_suffix`/`display_suffix`,
+replace `backup_encrypted_hash_salt`/`backup_encrypted_hash` with `bytes(range(16))` and
+`bytes(range(32))` so the fields stay present at the right length, and re-encrypt with
+`Database15(iv=bytes(range(16)))` carrying `prefix` = that header and `feature_table` = whether
+the source had the `0x01` byte, under `tests/res/encrypted_backup.key` at zlib level 9.
+`test_nothing_in_these_headers_is_unknown` is the tripwire: refresh a fixture from a newer
+WhatsApp and it fails until the schema catches up.
+
 **Compression level tracks WhatsApp's own and is load-bearing in two places.** WhatsApp
 compressed backups at zlib level 1 when this project was written and compresses at level 9
 now. Two things had been written against level 1 and broke silently when it moved:
