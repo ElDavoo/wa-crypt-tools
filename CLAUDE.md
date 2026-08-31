@@ -145,10 +145,20 @@ are intended: `wadecrypt` and `wainfo` handle every one of those files, and broa
 check would cost the search its only defence against false offsets.
 
 `key_type_new` (field 6) is why re-encryption had to start from the parsed header: every
-crypt15 backup from 2.26 sets it to `E2EE_ENCRYPTION_KEY`, and nothing here writes it. It is a
-modelled field now rather than an unknown one, but `waencrypt` still only ever reproduces what a
-`--reference` carried -- without a reference the output has no field 6, which the app would read
-as the default `WA_PROVIDED`. Whether that matters for a restore has not been established.
+crypt15 backup from 2.26 sets it to `E2EE_ENCRYPTION_KEY`. It is written by default now --
+`C.DEFAULT_KEY_TYPE`, through `Database15(key_type=...)` -- but only when there is no `prefix` to
+rebuild on, because a reference from before the field existed must not grow one. `key_type=None`
+asks for that older shape, which is what `tests/test_encrypt.py` does to reproduce the 2022
+fixtures. The rest of the defaults in `constants.py` are that same 2.26 backup's, so with the
+right `--iv` and `--jid` a reference-less `waencrypt` writes the phone's exact header bytes;
+`tests/test_encrypt.py` therefore has to pass `backup_version=0` explicitly, since the default
+is 1 now.
+
+`DatabaseFactory` warns about any header field the schema cannot name
+(`lib/utils.py: unknown_header_fields`, which walks nested messages too). That is the tripwire
+this did not have: protobuf keeps unknown fields and hands them back on serialisation, so
+`key_type_new` sat in every 2.26 backup without breaking anything and without being noticed
+either. Note `FieldDescriptor.label` is gone in protobuf 7 -- use `is_repeated`.
 
 **A re-encryption is built on the parsed header, not from scratch.** `DatabaseFactory` keeps the
 `BackupPrefix` it parsed on `db.prefix` and whether the `0x01` feature-table flag was there on
