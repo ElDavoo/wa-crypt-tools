@@ -108,6 +108,8 @@ class DatabaseFactory:
                 db = Database15(props=props) if is_crypt15 else Database14(props=props)
                 db.iv = iv
                 db.file_hash = file_hash
+                db.prefix = header
+                db.feature_table = bool(msgstore_features_flag)
                 if len(iv) != 16:
                     raise IntegrityError("IV is not 16 bytes long but is {} bytes long"
                                          .format(len(iv)), data=db)

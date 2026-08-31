@@ -8,6 +8,7 @@ across platforms. The one byte-for-byte check is guarded on that.
 
 import os.path
 import zlib
+from hashlib import md5
 
 import pytest
 
@@ -76,6 +77,40 @@ class TestRoundTrips:
         assert "Features: [5, 7, 13]" in out
 
 
+def with_unknown_header_field(source: str, dest: str, field: bytes = b'\x30\x03'):
+    """
+    Copies a backup, adding a protobuf field the schema does not model to its header.
+
+    Real 2.26 backups carry exactly this: field 6, varint, value 3. The header is rebuilt
+    around it -- the size byte grows, and the trailing md5 covers the header, so it has to be
+    recomputed -- but the ciphertext and its authentication tag are untouched.
+    """
+    raw = open(source, 'rb').read()
+    size = raw[0]
+    offset = 2 if raw[1] == 1 else 1
+    proto = raw[offset:offset + size] + field
+    body = raw[offset + size:-16]  # ciphertext and tag, without the md5
+    header = bytes([len(proto)]) + raw[1:offset] + proto
+    with open(dest, 'wb') as f:
+        f.write(header + body + md5(header + body).digest())
+
+
+def without_feature_table_flag(source: str, dest: str):
+    """
+    Copies a backup, dropping the 0x01 byte that flags the feature table.
+
+    Every backup that is not a msgstore lacks it -- wa.db, chatsettingsbackup and the rest --
+    so reproducing one means not writing a byte the original never had.
+    """
+    raw = open(source, 'rb').read()
+    size = raw[0]
+    assert raw[1] == 1, "source already has no feature table flag"
+    body = raw[2 + size:-16]
+    header = bytes([size]) + raw[2:2 + size]
+    with open(dest, 'wb') as f:
+        f.write(header + body + md5(header + body).digest())
+
+
 class TestReference:
     """--reference copies the props off a real backup, which is the documented workflow."""
 
@@ -94,11 +129,31 @@ class TestReference:
         assert ret == 0, out
         assert cmp_files(ROUNDTRIP, PLAIN)
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "Props(v_features=...) never sets max_feature, so get_features() -- which "
-        "Database14.encrypt calls and Database15.encrypt does not -- raises AttributeError. "
-        "Remove this marker when props.py is fixed."))
+    def test_an_unknown_header_field_is_carried_through(self, tmp_path):
+        # WhatsApp puts a field in the header that this schema does not model, and rebuilding
+        # the header from Props alone drops it. Those two bytes are the entire difference
+        # between a re-encryption that merely works and one that reproduces the original.
+        ref = str(tmp_path / "unknown-field.crypt15")
+        with_unknown_header_field("tests/res/msgstore.db.crypt15", ref)
+        out, ret = Propen(["waencrypt", "--reference", ref, KEY15, PLAIN, OUT])
+        assert ret == 0, out
+        if CLASSIC_ZLIB:
+            assert cmp_files(OUT, ref)
+
+    def test_a_reference_without_a_feature_table_stays_without_one(self, tmp_path):
+        # Database15 wrote the 0x01 flag unconditionally, so every non-msgstore backup came
+        # back one byte longer than it went in.
+        ref = str(tmp_path / "no-feature-table.crypt15")
+        without_feature_table_flag("tests/res/msgstore.db.crypt15", ref)
+        out, ret = Propen(["waencrypt", "--reference", ref, KEY15, PLAIN, OUT])
+        assert ret == 0, out
+        if CLASSIC_ZLIB:
+            assert cmp_files(OUT, ref)
+
     def test_a_crypt14_reference_works_too(self):
+        # This used to raise AttributeError out of Props.max_feature, because encrypt() asked
+        # the props whether to write the feature table flag and props built from a reference
+        # never set it. It reads the flag off the reference now and never asks.
         out, ret = Propen("waencrypt --type 14 --reference tests/res/msgstore.db.crypt14 "
                           "{} {} {}".format(KEY14, PLAIN, OUT))
         assert ret == 0, out

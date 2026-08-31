@@ -130,6 +130,16 @@ does not match this backup" -- and files below `HEADER_SIZE` are refused as too 
 are intended: `wadecrypt` and `wainfo` handle every one of those files, and broadening the
 check would cost the search its only defence against false offsets.
 
+**A re-encryption is built on the parsed header, not from scratch.** `DatabaseFactory` keeps the
+`BackupPrefix` it parsed on `db.prefix` and whether the `0x01` feature-table flag was there on
+`db.feature_table`; `waencrypt` hands both to the database it builds, and `Database14/15.encrypt`
+start from that prefix rather than an empty one. Real backups carry an unknown varint field 6
+this schema has no name for, and protobuf preserves it across a parse and a `CopyFrom` -- so
+carrying the header through keeps it, where rebuilding from `Props` alone dropped 2 bytes and
+made byte-identical output impossible. Only msgstore backups have the feature-table flag, so
+writing it unconditionally (as `Database15` did) made every other backup a byte too long. Both
+fall back to the old behaviour when there is no reference to copy.
+
 An incremental backup (`msgstore-increment-*.crypt15`) is a third shape: its plaintext is a
 ZIP of JSON changesets, but a *compressed* one, so the ZIP header only appears after
 decompression. `lib/utils.py: test_decompression` checks for it both before and after for
@@ -149,10 +159,13 @@ that reason -- before catches `stickers.backup.crypt15`, after catches the real 
   `coverage.process_startup()`. All five tools have invocation tests; what is left uncovered is
   mostly the pycryptodome/pycryptodomex import fallback in `wadecrypt.py` and `waguess.py`, which
   cannot run in an environment where the suite runs at all.
-- `waencrypt` is beta. `--type 14 --reference` is a known failure, marked `xfail(strict=True)` in
-  `tests/tools-invocation/test_waencrypt.py`: `Props(v_features=...)` never sets `max_feature`, so
-  `get_features()` -- which only `Database14.encrypt` calls -- raises `AttributeError`. Drop the
-  marker when `props.py` is fixed. `--multi-file` and `--noparse` are declared and never read.
+- `waencrypt` is beta, but `--reference` reproduces a real backup byte for byte -- verified
+  against 13 backups off a 2.26 device, from a 239-byte `avatar-password.bkup` to a 55 MB
+  msgstore, covering SQLite, ZIP, JSON and WebP payloads. Three things have to hold at once for
+  that, and each was separately broken: the zlib level has to match (see above), the header
+  protobuf has to keep the fields this schema does not model, and the `0x01` feature-table flag
+  has to be written only when the original had it. `--multi-file` and `--noparse` are declared
+  and never read.
   Its output positional -- like `wadecrypt`'s -- is deliberately a plain `str` and not an
   `argparse.FileType('wb')`: that type opens the file during parsing, so it was emptied before
   any check had run. The existence guard at the top of `encrypt()`/`decrypt()` only works while

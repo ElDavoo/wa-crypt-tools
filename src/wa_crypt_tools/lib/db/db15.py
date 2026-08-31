@@ -78,18 +78,28 @@ class Database15(Database):
         cipher.IV = self.iv
         from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
         from wa_crypt_tools.proto import key_type_pb2 as key_type
-        prefix = prefix.BackupPrefix()
-        prefix.key_type = key_type.Key_Type.HSM_CONTROLLED
-        prefix.c15_iv.CopyFrom(cipher)
+        header = prefix.BackupPrefix()
+        if self.prefix is not None:
+            # Start from the header this database was parsed from, so that whatever WhatsApp
+            # put there and this schema does not model comes along. Current backups carry a
+            # field we have no name for, and losing it is the whole difference between a
+            # re-encryption that works and one that reproduces the original byte for byte.
+            header.CopyFrom(self.prefix)
+        header.key_type = key_type.Key_Type.HSM_CONTROLLED
+        header.c15_iv.CopyFrom(cipher)
 
-        prefix.info.CopyFrom(props.get_proto())
-        prefix = prefix.SerializeToString()
+        header.info.CopyFrom(props.get_proto())
+        prefix = header.SerializeToString()
         out = b''
         file_hash = md5()
         out += len(prefix).to_bytes(1, byteorder='big')
         file_hash.update(out)
-        out += b'\x01'
-        file_hash.update(b'\x01')
+        # Only msgstore backups carry the feature table flag. When this database came from a
+        # file we know whether that one had it; otherwise keep writing it, as this has always
+        # done, since a bare Database15 is only ever built for a msgstore.
+        if self.feature_table is None or self.feature_table:
+            out += b'\x01'
+            file_hash.update(b'\x01')
         out += prefix
         file_hash.update(prefix)
         cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)

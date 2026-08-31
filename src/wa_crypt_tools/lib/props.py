@@ -9,6 +9,14 @@ class Props:
                  backup_version: int = C.DEFAULT_BACKUP_VERSION):
         if v_features is not None:
             self.props = v_features
+            # max_feature is not part of the protobuf -- it is only how far get_features()
+            # counts -- so a props built from a parsed header has to get one from somewhere
+            # or every call raises AttributeError. The schema itself is the answer, and
+            # reading it here means this keeps up when the proto grows a feature.
+            self.max_feature = max(
+                (int(name[2:]) for name in v_features.DESCRIPTOR.fields_by_name
+                 if name.startswith("f_") and name[2:].isdigit()),
+                default=C.DEFAULT_MAX_FEATURE)
             return
         self.props = backup_expiry.BackupExpiry()
         self.props.app_version = wa_version

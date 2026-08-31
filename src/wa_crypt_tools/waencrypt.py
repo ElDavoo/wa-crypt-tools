@@ -124,6 +124,8 @@ def encrypt(args):
     # If specified, use the IV from the command line
     iv = None
     props = None
+    prefix = None
+    feature_table = None
     if not args.reference:
         if args.iv:
             iv = bytes.fromhex(args.iv)
@@ -140,6 +142,10 @@ def encrypt(args):
             reference = e.data
         iv: bytes = reference.get_iv()
         props = reference.props
+        # The reference's own header, carried through to the output: it may hold fields this
+        # schema does not model, and reproducing the reference means keeping them.
+        prefix = reference.prefix
+        feature_table = reference.feature_table
         if args.compression_level is None:
             args.compression_level = compression_level_of(key, reference, args.reference)
     if args.compression_level is None:
@@ -151,6 +157,8 @@ def encrypt(args):
         db = Database14(iv=iv)
     else:
         db = Database12(key=key, iv=iv)
+    db.prefix = prefix
+    db.feature_table = feature_table
     if args.no_compress:
         encrypted = db.encrypt(key, props, data)
     else:

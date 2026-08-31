@@ -49,6 +49,17 @@ class TestProps:
         assert props.get_proto() is parsed
         assert props.get_jid() == "67"
 
+    def test_features_are_readable_off_a_parsed_header_too(self):
+        # Props(v_features=...) is how DatabaseFactory wraps a header it has just parsed.
+        # It never set max_feature, so get_features() -- the only thing that reads it --
+        # raised AttributeError on every props built that way.
+        from wa_crypt_tools.proto import backup_expiry_pb2 as backup_expiry
+        parsed = backup_expiry.BackupExpiry()
+        parsed.f_5 = True
+        parsed.f_13 = True
+        parsed.f_39 = True
+        assert Props(v_features=parsed).get_features() == [5, 13, 39]
+
     def test_wa_version_and_jid_are_kept(self):
         props = Props(wa_version="2.22.5.13", jid="67", features=[5], max_feature=37)
         assert props.get_jid() == "67"
