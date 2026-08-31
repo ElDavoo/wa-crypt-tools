@@ -63,6 +63,42 @@ class TestWaGuess:
         assert written.startswith(original)
 
 
+class TestCompressionLevels:
+    """
+    The search gates on the first two decrypted bytes matching a known zlib header before it
+    spends time on a full test decryption. That list held only 78 01, the header for level 0
+    and 1, which is what WhatsApp compressed with when this was written. It moved to level 9
+    since -- a real 2.26 backup starts 78 da -- and every one of those was rejected outright,
+    reported as "the key does not match this backup" on a key that matched perfectly.
+    """
+
+    ENCRYPTED = "waguess-level-test.crypt15"
+
+    def teardown_method(self):
+        rm_if_found(OUT)
+        rm_if_found(self.ENCRYPTED)
+
+    # 0/1 -> 78 01, 2-5 -> 78 5e, 6 -> 78 9c, 7-9 -> 78 da: every zlib header there is.
+    @pytest.mark.parametrize("level", ["1", "3", "6", "9"])
+    def test_a_backup_at_any_compression_level_is_found(self, level):
+        out, ret = Propen(["waencrypt", "-c", level, KEY15,
+                           "tests/res/msgstore.db", self.ENCRYPTED])
+        assert ret == 0, out
+        out, ret = Propen("waguess {} {} {}".format(KEY15, self.ENCRYPTED, OUT))
+        assert ret == 0, out
+        assert cmp_files(OUT, "tests/res/msgstore.db")
+
+    def test_a_zip_payload_at_the_current_level_is_found(self):
+        # What an incremental backup is: a ZIP, compressed at the level WhatsApp uses now.
+        # It needs the header list and the ZIP-after-decompression check together.
+        out, ret = Propen(["waencrypt", "-c", "9", KEY15,
+                           "tests/res/test9.zip", self.ENCRYPTED])
+        assert ret == 0, out
+        out, ret = Propen("waguess {} {} {}".format(KEY15, self.ENCRYPTED, OUT))
+        assert ret == 0, out
+        assert cmp_files(OUT, "tests/res/test9.zip")
+
+
 class TestWaGuessFailures:
     def teardown_method(self):
         rm_if_found(OUT)

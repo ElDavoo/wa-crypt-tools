@@ -35,6 +35,27 @@ logged its failure and then continued anyway.
   `argparse.FileType('wb')`, which is opened while the arguments are still being parsed:
   pointing either tool at an existing file emptied it before any check had run, and a run
   that then failed -- an unusable key, say -- left nothing behind.
+- **`waguess` works on current backups again.** It gates on the first two decrypted bytes
+  matching a known zlib header before spending time on a full test decryption, and that
+  list held only `78 01`, the header for levels 0 and 1. WhatsApp compressed at level 1 when
+  that was written and compresses at level 9 now, so every current backup was rejected
+  outright and reported as "the key does not match this backup" on a key that matched. All
+  four zlib headers are accepted now.
+- **Incremental and multi-file backups are recognised by the guessing logic.** Their payload
+  is a ZIP that WhatsApp compresses like any other, so the ZIP header only appears after
+  decompression; `test_decompression` looked for it only before, and demanded a SQLite
+  header after. Found against a real incremental backup, which `waguess` failed to decrypt
+  in 23 seconds and now handles in under one.
+- **`waencrypt` takes `-c`/`--compression-level`**, defaulting to 9. The level was hardcoded
+  to 1, again matching the WhatsApp of the time; re-encrypting a real 2.26 msgstore came out
+  3.5% larger than the original at level 1 and within 2 bytes of it at level 9. Level 1
+  stays reachable for reproducing older backups.
+- **`--reference` now supplies the compression level too**, so reproducing a backup no longer
+  means remembering `-c` alongside it. The reference's zlib header names a band of levels and
+  the top of that band is used, which is exact for the only two levels WhatsApp has used. An
+  explicit `-c` still wins, and a reference whose payload is not zlib warns and falls back.
+- `wainfo` printed the crypt15 IV on the same line as the heading that introduces it, unlike
+  the crypt14 branch beside it, so anything reading its output line by line missed the IV.
 
 ## Version 0.0.9
 

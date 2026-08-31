@@ -5,6 +5,8 @@ import zlib
 import logging
 from pathlib import Path
 
+from Cryptodome.Cipher import AES
+
 from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.lib.db.db import Database
 from wa_crypt_tools.lib.db.db12 import Database12
@@ -61,6 +63,16 @@ def parsecmdline() -> argparse.Namespace:
                         help='The backup version to use in the header of the encrypted file. Default: 0')
     parser.add_argument('--no-compress', action='store_true',
                         help='Do not compress the file. This will make the backup not working. Only used in development. Default: false')
+    # This was hardcoded to 1, which is what WhatsApp itself used when it was written.
+    # Current WhatsApp compresses at 9, so that is the default now -- but old backups were
+    # built at 1 and reproducing one has to stay possible, hence the option. The default is
+    # resolved in encrypt(), not here, so that --reference can supply it instead.
+    parser.add_argument('-c', '--compression-level', type=int, choices=range(0, 10),
+                        metavar='[0-9]', default=None,
+                        help='The zlib compression level to use. Lower is faster and bigger. '
+                             'WhatsApp used 1 historically and uses 9 now. '
+                             'Default: the level of --reference, else {}.'
+                             .format(C.DEFAULT_COMPRESSION_LEVEL))
     return parser.parse_args()
 
 
@@ -79,6 +91,26 @@ def main():
     except WaCryptError as e:
         log.critical(str(e))
         exit(1)
+
+
+def compression_level_of(key, reference, stream):
+    """
+    The zlib level the reference was compressed at, or None if it cannot be told.
+
+    The level is part of what --reference reproduces: a backup from the era when WhatsApp
+    compressed at 1 comes back out 3.5% larger at the current default of 9. The factory
+    leaves the stream on the first ciphertext byte, so the level is two bytes away.
+    """
+    head = AES.new(key.get(), AES.MODE_GCM, reference.get_iv()).decrypt(stream.read(2))
+    level = C.ZLIB_HEADER_LEVELS.get(head)
+    if level is None:
+        # A multi-file reference is a ZIP, and --no-compress leaves anything at all there.
+        log.warning("Cannot tell the compression level of the reference: it starts {}, "
+                    "which is not a zlib header. Using {}."
+                    .format(head.hex(), C.DEFAULT_COMPRESSION_LEVEL))
+    else:
+        log.debug("Reference was compressed at level {}".format(level))
+    return level
 
 
 def encrypt(args):
@@ -108,6 +140,10 @@ def encrypt(args):
             reference = e.data
         iv: bytes = reference.get_iv()
         props = reference.props
+        if args.compression_level is None:
+            args.compression_level = compression_level_of(key, reference, args.reference)
+    if args.compression_level is None:
+        args.compression_level = C.DEFAULT_COMPRESSION_LEVEL
     data = args.decrypted.read()
     if args.type == 15:
         db = Database15(iv=iv)
@@ -118,7 +154,7 @@ def encrypt(args):
     if args.no_compress:
         encrypted = db.encrypt(key, props, data)
     else:
-        compressed = zlib.compress(data, 1)
+        compressed = zlib.compress(data, args.compression_level)
         encrypted = db.encrypt(key, props, compressed)
     with open(args.encrypted, 'wb') as f:
         f.write(encrypted)

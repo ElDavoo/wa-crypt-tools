@@ -64,11 +64,15 @@ wadecrypt.py:271        : [I] Done
 usage: waencrypt [-h] [-f] [-y] [-v] [--enable-features [ENABLE_FEATURES ...]] [--max-feature MAX_FEATURE]
                  [--multi-file] [--type {12,14,15}] [--iv IV] [--reference REFERENCE] [--noparse]
                  [--wa-version WA_VERSION] [--jid JID] [--backup-version BACKUP_VERSION] [--no-compress]
-                 [keyfile] [decrypted] [encrypted]
+                 [-c [0-9]] [keyfile] [decrypted] [encrypted]
 ```
 
 `waencrypt` will not write over a file that already exists; pass `-y`/`--yes` if that is what
 you want.
+
+`-c`/`--compression-level` is the zlib level, 9 by default, which is what WhatsApp uses now.
+It compressed at 1 historically. With `--reference` the level is taken from the reference, so
+reproducing an older backup needs nothing extra; pass `-c` to override it.
 
 Encryption is more complex and untested: it is advised to use another encrypted file 
 from the same account, which we will call "reference".  

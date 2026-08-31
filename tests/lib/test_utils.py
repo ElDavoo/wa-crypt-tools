@@ -92,6 +92,13 @@ class TestTestDecompression:
     def test_sqlite_header_is_accepted(self):
         assert decompresses_to_a_database(zlib.compress(SQLITE)) is True
 
+    def test_a_compressed_zip_is_accepted(self):
+        # What a real incremental or multi-file backup actually is: a ZIP that WhatsApp then
+        # zlib-compresses, so the ZIP header only appears *after* decompression. The check
+        # looked for it only before, and so rejected every one of them -- which left waguess
+        # unable to find the offsets of a backup it had decrypted perfectly well.
+        assert decompresses_to_a_database(zlib.compress(read("tests/res/test9.zip"))) is True
+
 
 class TestEncryptionLoop:
     """The HMAC-SHA256 loop mirrored in utils/WA_HMACSHA256_Loop.java."""
@@ -197,6 +204,12 @@ class TestHeaderInfo:
         assert "crypt14" in string
         assert header.c14_cipher.IV.hex() in string
         assert header.c14_cipher.server_salt.hex() in string
+
+    def test_the_crypt15_iv_is_on_a_line_of_its_own(self):
+        # "...in your crypt15 file:" ran straight into "IV: ", unlike the crypt14 branch just
+        # below it, so anything reading wainfo's output line by line never saw the IV.
+        header = self.header_of("tests/res/msgstore.db.crypt15")
+        assert "IV: {}".format(header.c15_iv.IV.hex()) in header_info(header).splitlines()
 
     def test_a_backup_without_a_feature_table(self):
         string = header_info(self.header_of("tests/res/msgstore-noexpiry.db.crypt14"))
