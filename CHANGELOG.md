@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- New `waincrement` tool: decrypts a WhatsApp incremental backup
+  (`msgstore-increment-N.db.crypt15`) and reads the messages inside its
+  `messages.bin` — the community-reverse-engineered `HistorySync` protobuf schema WhatsApp
+  Web's own multi-device history-sync uses. Closes #129 for the "can it be read at all"
+  half of that issue; the per-table JSON diffs inside an increment (`chat_modified_1.json`
+  etc.) are out of scope for now. New library module `wa_crypt_tools.lib.increment`.
+  Vendors 16 `.proto` files from `tulir/whatsmeow` (MPL-2.0) — see `proto/NOTICE.md`.
+
 ## Version 0.2.0
 
 The library now raises instead of logging and carrying on. This is a breaking change, and

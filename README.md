@@ -107,6 +107,28 @@ waencrypt.py:89         : [I] Done!
 
 You can get info about a backup file with the `wainfo` tool.
 
+## Read an incremental backup with waincrement (BETA)
+
+Current WhatsApp Android sometimes writes `msgstore-increment-N.db.crypt15` alongside
+(or instead of refreshing) the full `msgstore.db.crypt15` snapshot. `wadecrypt` already
+decrypts these correctly — decryption does not care what is inside — but the result is a
+ZIP, not a SQLite database: the new/changed messages are protobuf, in `messages.bin`,
+not SQL rows. `waincrement` reads that.
+
+```
+$ waincrement encrypted_backup.key msgstore-increment-1.db.crypt15
+waincrement.py:78       : [I] WhatsApp version: 2.26.33.76
+waincrement.py:79       : [I] Messages on backup: 373401, updated: 35, deleted: 0
+waincrement.py:85       : [I] Parsed 35 message(s)
+1735689600      34600...@s.whatsapp.net 34600...@s.whatsapp.net them    hola
+...
+```
+
+Pass `-o out.json` to write the messages as a JSON array instead. The protobuf schema
+this reads (`HistorySync`, the same wire format WhatsApp Web's own multi-device
+history-sync uses) is reverse-engineered by the community, not published by WhatsApp —
+see `proto/NOTICE.md`. Issue #129.
+
 # Tool list
 For usage, run the tool with `-h` option.
 1) `wacreatekey` - Create key files
@@ -114,6 +136,7 @@ For usage, run the tool with `-h` option.
 3) `waencrypt` - Encrypt backups
 4) `waguess` - Hacky way to try decrypt backups
 5) `wainfo` - Get info about a backup 
+6) `waincrement` - Read the messages inside an incremental backup (BETA)
 
 # Use as a library
 
