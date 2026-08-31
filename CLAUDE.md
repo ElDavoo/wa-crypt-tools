@@ -48,13 +48,27 @@ python fix_imports.py ../src/wa_crypt_tools/proto
 `fix_imports.py` rewrites protoc's absolute imports into package-relative ones; skipping it
 breaks `from wa_crypt_tools.proto import ...`. It replaces protoletariat (`protol`), which was
 archived upstream and pinned `protobuf<6`. Only `backup_prefix.proto` imports other protos, so
-the script rewrites 4 lines in `backup_prefix_pb2.py` and leaves the other four files exactly as
-protoc wrote them. The committed files predate it and are still in protol's reformatted style, so
-the next regeneration will show a one-time formatting diff across all five.
+the script rewrites 5 lines in `backup_prefix_pb2.py` and leaves the other five files exactly as
+protoc wrote them.
+
+There is no protoc in this environment; on NixOS a throwaway flake with `pkgs.protobuf_29` gives
+a matching one (`nix develop --command protoc ...`). The committed files are protoc 29.6 output
+and load under the 7.36 runtime the venv has.
 
 `protoc` and the `protobuf` runtime must be version-matched: generated code calls
-`ValidateProtobufRuntimeVersion` with the generator's version, so protoc 29.5 needs protobuf
->= 5.29.5, protoc 36.0 needs >= 7.36.0. The committed files are protoc 29.5 output.
+`ValidateProtobufRuntimeVersion` with the generator's version, so protoc 29.6 needs protobuf
+>= 5.29.6, protoc 36.0 needs >= 7.36.0. The committed files are protoc 29.6 output.
+
+**The field names are WhatsApp's own**, read out of `com.whatsapp` 2.26.34.7 rather than guessed:
+`classes6.dex` holds `BackupPrefix` as a `GeneratedMessageLite` whose `*_FIELD_NUMBER` constants
+and `newMessageInfo` field-name array survived obfuscation. That is where `key_type_deprecated`,
+`wa_provided_key_data`, `e2ee_key_data`, `backup_metadata`, `passkey_encryption_metadata` and
+`key_type_new` come from, and it is why the "feature table" is really a set of
+`<migration>_migration_finished` flags. Two things the app does that this schema now mirrors:
+fields 2 and 3 are **not** a oneof -- its message schema lists them as two ordinary optional
+fields -- and fields 1 and 6 share one enum, so `Key_Type` carries all five of its values.
+Renaming a field cannot change the wire format, so none of this affects what is read or written;
+it only stops the header being half-anonymous.
 
 `git-hooks/pre-commit` (not installed by default) runs `python3 -m pytest -q`.
 
@@ -129,6 +143,12 @@ sticker (WebP) and settings (JSON) backups under `WhatsApp/Backups/` come back a
 does not match this backup" -- and files below `HEADER_SIZE` are refused as too small. Both
 are intended: `wadecrypt` and `wainfo` handle every one of those files, and broadening the
 check would cost the search its only defence against false offsets.
+
+`key_type_new` (field 6) is why re-encryption had to start from the parsed header: every
+crypt15 backup from 2.26 sets it to `E2EE_ENCRYPTION_KEY`, and nothing here writes it. It is a
+modelled field now rather than an unknown one, but `waencrypt` still only ever reproduces what a
+`--reference` carried -- without a reference the output has no field 6, which the app would read
+as the default `WA_PROVIDED`. Whether that matters for a restore has not been established.
 
 **A re-encryption is built on the parsed header, not from scratch.** `DatabaseFactory` keeps the
 `BackupPrefix` it parsed on `db.prefix` and whether the `0x01` feature-table flag was there on

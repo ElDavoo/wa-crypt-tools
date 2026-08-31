@@ -194,7 +194,7 @@ class TestHeaderInfo:
         header = self.header_of("tests/res/msgstore.db.crypt15")
         string = header_info(header)
         assert "Crypt15 info" in string
-        assert header.c15_iv.IV.hex() in string
+        assert header.e2ee_key_data.encryption_iv.hex() in string
         assert "Features: " in string
         assert "Max feature number: 37" in string
 
@@ -202,14 +202,14 @@ class TestHeaderInfo:
         header = self.header_of("tests/res/msgstore.db.crypt14")
         string = header_info(header)
         assert "crypt14" in string
-        assert header.c14_cipher.IV.hex() in string
-        assert header.c14_cipher.server_salt.hex() in string
+        assert header.wa_provided_key_data.encryption_iv.hex() in string
+        assert header.wa_provided_key_data.server_salt.hex() in string
 
     def test_the_crypt15_iv_is_on_a_line_of_its_own(self):
         # "...in your crypt15 file:" ran straight into "IV: ", unlike the crypt14 branch just
         # below it, so anything reading wainfo's output line by line never saw the IV.
         header = self.header_of("tests/res/msgstore.db.crypt15")
-        assert "IV: {}".format(header.c15_iv.IV.hex()) in header_info(header).splitlines()
+        assert "IV: {}".format(header.e2ee_key_data.encryption_iv.hex()) in header_info(header).splitlines()
 
     def test_a_backup_without_a_feature_table(self):
         string = header_info(self.header_of("tests/res/msgstore-noexpiry.db.crypt14"))

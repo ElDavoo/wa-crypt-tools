@@ -34,12 +34,12 @@ class Database14(Database):
 
         cipher = C14_cipher.C14_cipher()
         # TODO which ones take priority? Key or self values?
-        cipher.cipher_version = key.get_cipher_version()
+        cipher.backup_cipher_header = key.get_cipher_version()
         #FIXME
         cipher.key_version = "2".encode()
         cipher.server_salt = key.get_serversalt()
-        cipher.google_id = key.get_googleid()
-        cipher.IV = self.iv
+        cipher.google_id_salt = key.get_googleid()
+        cipher.encryption_iv = self.iv
         from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
         from wa_crypt_tools.proto import key_type_pb2 as key_type
         header = prefix.BackupPrefix()
@@ -49,10 +49,10 @@ class Database14(Database):
             # field we have no name for, and losing it is the whole difference between a
             # re-encryption that works and one that reproduces the original byte for byte.
             header.CopyFrom(self.prefix)
-        header.key_type = 0
-        header.c14_cipher.CopyFrom(cipher)
+        header.key_type_deprecated = key_type.Key_Type.WA_PROVIDED
+        header.wa_provided_key_data.CopyFrom(cipher)
 
-        header.info.CopyFrom(props.get_proto())
+        header.backup_metadata.CopyFrom(props.get_proto())
         prefix = header.SerializeToString()
         out = b''
         file_hash = md5()

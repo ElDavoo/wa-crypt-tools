@@ -163,24 +163,28 @@ def header_info(header):
     FIXME
     """
     string: str = ""
-    if header.c15_iv.IV:
+    if header.e2ee_key_data.encryption_iv:
         string += "Crypt15 info:\n"
         string += str("Header information in your crypt15 file:\n")
-        string += str("IV: {}\n".format(header.c15_iv.IV.hex()))
-    if header.c14_cipher.IV:
+        string += str("IV: {}\n".format(header.e2ee_key_data.encryption_iv.hex()))
+    if header.wa_provided_key_data.encryption_iv:
+        cipher = header.wa_provided_key_data
         string += str("Header information in your crypt14 file:\n")
-        string += str("Cipher version: {}\n".format(header.c14_cipher.cipher_version.hex()))
-        string += str("Key version: {}\n".format(header.c14_cipher.key_version.hex()))
-        string += str("Server salt: {}\n".format(header.c14_cipher.server_salt.hex()))
-        string += str("Google ID: {}\n".format(header.c14_cipher.google_id.hex()))
-        string += str("IV: {}\n".format(header.c14_cipher.IV.hex()))
-    string += str("Key type: {}\n".format(header.key_type))
-    string += str("WhatsApp version: {}\n".format(header.info.app_version))
-    #string += str("Device model: {}".format(header.info.device_model))
-    string += str("The last two numbers of the user's Jid: {}\n".format(header.info.jidSuffix))
-    string += str("Backup version: {}\n".format(header.info.backup_version))
-    #string += str("Size of the backup file: {}".format(header.backup_export_file_size))
-    features = [n for n in [*range(5, 38), 39] if getattr(header.info, "f_" + str(n)) == True]
+        string += str("Cipher version: {}\n".format(cipher.backup_cipher_header.hex()))
+        string += str("Key version: {}\n".format(cipher.key_version.hex()))
+        string += str("Server salt: {}\n".format(cipher.server_salt.hex()))
+        string += str("Google ID: {}\n".format(cipher.google_id_salt.hex()))
+        string += str("IV: {}\n".format(cipher.encryption_iv.hex()))
+    string += str("Key type: {}\n".format(header.key_type_deprecated))
+    string += str("WhatsApp version: {}\n".format(header.backup_metadata.app_version))
+    #string += str("Device model: {}".format(header.backup_metadata.device_model))
+    string += str("The last two numbers of the user's Jid: {}\n".format(header.backup_metadata.jid_suffix))
+    string += str("Backup version: {}\n".format(header.backup_metadata.backup_version))
+    #string += str("Size of the backup file: {}".format(header.backup_metadata.backup_export_file_size))
+    # The migration flags, by field number: the numbers are what this project has always called
+    # features, and the schema is what says which fields are flags rather than metadata.
+    features = [f.number for f in header.backup_metadata.DESCRIPTOR.fields
+                if f.type == f.TYPE_BOOL and getattr(header.backup_metadata, f.name)]
     if len(features) > 0:
         string += str("Features: {}\n".format(features))
         string += str("Max feature number: {}\n".format(max(features)))

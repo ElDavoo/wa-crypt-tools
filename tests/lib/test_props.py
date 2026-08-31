@@ -11,8 +11,8 @@ class TestProps:
         props = Props()
         assert props.get_jid() == C.DEFAULT_JID_SUFFIX
         assert props.get_proto().app_version == C.DEFAULT_APP_VERSION
-        # DEFAULT_MAX_FEATURE is 39 but the protobuf has no f_38: the numbering skips it, so
-        # walking 5..39 has to survive the gap rather than blowing up on it.
+        # DEFAULT_MAX_FEATURE is 39, but field 38 is backup_export_file_size and not a flag at
+        # all, so walking 5..39 has to survive the gap rather than blowing up on it.
         assert props.get_features() == C.DEFAULT_FEATURE_LIST
         assert 38 not in props.get_features()
 
@@ -43,8 +43,8 @@ class TestProps:
         from wa_crypt_tools.proto import backup_expiry_pb2 as backup_expiry
         parsed = backup_expiry.BackupExpiry()
         parsed.app_version = "2.22.5.13"
-        parsed.jidSuffix = "67"
-        parsed.f_5 = True
+        parsed.jid_suffix = "67"
+        parsed.call_log_migration_finished = True
         props = Props(v_features=parsed)
         assert props.get_proto() is parsed
         assert props.get_jid() == "67"
@@ -55,9 +55,9 @@ class TestProps:
         # raised AttributeError on every props built that way.
         from wa_crypt_tools.proto import backup_expiry_pb2 as backup_expiry
         parsed = backup_expiry.BackupExpiry()
-        parsed.f_5 = True
-        parsed.f_13 = True
-        parsed.f_39 = True
+        parsed.call_log_migration_finished = True
+        parsed.receipt_user_migration_finished = True
+        parsed.cleaned_db = True
         assert Props(v_features=parsed).get_features() == [5, 13, 39]
 
     def test_wa_version_and_jid_are_kept(self):
@@ -76,4 +76,4 @@ class TestProps:
     def test_str_is_the_protobuf_text_format(self):
         string = str(Props(wa_version="2.22.5.13", jid="67", features=[5], max_feature=37))
         assert 'app_version: "2.22.5.13"' in string
-        assert "f_5: true" in string
+        assert "call_log_migration_finished: true" in string

@@ -75,7 +75,7 @@ class Database15(Database):
         """Encrypts the database using the provided key"""
         from wa_crypt_tools.proto import C15_IV_pb2 as C15_IV
         cipher = C15_IV.C15_IV()
-        cipher.IV = self.iv
+        cipher.encryption_iv = self.iv
         from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
         from wa_crypt_tools.proto import key_type_pb2 as key_type
         header = prefix.BackupPrefix()
@@ -85,10 +85,10 @@ class Database15(Database):
             # field we have no name for, and losing it is the whole difference between a
             # re-encryption that works and one that reproduces the original byte for byte.
             header.CopyFrom(self.prefix)
-        header.key_type = key_type.Key_Type.HSM_CONTROLLED
-        header.c15_iv.CopyFrom(cipher)
+        header.key_type_deprecated = key_type.Key_Type.E2EE_DEPRECATED
+        header.e2ee_key_data.CopyFrom(cipher)
 
-        header.info.CopyFrom(props.get_proto())
+        header.backup_metadata.CopyFrom(props.get_proto())
         prefix = header.SerializeToString()
         out = b''
         file_hash = md5()
