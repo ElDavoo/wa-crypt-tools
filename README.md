@@ -92,22 +92,23 @@ waencrypt.py:89         : [I] Done!
 
 You need to supply the following parameters:  
 
-1) The feature list: Only for 2019+ databases. A list of numbered boolean
-   properties related to your database. There is currently no way to infer them
-   from a database file. In the example, we will just use my backup's feature list,
-   but don't expect it to work for you.  
+1) The feature list: Only for 2019+ databases. These are really the database migration flags
+   WhatsApp records in the header, and there is no way to infer them from a database file. The
+   defaults are what a 2.26.34.7 msgstore carries, which is all of them.
 2) The max feature number, which is 39 at the time of writing
-3) The version of the app that encrypted the file: Use a reasonable value,
-   like 2.24.8.6 or something.  
-4) Jid: The last 2 numbers of your phone number  
+3) The version of the app that encrypted the file: defaults to 2.26.34.7.
+4) Jid: The last 2 numbers of your phone number -- this one really is yours, and defaults to 00
 5) Backup version: Use 1.
 
-Defaults will be used if parameters are omitted.  
+Defaults will be used if parameters are omitted, and they are taken from a real 2.26.34.7
+backup: given the right `--iv` and `--jid`, `waencrypt` writes the same header bytes as the
+phone does, with no reference at all. Passing `--reference` is still the better way, since it
+takes the IV, the compression level and the whole header off a backup you already have.  
 
 To sum it up:
 ```
 $ waencrypt --enable-features 5 6 7 8 9 10 11 12 13 14 15 16
- 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 39 --type 15 --wa-version 2.26.1.2 --jid 00 --backup
+ 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 39 --type 15 --wa-version 2.26.34.7 --jid 00 --backup
 -version 1 encrypted_backup.key msgstore.db msgstore-new.db.crypt15 
 waencrypt.py:57         : [W] This script is in beta stage
 waencrypt.py:89         : [I] Done!
@@ -261,15 +262,19 @@ See the [CITATION.cff](CITATION.cff) file for citation information.
 
 ### I will happily accept pull requests for the currently open issues. :)
 
-### Last tested version (don't expect this to be updated)
-Stable: 
-2.24.16.76  
-Beta: 
-2.24.26.11
+### Last tested version
+Stable:
+2.26.34.7
+
+Tested against real backups off a 2.26.34.7 device: a msgstore, an incremental backup, and the
+`WhatsApp/Backups/` set (`wa.db`, `status_backup.db`, `stickers_db.bak`, `chatsettingsbackup.db`,
+`commerce_backup.db`, `offloaded-media.db`, `backup_settings.json`, `avatar-password.bkup`,
+`chatlock_backup.bkup`, individual stickers). All thirteen decrypt, and re-encrypt back to the
+byte-for-byte original.
 
 #### Business
-Stable:  
-2.24.23.78
+Stable:
+2.24.23.78 (not retested)
 
 #### Protobuf automatic fix
 

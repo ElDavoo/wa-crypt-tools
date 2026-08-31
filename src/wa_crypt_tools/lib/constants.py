@@ -28,15 +28,23 @@ class C:
     DEFAULT_DATA_OFFSET = 122
     DEFAULT_IV_OFFSET = 8
 
-    # Encryption constants
-    DEFAULT_APP_VERSION = "2.23.18.12"
+    # Encryption constants. These are what a real msgstore backup off WhatsApp 2.26.34.7
+    # carries, so that a waencrypt run given no reference still produces a current-looking
+    # header rather than a 2023-looking one.
+    DEFAULT_APP_VERSION = "2.26.34.7"
+    # Not taken from a real backup, for obvious reasons: this is the owner's phone number.
     DEFAULT_JID_SUFFIX = "00"
-    DEFAULT_BACKUP_VERSION = 0
-    # The Props I got from a recent backup of mine
+    DEFAULT_BACKUP_VERSION = 1
+    # BackupPrefix.key_type_new, which says which kind of end-to-end key was used. 3 is
+    # E2EE_ENCRYPTION_KEY -- the 64-digit key -- and is what every 2.26 crypt15 backup carries.
+    # Backups from before the field existed are reproduced by passing None instead.
+    DEFAULT_KEY_TYPE = 3
+    # Every migration flag the schema has. A current msgstore sets all of them -- 34 was the
+    # one missing from this list, and 38 is not a flag at all but backup_export_file_size.
     DEFAULT_FEATURE_LIST = [5, 6, 7, 8, 9,
                             10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
                             20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-                            30, 31, 32, 33, 35, 36, 37, 39]
+                            30, 31, 32, 33, 34, 35, 36, 37, 39]
     # Old backups might not have knowledge of the new features (in 2022 backups the max is 37)
     DEFAULT_MAX_FEATURE = 39
 

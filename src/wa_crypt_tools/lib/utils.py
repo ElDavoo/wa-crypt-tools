@@ -157,6 +157,39 @@ def get_mcrypt1_name(*, key, name: str, md5: bytes) -> bytes:
     return media_hash
 
 
+def unknown_header_fields(header) -> list[str]:
+    """
+    Names the fields of a parsed header that this schema does not describe, innermost included.
+
+    A WhatsApp format change shows up here first. Field 6 of BackupPrefix sat in every 2.26
+    backup for a long time without anyone noticing, because protobuf keeps what it cannot name
+    and hands it back on serialisation -- so nothing broke and nothing said anything either.
+    Returns descriptions like "BackupPrefix field 7", empty when the schema covers everything.
+    """
+    try:
+        from google.protobuf.unknown_fields import UnknownFieldSet
+    except ImportError:  # pragma: no cover - only on a protobuf too old to have it
+        return []
+
+    found: list[str] = []
+
+    def walk(message):
+        try:
+            unknown = UnknownFieldSet(message)
+        except (NotImplementedError, TypeError):  # pragma: no cover - implementation-dependent
+            return
+        for field in unknown:
+            found.append("{} field {}".format(message.DESCRIPTOR.name, field.field_number))
+        for descriptor, value in message.ListFields():
+            # is_repeated rather than the old label constant: protobuf 7 dropped label with
+            # the move to editions.
+            if descriptor.type == descriptor.TYPE_MESSAGE and not descriptor.is_repeated:
+                walk(value)
+
+    walk(header)
+    return found
+
+
 def header_info(header):
     """
     shows all header, information including the feature vector

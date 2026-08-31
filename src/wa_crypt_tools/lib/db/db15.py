@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import logging
 from hashlib import md5
 from os import urandom
 
 from Cryptodome.Cipher import AES
 
+from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.lib.props import Props
 
 log = logging.getLogger(__name__)
@@ -18,10 +21,14 @@ class Database15(Database):
         return "Database15"
         # todo
 
-    def __init__(self, *, iv: bytes = None, props: Props = None):
+    def __init__(self, *, iv: bytes = None, props: Props = None,
+                 key_type: int | None = C.DEFAULT_KEY_TYPE):
         self.file_hash = md5()
         # just store it for now
         self.props = props
+        # None writes no key_type_new at all, which is what a backup from before WhatsApp
+        # added the field looks like.
+        self.key_type = key_type
         if iv:
             if len(iv) != 16:
                 raise IntegrityError("IV is not 16 bytes long but is {} bytes long".format(len(iv)))
@@ -86,6 +93,11 @@ class Database15(Database):
             # re-encryption that works and one that reproduces the original byte for byte.
             header.CopyFrom(self.prefix)
         header.key_type_deprecated = key_type.Key_Type.E2EE_DEPRECATED
+        if self.prefix is None and self.key_type is not None:
+            # Only when there is no reference to reproduce: a reference's own value has already
+            # been copied in above, and overwriting it would put the field into backups made
+            # before it existed.
+            header.key_type_new = self.key_type
         header.e2ee_key_data.CopyFrom(cipher)
 
         header.backup_metadata.CopyFrom(props.get_proto())

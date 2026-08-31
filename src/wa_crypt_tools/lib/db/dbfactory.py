@@ -7,7 +7,7 @@ from wa_crypt_tools.lib.db.db14 import Database14
 from wa_crypt_tools.lib.db.db15 import Database15
 from wa_crypt_tools.lib.errors import HeaderError, IntegrityError
 from wa_crypt_tools.lib.props import Props
-from wa_crypt_tools.lib.utils import header_info
+from wa_crypt_tools.lib.utils import header_info, unknown_header_fields
 
 log = logging.getLogger(__name__)
 
@@ -101,6 +101,16 @@ class DatabaseFactory:
 
                 # We are done here
                 log.debug(header_info(header))
+
+                # Anything the schema cannot name is how a format change announces itself.
+                extra = unknown_header_fields(header)
+                if extra:
+                    log.warning("This header carries {} this schema does not know: {}.\n    "
+                                "Your WhatsApp is probably newer than this library. The backup "
+                                "still reads, and re-encrypting keeps the field, but please "
+                                "report it."
+                                .format("a field" if len(extra) == 1 else
+                                        "{} fields".format(len(extra)), ", ".join(extra)))
 
                 props = Props(v_features=header.backup_metadata)
                 # The database is built even when the IV is the wrong length, so that --force

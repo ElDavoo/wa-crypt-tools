@@ -84,6 +84,16 @@ logged its failure and then continued anyway.
   `E2EE_PASSWORD`, `E2EE_ENCRYPTION_KEY`, `E2EE_PASSKEY` -- and what this project called
   `HSM_CONTROLLED` is really `E2EE_DEPRECATED`. Renaming a field cannot change the wire format,
   so nothing about what is read or written changes.
+- **The defaults are a real 2.26.34.7 backup's.** `DEFAULT_APP_VERSION` was 2.23.18.12 and
+  `DEFAULT_BACKUP_VERSION` was 0; the feature list was missing flag 34. With the right `--iv`
+  and `--jid`, `waencrypt` given no reference at all now writes the same header bytes as the
+  phone does. `Database15` also takes a `key_type`, defaulting to `E2EE_ENCRYPTION_KEY`, which
+  is what `key_type_new` holds in every current backup -- pass `None` to reproduce a backup
+  from before that field existed. A `--reference` still wins over all of it.
+- **A header field this schema cannot name is now reported.** `waguess`, `wadecrypt` and
+  `wainfo` warn, naming the message and the field number. Unknown fields survive a parse and
+  come back on re-encryption, so nothing broke while `key_type_new` went unnoticed in every
+  2.26 backup -- and nothing said anything either. Now it would.
 - `wainfo` printed the crypt15 IV on the same line as the heading that introduces it, unlike
   the crypt14 branch beside it, so anything reading its output line by line missed the IV.
 

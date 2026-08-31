@@ -26,9 +26,13 @@ def decrypt_roundtrip(key, data: bytes) -> bytes:
 class TestEncryption:
     def test_encryption15(self):
         key = KeyFactory.new("tests/res/encrypted_backup.key")
+        # backup_version=0 explicitly: the fixtures are 2022 backups and the default is now 1,
+        # which is what a current device writes.
         props = Props(wa_version="2.22.5.13", jid="67", features=[5, 7, 8, 13, 14, 19, 22, 25, 28, 30, 31, 32, 36, 37],
-                      max_feature=37)
-        db = Database15(iv=bytes.fromhex("C395EE009CF8B68AC0EA760550F6559C"))
+                      max_feature=37, backup_version=0)
+        # key_type=None: the fixture is a 2022 backup, from before WhatsApp added
+        # key_type_new to the header, so reproducing it means not writing that field.
+        db = Database15(iv=bytes.fromhex("C395EE009CF8B68AC0EA760550F6559C"), key_type=None)
         with open("tests/res/msgstore.db", 'rb') as f:
             orig = f.read()
         data = db.encrypt(
@@ -43,8 +47,10 @@ class TestEncryption:
 
     def test_encryption14(self):
         key = KeyFactory.new("tests/res/key")
+        # backup_version=0 explicitly: the fixtures are 2022 backups and the default is now 1,
+        # which is what a current device writes.
         props = Props(wa_version="2.22.5.13", jid="67", features=[5, 7, 8, 13, 14, 19, 22, 25, 28, 30, 31, 32, 36, 37],
-                      max_feature=37)
+                      max_feature=37, backup_version=0)
         db = Database14(iv=bytes.fromhex("EA53CEAE36ECAB50BC331AEB62491625"))
         with open("tests/res/msgstore.db", 'rb') as f:
             orig = f.read()

@@ -36,6 +36,42 @@ def crypt15_header(*, iv: bytes) -> bytes:
     return len(serialized).to_bytes(1, byteorder='big') + b'\x01' + serialized
 
 
+def crypt15_header_with_extra(*, iv: bytes, extra: bytes) -> bytes:
+    """The same header with raw protobuf bytes appended that the schema does not describe."""
+    from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
+    from wa_crypt_tools.proto import key_type_pb2 as key_type
+    header = prefix.BackupPrefix()
+    header.key_type_deprecated = key_type.Key_Type.E2EE_DEPRECATED
+    header.e2ee_key_data.encryption_iv = iv
+    header.backup_metadata.app_version = "2.22.5.13"
+    serialized = header.SerializeToString() + extra
+    return len(serialized).to_bytes(1, byteorder='big') + b'\x01' + serialized
+
+
+class TestUnknownFields:
+    """
+    A header field this schema has never heard of is how a WhatsApp format change first shows
+    up. It used to pass in silence -- field 6 sat in every 2.26 backup unnoticed until a
+    byte-for-byte comparison went looking for it -- so now it says so.
+    """
+
+    def test_an_unknown_top_level_field_is_reported(self, caplog):
+        # Field 7, varint, value 1: the shape a new BackupPrefix field would arrive in.
+        stream = as_stream(crypt15_header_with_extra(iv=b'\x00' * 16, extra=b'\x38\x01'))
+        DatabaseFactory.from_file(stream)
+        assert "BackupPrefix field 7" in caplog.text
+
+    def test_an_unknown_nested_field_is_reported(self, caplog):
+        # Inside backup_metadata: field 4 of BackupPrefix, then field 45 within it.
+        stream = as_stream(crypt15_header_with_extra(iv=b'\x00' * 16, extra=b'\x22\x03\xe8\x02\x01'))
+        DatabaseFactory.from_file(stream)
+        assert "BackupExpiry field 45" in caplog.text
+
+    def test_a_header_this_schema_covers_says_nothing(self, caplog):
+        DatabaseFactory.from_file(as_stream(crypt15_header(iv=b'\x00' * 16)))
+        assert "does not know" not in caplog.text
+
+
 class ExplodingStream(io.BufferedReader):
     """A stream that fails where the factory has to cope: on read, or on the crypt12 rewind."""
 
