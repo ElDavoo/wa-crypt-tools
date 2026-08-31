@@ -70,6 +70,10 @@ usage: waencrypt [-h] [-f] [-y] [-v] [--enable-features [ENABLE_FEATURES ...]] [
 `waencrypt` will not write over a file that already exists; pass `-y`/`--yes` if that is what
 you want.
 
+With `--reference`, `waencrypt` reproduces the referenced backup byte for byte: the IV, the
+header (including fields this library does not model) and the compression level all come off
+it, so re-encrypting an unmodified database gives you back the md5 you started with.
+
 `-c`/`--compression-level` is the zlib level, 9 by default, which is what WhatsApp uses now.
 It compressed at 1 historically. With `--reference` the level is taken from the reference, so
 reproducing an older backup needs nothing extra; pass `-c` to override it.

@@ -42,17 +42,25 @@ class Database14(Database):
         cipher.IV = self.iv
         from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
         from wa_crypt_tools.proto import key_type_pb2 as key_type
-        prefix = prefix.BackupPrefix()
-        prefix.key_type = 0
-        prefix.c14_cipher.CopyFrom(cipher)
+        header = prefix.BackupPrefix()
+        if self.prefix is not None:
+            # Start from the header this database was parsed from, so that whatever WhatsApp
+            # put there and this schema does not model comes along. Current backups carry a
+            # field we have no name for, and losing it is the whole difference between a
+            # re-encryption that works and one that reproduces the original byte for byte.
+            header.CopyFrom(self.prefix)
+        header.key_type = 0
+        header.c14_cipher.CopyFrom(cipher)
 
-        prefix.info.CopyFrom(props.get_proto())
-        prefix = prefix.SerializeToString()
+        header.info.CopyFrom(props.get_proto())
+        prefix = header.SerializeToString()
         out = b''
         file_hash = md5()
         out += len(prefix).to_bytes(1, byteorder='big')
         file_hash.update(out)
-        if len(props.get_features()) > 0:
+        # As above: what the source had wins, and the feature list decides only when there
+        # was no source to copy.
+        if self.feature_table if self.feature_table is not None else len(props.get_features()) > 0:
             out += b'\x01'
             file_hash.update(b'\x01')
         out += prefix

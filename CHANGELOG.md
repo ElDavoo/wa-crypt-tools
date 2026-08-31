@@ -54,6 +54,25 @@ logged its failure and then continued anyway.
   means remembering `-c` alongside it. The reference's zlib header names a band of levels and
   the top of that band is used, which is exact for the only two levels WhatsApp has used. An
   explicit `-c` still wins, and a reference whose payload is not zlib warns and falls back.
+- **`waencrypt --reference` reproduces a backup byte for byte.** Verified against 13 real
+  backups off a 2.26 device -- a 55 MB msgstore, an incremental backup, stickers, settings,
+  and files as small as 239 bytes -- every one of which now comes back with the md5 it went
+  in with. Three separate things had to be fixed for that:
+  - The header was rebuilt from `Props` alone, which dropped the fields this schema does not
+    model. Real backups carry an unknown varint field 6, so every re-encryption was 2 bytes
+    short of the original no matter what else was right. `DatabaseFactory` keeps the header
+    it parsed now and `encrypt()` builds on top of it, which also future-proofs against
+    WhatsApp adding fields this library has never heard of.
+  - `Database15` wrote the `0x01` feature-table flag unconditionally, so every backup that is
+    not a msgstore -- `wa.db`, `chatsettingsbackup`, the stickers -- came out a byte longer
+    than it went in. Whether the source had it is recorded and honoured.
+  - The compression level, above.
+- **`waencrypt --type 14 --reference` works.** It raised `AttributeError: 'Props' object has
+  no attribute 'max_feature'` from `get_features()`, which `Database14.encrypt` called to
+  decide whether to write the feature table flag; it reads that off the reference now. The
+  underlying hole is fixed too: `Props(v_features=...)`, which is how a parsed header becomes
+  props, never set `max_feature`, so `get_features()` raised on every props built that way.
+  It is taken from the protobuf schema now.
 - `wainfo` printed the crypt15 IV on the same line as the heading that introduces it, unlike
   the crypt14 branch beside it, so anything reading its output line by line missed the IV.
 
