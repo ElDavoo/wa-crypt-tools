@@ -99,6 +99,30 @@ class TestCompressionLevels:
         assert cmp_files(OUT, "tests/res/test9.zip")
 
 
+class TestRealCurrentBackups:
+    """
+    The two things that stopped waguess working on current backups, as they actually arrive:
+    level 9 compression, and a payload that is a ZIP only after inflating. Both fixtures are
+    real 2.26 headers -- see tests/lib/db/test_current_format.py for what was scrubbed.
+    """
+
+    def teardown_method(self):
+        rm_if_found(OUT)
+
+    def test_a_current_msgstore_is_found(self):
+        out, ret = Propen("waguess {} tests/res/msgstore-2.26.db.crypt15 {}".format(KEY15, OUT))
+        assert ret == 0, out
+
+    def test_a_real_incremental_backup_is_found(self):
+        # This one failed outright before: the header gate did not know 78 da, and the payload
+        # check wanted SQLite where a compressed ZIP was.
+        out, ret = Propen("waguess {} tests/res/msgstore-increment-2.26.crypt15 {}"
+                          .format(KEY15, OUT))
+        assert ret == 0, out
+        with open(OUT, 'rb') as f:
+            assert f.read(4) == b'PK\x03\x04'
+
+
 class TestWaGuessFailures:
     def teardown_method(self):
         rm_if_found(OUT)

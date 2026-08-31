@@ -94,6 +94,11 @@ logged its failure and then continued anyway.
   `wainfo` warn, naming the message and the field number. Unknown fields survive a parse and
   come back on re-encryption, so nothing broke while `key_type_new` went unnoticed in every
   2.26 backup -- and nothing said anything either. Now it would.
+- **The test suite runs on real current backups.** Three fixtures off a WhatsApp 2.26.34.7
+  device -- a msgstore, a backup that is not a msgstore, and an incremental one -- each keeping
+  its original header byte for byte apart from the owner's own fields, with the payload's schema
+  kept and every row deleted. The reconstructions the suite had could not have caught
+  `key_type_new`, since they were built from the same schema that did not know about it.
 - `wainfo` printed the crypt15 IV on the same line as the heading that introduces it, unlike
   the crypt14 branch beside it, so anything reading its output line by line missed the IV.
 
