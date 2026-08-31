@@ -48,6 +48,29 @@ def crypt15_header_with_extra(*, iv: bytes, extra: bytes) -> bytes:
     return len(serialized).to_bytes(1, byteorder='big') + b'\x01' + serialized
 
 
+def crypt15_header_with_passkey(*, iv: bytes) -> bytes:
+    """A crypt15 header carrying a fully populated PasskeyEncryptionMetadata -- the shape a
+    passkey-protected backup's header would take. No fixture in tests/res has one: nothing
+    this project has seen sets E2EE_PASSKEY (see passkey_encryption_metadata.proto)."""
+    from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
+    from wa_crypt_tools.proto import key_type_pb2 as key_type
+    header = prefix.BackupPrefix()
+    header.key_type_deprecated = key_type.Key_Type.E2EE_DEPRECATED
+    header.key_type_new = key_type.Key_Type.E2EE_PASSKEY
+    header.e2ee_key_data.encryption_iv = iv
+    header.backup_metadata.app_version = "2.26.34.7"
+    meta = header.passkey_encryption_metadata
+    meta.encapsulated_root_key = "encapsulated-root-key"
+    meta.credential_id_deprecated = "credential-id"
+    meta.prf_salt_deprecated = bytes(range(8))
+    meta.server_cypher_key_version = "1"
+    meta.server_cypher_key_account_salt = bytes(range(16))
+    meta.server_cypher_key_server_salt = bytes(range(16, 32))
+    meta.client_metadata = b'client-metadata'
+    serialized = header.SerializeToString()
+    return len(serialized).to_bytes(1, byteorder='big') + b'\x01' + serialized
+
+
 class TestUnknownFields:
     """
     A header field this schema has never heard of is how a WhatsApp format change first shows
@@ -69,6 +92,12 @@ class TestUnknownFields:
 
     def test_a_header_this_schema_covers_says_nothing(self, caplog):
         DatabaseFactory.from_file(as_stream(crypt15_header(iv=b'\x00' * 16)))
+        assert "does not know" not in caplog.text
+
+    def test_a_populated_passkey_encryption_metadata_says_nothing_is_unknown(self, caplog):
+        # No fixture backup carries a passkey_encryption_metadata yet, so this is the only
+        # way to walk unknown_header_fields over every field the message actually has.
+        DatabaseFactory.from_file(as_stream(crypt15_header_with_passkey(iv=b'\x00' * 16)))
         assert "does not know" not in caplog.text
 
 

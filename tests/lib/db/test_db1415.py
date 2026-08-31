@@ -117,3 +117,42 @@ class TestCrypt14KeyVersionIsCarriedThrough:
         # in tests/res and every backup off a current device carries.
         header = self.written_header(Database14(iv=bytes(range(16))), KeyFactory.new("tests/res/key"))
         assert header.wa_provided_key_data.key_version == b'2'
+
+
+class TestPasskeyMetadataIsCarriedThrough:
+    """
+    No fixture backup has passkey_encryption_metadata set: nothing this project has seen uses
+    E2EE_PASSKEY (see passkey_encryption_metadata.proto). Database15.encrypt starts the header
+    with header.CopyFrom(self.prefix), the same mechanism that dropped crypt14's key_version
+    when it was rebuilt from scratch instead -- so this proves the submessage actually survives
+    a re-encryption rather than trusting the CopyFrom by inspection.
+    """
+
+    @staticmethod
+    def written_header(db: Database15, key) -> "object":
+        """The header Database15.encrypt actually wrote, parsed back out."""
+        from wa_crypt_tools.lib.props import Props
+        data = db.encrypt(key, Props(wa_version="2.22.5.13", jid="67", features=None), b'payload')
+        return DatabaseFactory.from_file(as_stream(data)).prefix
+
+    def test_passkey_encryption_metadata_survives_re_encryption(self):
+        from wa_crypt_tools.proto import key_type_pb2 as key_type
+        key = KeyFactory.new("tests/res/encrypted_backup.key")
+        reference = DatabaseFactory.from_file(as_stream(read("tests/res/msgstore.db.crypt15")))
+        reference.prefix.key_type_new = key_type.Key_Type.E2EE_PASSKEY
+        meta = reference.prefix.passkey_encryption_metadata
+        meta.encapsulated_root_key = "encapsulated-root-key"
+        meta.credential_id_deprecated = "credential-id"
+        meta.prf_salt_deprecated = bytes(range(8))
+        meta.server_cypher_key_version = "1"
+        meta.server_cypher_key_account_salt = bytes(range(16))
+        meta.server_cypher_key_server_salt = bytes(range(16, 32))
+        meta.client_metadata = b'client-metadata'
+
+        db = Database15(iv=bytes(range(16)))
+        db.prefix = reference.prefix
+        db.feature_table = reference.feature_table
+
+        written = self.written_header(db, key)
+        assert written.key_type_new == key_type.Key_Type.E2EE_PASSKEY
+        assert written.passkey_encryption_metadata == meta
