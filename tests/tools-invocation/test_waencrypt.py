@@ -6,6 +6,7 @@ zlib-ng (CPython 3.14+ on Windows) compresses differently, so only the plaintext
 across platforms. The one byte-for-byte check is guarded on that.
 """
 
+import os.path
 import zlib
 
 import pytest
@@ -82,6 +83,8 @@ class TestReference:
         cleanup()
 
     def test_a_crypt15_reference_reproduces_the_original(self):
+        # The fixture is a 2.22 backup, compressed at level 1, and no -c is passed here:
+        # reproducing it byte-for-byte means the level has to come off the reference too.
         out, ret = Propen("waencrypt --reference tests/res/msgstore.db.crypt15 {} {} {}"
                           .format(KEY15, PLAIN, OUT))
         assert ret == 0, out
@@ -156,3 +159,64 @@ class TestFailures:
                           .format(KEY15, PLAIN, OUT))
         assert ret != 0
         assert "does not look like a crypt12, 14 or 15 database" in out
+
+
+class TestCompressionLevel:
+    """
+    The level was hardcoded to 1, which is what WhatsApp itself used at the time. Current
+    WhatsApp compresses at 9 -- a real 2.26 msgstore re-encrypted at 1 came out 3.5% larger
+    than the original, and at 9 landed within 4 bytes of it. Both levels have to stay
+    reachable, so the level is an option and 9 is only the default.
+    """
+
+    REF = "waencrypt-test-reference.crypt15"
+
+    def teardown_method(self):
+        cleanup()
+        rm_if_found(self.REF)
+
+    def size_at(self, *extra: str) -> int:
+        out, ret = Propen(["waencrypt", *extra, KEY15, PLAIN, OUT])
+        assert ret == 0, out
+        size = os.path.getsize(OUT)
+        rm_if_found(OUT)
+        return size
+
+    def test_nine_compresses_better_than_one(self):
+        assert self.size_at("-c", "9") < self.size_at("-c", "1")
+
+    def test_the_default_is_nine(self):
+        assert self.size_at() == self.size_at("-c", "9")
+
+    @pytest.mark.parametrize("level", ["1", "6", "9"])
+    def test_every_level_still_round_trips(self, level):
+        roundtrip(KEY15, "-c", level)
+        assert cmp_files(PLAIN, ROUNDTRIP)
+
+    @pytest.mark.parametrize("level", ["-1", "10", "abc"])
+    def test_a_level_outside_the_range_is_refused(self, level):
+        out, ret = Propen(["waencrypt", "-c", level, KEY15, PLAIN, OUT])
+        assert ret != 0, out
+
+    def test_the_level_is_taken_from_the_reference(self):
+        # --reference exists to reproduce a backup, and the level is part of that: a
+        # reference built at 1 has to come back out at 1, not at the default of 9.
+        out, ret = Propen(["waencrypt", "-c", "1", KEY15, PLAIN, self.REF])
+        assert ret == 0, out
+        out, ret = Propen(["waencrypt", "--reference", self.REF, KEY15, PLAIN, OUT])
+        assert ret == 0, out
+        assert os.path.getsize(OUT) == os.path.getsize(self.REF)
+
+    def test_an_explicit_level_beats_the_reference(self):
+        out, ret = Propen(["waencrypt", "-c", "1", KEY15, PLAIN, self.REF])
+        assert ret == 0, out
+        out, ret = Propen(["waencrypt", "-c", "9", "--reference", self.REF, KEY15, PLAIN, OUT])
+        assert ret == 0, out
+        assert os.path.getsize(OUT) < os.path.getsize(self.REF)
+
+    def test_no_compress_ignores_the_level(self):
+        # --no-compress writes the plaintext through untouched, so a level alongside it
+        # cannot silently start compressing.
+        out, ret = Propen(["waencrypt", "--no-compress", "-c", "9", KEY15, PLAIN, OUT])
+        assert ret == 0, out
+        assert os.path.getsize(OUT) > os.path.getsize(PLAIN)

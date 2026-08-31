@@ -1,12 +1,27 @@
 class C:
     # These constants are only used by the guessing logic.
-    # zlib magic header is 78 01 (Low Compression).
-    # The first two bytes of the decrypted data should be those,
-    # in case of single file backup, or PK in case of multi file.
+    # The first two bytes of the decrypted data are a zlib header for a single file backup,
+    # or PK for a multi file one stored uncompressed. With CMF 0x78 -- a 32K window, which is
+    # what every level uses -- the check byte leaves exactly four possible headers, one per
+    # band of compression levels. WhatsApp compressed at level 1 historically and at level 9
+    # now, so a list holding only 78 01 stopped recognising current backups entirely.
     ZLIB_HEADERS = [
-        b'x\x01',
+        b'x\x01',  # levels 0-1
+        b'x\x5e',  # levels 2-5
+        b'x\x9c',  # level 6, zlib's default
+        b'x\xda',  # levels 7-9, what WhatsApp uses now
         b'PK'
     ]
+    # A zlib header names a band of levels, not one level, so reproducing a stream from its
+    # header alone means picking a representative: the top of each band, which is exact for
+    # the only two levels WhatsApp has ever used, 1 and 9.
+    ZLIB_HEADER_LEVELS = {
+        b'x\x01': 1,
+        b'x\x5e': 5,
+        b'x\x9c': 6,
+        b'x\xda': 9,
+    }
+    DEFAULT_COMPRESSION_LEVEL = 9
     ZIP_HEADER = b'PK\x03\x04'
     # Size of bytes to test (number chosen arbitrarily, but values less than ~310 makes test_decompression fail)
     HEADER_SIZE = 384

@@ -106,7 +106,34 @@ when touching them (`tests/res/` has a fixture backup in each format, all decryp
 multi-file one, so its plaintext is a ZIP (`test9.zip`) rather than a zlib'd SQLite database and
 it has no trailing md5, which puts the tag where the checksum would be. It was made with
 `waencrypt --no-compress --iv 000102030405060708090a0b0c0d0e0f tests/res/encrypted_backup.key
-tests/res/test9.zip <out>` with the last 16 bytes then dropped.
+tests/res/test9.zip <out>` with the last 16 bytes then dropped. Note `--no-compress`: it is a
+*raw* ZIP, so it exercises the multi-file reader but not the guessing logic, which sees a real
+multi-file backup as a compressed one (see below).
+
+**Compression level tracks WhatsApp's own and is load-bearing in two places.** WhatsApp
+compressed backups at zlib level 1 when this project was written and compresses at level 9
+now. Two things had been written against level 1 and broke silently when it moved:
+`waencrypt`'s hardcoded level, now `-c`/`--compression-level` defaulting to 9; and
+`C.ZLIB_HEADERS`, the first-two-bytes gate `waguess` applies before it will spend time on a
+candidate decryption, which held only `78 01` and so rejected every current backup with
+"the key does not match this backup". All four zlib headers are listed there now, one per
+band of levels, so the gate no longer depends on which level WhatsApp picks. Anything that
+compares the *size* of an encrypted file against a real backup is really comparing
+compression levels, and a re-encryption at 9 lands within a couple of bytes of the original.
+`--reference` reads the level off the reference's own zlib header, so it reproduces a backup
+of any era without being told; the default only applies when there is no reference.
+
+`waguess` is for msgstore and nothing else, by design. Its only signal that a candidate offset
+decrypted correctly is `test_decompression`, which demands a SQLite or ZIP payload, so the
+sticker (WebP) and settings (JSON) backups under `WhatsApp/Backups/` come back as "the key
+does not match this backup" -- and files below `HEADER_SIZE` are refused as too small. Both
+are intended: `wadecrypt` and `wainfo` handle every one of those files, and broadening the
+check would cost the search its only defence against false offsets.
+
+An incremental backup (`msgstore-increment-*.crypt15`) is a third shape: its plaintext is a
+ZIP of JSON changesets, but a *compressed* one, so the ZIP header only appears after
+decompression. `lib/utils.py: test_decompression` checks for it both before and after for
+that reason -- before catches `stickers.backup.crypt15`, after catches the real thing.
 
 ## Notes
 

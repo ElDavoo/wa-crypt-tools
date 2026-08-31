@@ -33,6 +33,11 @@ def test_decompression(test_data: bytes) -> bool:
         if len(zlib_obj) < 16:
             log.error("Test decompression: chunk too small")
             return False
+        # A multi-file or incremental backup is a ZIP that WhatsApp compresses like any
+        # other payload, so its header only shows up once we have decompressed. The check
+        # above only catches a ZIP stored uncompressed.
+        if zlib_obj[:4] == C.ZIP_HEADER:
+            return True
         # Decoding can fail if first two bytes are a bad UTF-8 char
         if zlib_obj[:15].decode('ascii') != 'SQLite format 3':
             log.error("Test decompression: Decryption and decompression ok but not a valid SQLite database")
@@ -160,7 +165,7 @@ def header_info(header):
     string: str = ""
     if header.c15_iv.IV:
         string += "Crypt15 info:\n"
-        string += str("Header information in your crypt15 file:")
+        string += str("Header information in your crypt15 file:\n")
         string += str("IV: {}\n".format(header.c15_iv.IV.hex()))
     if header.c14_cipher.IV:
         string += str("Header information in your crypt14 file:\n")
