@@ -97,16 +97,28 @@ def with_unknown_header_field(source: str, dest: str, field: bytes = b'\x30\x03'
 
 def without_feature_table_flag(source: str, dest: str):
     """
-    Copies a backup, dropping the 0x01 byte that flags the feature table.
+    Rewrites a backup's header with every migration flag cleared -- the shape a non-msgstore
+    backup (wa.db, chatsettingsbackup and the rest) actually has.
 
-    Every backup that is not a msgstore lacks it -- wa.db, chatsettingsbackup and the rest --
-    so reproducing one means not writing a byte the original never had.
+    There never was a separate byte marking a header as "no feature table": the header's size
+    prefix is a protobuf varint on its own, and a header with nothing set is just smaller
+    content, sized the same way any other header is. What looked like that byte was its
+    mandatory varint continuation for any size in [128, 255], present or not regardless of
+    features.
     """
+    import io
+    from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
+    from wa_crypt_tools.lib.utils import encode_varint
     raw = open(source, 'rb').read()
-    size = raw[0]
-    assert raw[1] == 1, "source already has no feature table flag"
-    body = raw[2 + size:-16]
-    header = bytes([size]) + raw[2:2 + size]
+    stream = io.BufferedReader(io.BytesIO(raw))
+    db = DatabaseFactory.from_file(stream)
+    header_len = stream.tell()
+    body = raw[header_len:-16]
+    for field in db.prefix.backup_metadata.DESCRIPTOR.fields:
+        if field.type == field.TYPE_BOOL:
+            db.prefix.backup_metadata.ClearField(field.name)
+    serialized = db.prefix.SerializeToString()
+    header = encode_varint(len(serialized)) + serialized
     with open(dest, 'wb') as f:
         f.write(header + body + md5(header + body).digest())
 
@@ -141,8 +153,9 @@ class TestReference:
             assert cmp_files(OUT, ref)
 
     def test_a_reference_without_a_feature_table_stays_without_one(self, tmp_path):
-        # Database15 wrote the 0x01 flag unconditionally, so every non-msgstore backup came
-        # back one byte longer than it went in.
+        # Database15 used to write an extra byte whenever it believed the source was a
+        # msgstore, so a non-msgstore reference came back one byte longer than it went in.
+        # The size prefix is a plain protobuf varint now, with nothing extra to get wrong.
         ref = str(tmp_path / "no-feature-table.crypt15")
         without_feature_table_flag("tests/res/msgstore.db.crypt15", ref)
         out, ret = Propen(["waencrypt", "--reference", ref, KEY15, PLAIN, OUT])

@@ -157,6 +157,20 @@ def get_mcrypt1_name(*, key, name: str, md5: bytes) -> bytes:
     return media_hash
 
 
+def encode_varint(value: int) -> bytes:
+    """The protobuf varint encoding of a non-negative int, as used for the header's own size
+    prefix: one byte for any header under 128 bytes, more above that."""
+    out = bytearray()
+    while True:
+        byte = value & 0x7f
+        value >>= 7
+        if value:
+            out.append(byte | 0x80)
+        else:
+            out.append(byte)
+            return bytes(out)
+
+
 def unknown_header_fields(header) -> list[str]:
     """
     Names the fields of a parsed header that this schema does not describe, innermost included.

@@ -51,21 +51,27 @@ class DatabaseFactory:
 
         try:
             file_hash = md5()
-            # The first byte is the size of the upcoming protobuf message
-            protobuf_size = encrypted.read(1)
-            file_hash.update(protobuf_size)
-            protobuf_size = int.from_bytes(protobuf_size, byteorder='big')
-
-            # A 0x01 as a second byte indicates the presence of the feature table in the protobuf.
-            # It is optional and present only in msgstore database, although
-            # I found some old msgstore backups without it, so it is optional.
-            msgstore_features_flag = encrypted.peek(1)[0]
-            if msgstore_features_flag != 1:
-                msgstore_features_flag = 0
+            # The size of the upcoming protobuf message is itself a protobuf varint: one byte
+            # for any header under 128 bytes, which covers every backup this project once saw,
+            # until a populated passkey_encryption_metadata pushed one over that line. What
+            # looked like a second, separate "msgstore feature table" flag byte (a literal
+            # 0x01 right after the size) was never an independent thing -- it is the varint's
+            # own mandatory continuation byte for any size in [128, 255], which is always 1.
+            # Whether the header actually carries feature flags is content, read off
+            # backup_metadata below, not a byte in this prefix.
+            protobuf_size = 0
+            for shift in range(0, 35, 7):
+                size_byte = encrypted.read(1)
+                if not size_byte:
+                    raise HeaderError("Reading database header failed: file ended while reading "
+                                      "the header size.")
+                file_hash.update(size_byte)
+                byte = size_byte[0]
+                protobuf_size |= (byte & 0x7f) << shift
+                if not byte & 0x80:
+                    break
             else:
-                file_hash.update(encrypted.read(1))
-            if not msgstore_features_flag:
-                log.debug("No feature table found (not a msgstore DB or very old)")
+                raise HeaderError("The header size varint is too long. Please report a bug.")
 
             try:
 
@@ -119,7 +125,7 @@ class DatabaseFactory:
                 db.iv = iv
                 db.file_hash = file_hash
                 db.prefix = header
-                db.feature_table = bool(msgstore_features_flag)
+                db.feature_table = len(props.get_features()) > 0
                 if len(iv) != 16:
                     raise IntegrityError("IV is not 16 bytes long but is {} bytes long"
                                          .format(len(iv)), data=db)

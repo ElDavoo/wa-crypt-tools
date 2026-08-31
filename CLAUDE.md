@@ -89,9 +89,15 @@ the actual cipher key from the root key via an HMAC-SHA256 loop keyed with `b'ba
 **Databases** (`lib/db/`) — `Database` ABC (`decrypt`/`encrypt`/`get_iv`), implemented by
 `Database12`, `Database14`, `Database15`. `DatabaseFactory.from_file(stream)` reads the header
 off an open binary stream and decides:
-- Byte 0 is the size of a `BackupPrefix` protobuf; an optional `0x01` at byte 1 flags the msgstore
-  feature table. `header.c15_iv.IV` non-empty → `Database15`; `header.c14_cipher.IV` non-empty →
-  `Database14`.
+- The header opens with the size of a `BackupPrefix` protobuf, encoded as a protobuf varint --
+  one byte under 128, more above that. What looked like a separate `0x01` byte flagging the
+  msgstore feature table was never an independent thing: it is that varint's own mandatory
+  continuation byte for any size in [128, 255], which is always 1, so every msgstore header seen
+  before 2026 (all of them in that range) made the two look identical. A passkey-protected
+  backup's header exceeds 255 bytes and exposed the difference: a single raw size byte
+  misreads it, a real multi-byte varint reads it correctly. Whether the header actually carries
+  feature flags is read off `backup_metadata`'s content, not off a byte in this prefix.
+  `header.c15_iv.IV` non-empty → `Database15`; `header.c14_cipher.IV` non-empty → `Database14`.
 - A `DecodeError` parsing that protobuf means it is a crypt12: the stream is `seek(0)`'d and
   handed to `Database12`, which parses the fixed-offset legacy header itself.
 
@@ -126,8 +132,8 @@ multi-file backup as a compressed one (see below).
 
 **The `*-2.26.*` fixtures are real backups**, off a WhatsApp 2.26.34.7 device, and are what
 `tests/lib/db/test_current_format.py` runs on: `msgstore-2.26.db.crypt15` (a current msgstore),
-`wa-2.26.db.crypt15` (a backup that is not a msgstore, so no `0x01` feature-table byte, and it
-carries `backup_encrypted_hash`), and `msgstore-increment-2.26.crypt15` (an incremental backup,
+`wa-2.26.db.crypt15` (a backup that is not a msgstore, so `backup_metadata` carries no migration
+flags, and it carries `backup_encrypted_hash`), and `msgstore-increment-2.26.crypt15` (an incremental backup,
 whose payload is a compressed ZIP of JSON changesets). They exist because reconstructions kept
 missing what real backups do -- `key_type_new` went unnoticed in every 2.26 backup until a
 byte-for-byte comparison went looking for it, and the older fixtures cannot catch its like.
@@ -141,7 +147,7 @@ original header, set `jid_suffix` to `"00"`, blank `device_model`/`lid_suffix`/`
 replace `backup_encrypted_hash_salt`/`backup_encrypted_hash` with `bytes(range(16))` and
 `bytes(range(32))` so the fields stay present at the right length, and re-encrypt with
 `Database15(iv=bytes(range(16)))` carrying `prefix` = that header and `feature_table` = whether
-the source had the `0x01` byte, under `tests/res/encrypted_backup.key` at zlib level 9.
+the source had any migration flag set, under `tests/res/encrypted_backup.key` at zlib level 9.
 `test_nothing_in_these_headers_is_unknown` is the tripwire: refresh a fixture from a newer
 WhatsApp and it fails until the schema catches up.
 
@@ -182,19 +188,26 @@ this did not have: protobuf keeps unknown fields and hands them back on serialis
 either. Note `FieldDescriptor.label` is gone in protobuf 7 -- use `is_repeated`.
 
 **A re-encryption is built on the parsed header, not from scratch.** `DatabaseFactory` keeps the
-`BackupPrefix` it parsed on `db.prefix` and whether the `0x01` feature-table flag was there on
-`db.feature_table`; `waencrypt` hands both to the database it builds, and `Database14/15.encrypt`
-start from that prefix rather than an empty one. Real backups carry an unknown varint field 6
-this schema has no name for, and protobuf preserves it across a parse and a `CopyFrom` -- so
-carrying the header through keeps it, where rebuilding from `Props` alone dropped 2 bytes and
-made byte-identical output impossible. In crypt15 only msgstore backups have the feature-table
-flag, so writing it unconditionally (as `Database15` did) made every other backup a byte too
-long. Both fall back to the old behaviour when there is no reference to copy. Note the flag is
-crypt15-specific: on a 2.26 crypt14 device *every* backup carries the `0x01` byte, msgstore or
-not, which is why the rule has to be "copy what the source had" rather than "write it for
-msgstore". Also, `dbfactory.py` and `utils.py: header_info` print the same "No feature table
-found" sentence for two different things -- the missing `0x01` byte and a header with no
-`*_migration_finished` flags -- so `wainfo` will say it about a file that does have the byte.
+`BackupPrefix` it parsed on `db.prefix`; `waencrypt` hands it to the database it builds, and
+`Database14/15.encrypt` start from that prefix rather than an empty one. Real backups carry an
+unknown varint field 6 this schema has no name for, and protobuf preserves it across a parse
+and a `CopyFrom` -- so carrying the header through keeps it, where rebuilding from `Props` alone
+dropped 2 bytes and made byte-identical output impossible.
+
+`db.feature_table` records whether the source's `backup_metadata` had any migration flag set,
+but it is purely informational now -- `encrypt()` always sizes the header with a plain protobuf
+varint and never writes a byte of its own for it. It used to: `Database15` wrote an extra `0x01`
+whenever it believed the source was a msgstore, and `dbfactory.py` detected "msgstore-ness" by
+peeking a byte that was assumed to sit right after the header's size. Both readings were wrong
+in the same way. Every msgstore header this project had ever seen was 128-255 bytes, and the
+varint encoding of any size in that range mandatorily ends in a continuation byte equal to 1 --
+so what looked like a deliberate flag was that byte, every time, by construction, not by
+survey. A passkey-protected backup's header (over 500 bytes, `client_metadata` alone can run
+past 200) needs a genuine multi-byte varint, and reading its second byte as a boolean flag
+truncates the header into garbage. `header_info` already computed "feature table" correctly, by
+whether `backup_metadata`'s own migration-flag fields were set -- content, not a byte in the
+prefix -- and `dbfactory.py`'s duplicate, byte-peeking "No feature table found" message is gone
+now that the peek is gone with it.
 
 **crypt14 has a fourth thing that must hold: the header's own `key_version`.** `C14_cipher`
 carries a key version that nothing else can supply -- the key file stores the same number as a
@@ -232,9 +245,9 @@ that reason -- before catches `stickers.backup.crypt15`, after catches the real 
   against 13 backups off a 2.26 device, from a 239-byte `avatar-password.bkup` to a 55 MB
   msgstore, covering SQLite, ZIP, JSON and WebP payloads. Three things have to hold at once for
   that, and each was separately broken: the zlib level has to match (see above), the header
-  protobuf has to keep the fields this schema does not model, and the `0x01` feature-table flag
-  has to be written only when the original had it. `--multi-file` and `--noparse` are declared
-  and never read.
+  protobuf has to keep the fields this schema does not model, and the header's own size prefix
+  has to be written as the same protobuf varint a real device would write. `--multi-file` and
+  `--noparse` are declared and never read.
   Its output positional -- like `wadecrypt`'s -- is deliberately a plain `str` and not an
   `argparse.FileType('wb')`: that type opens the file during parsing, so it was emptied before
   any check had run. The existence guard at the top of `encrypt()`/`decrypt()` only works while

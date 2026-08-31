@@ -10,6 +10,7 @@ from wa_crypt_tools.lib.errors import DecryptionError, IntegrityError
 from wa_crypt_tools.lib.key.key import Key
 from wa_crypt_tools.lib.key.key14 import Key14
 from wa_crypt_tools.lib.props import Props
+from wa_crypt_tools.lib.utils import encode_varint
 
 log = logging.getLogger(__name__)
 
@@ -64,13 +65,11 @@ class Database14(Database):
         prefix = header.SerializeToString()
         out = b''
         file_hash = md5()
-        out += len(prefix).to_bytes(1, byteorder='big')
+        # The size prefix is a protobuf varint, not a raw byte capped at 255: what looked like
+        # a separate "feature table" flag byte was always just that varint's own mandatory
+        # continuation byte for sizes in [128, 255], never an independent flag.
+        out += encode_varint(len(prefix))
         file_hash.update(out)
-        # As above: what the source had wins, and the feature list decides only when there
-        # was no source to copy.
-        if self.feature_table if self.feature_table is not None else len(props.get_features()) > 0:
-            out += b'\x01'
-            file_hash.update(b'\x01')
         out += prefix
         file_hash.update(prefix)
         cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)

@@ -8,6 +8,7 @@ from Cryptodome.Cipher import AES
 
 from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.lib.props import Props
+from wa_crypt_tools.lib.utils import encode_varint
 
 log = logging.getLogger(__name__)
 
@@ -104,14 +105,11 @@ class Database15(Database):
         prefix = header.SerializeToString()
         out = b''
         file_hash = md5()
-        out += len(prefix).to_bytes(1, byteorder='big')
+        # The size prefix is a protobuf varint, not a raw byte capped at 255: what looked like
+        # a separate msgstore "feature table" flag byte was always just that varint's own
+        # mandatory continuation byte for sizes in [128, 255], never an independent flag.
+        out += encode_varint(len(prefix))
         file_hash.update(out)
-        # Only msgstore backups carry the feature table flag. When this database came from a
-        # file we know whether that one had it; otherwise keep writing it, as this has always
-        # done, since a bare Database15 is only ever built for a msgstore.
-        if self.feature_table is None or self.feature_table:
-            out += b'\x01'
-            file_hash.update(b'\x01')
         out += prefix
         file_hash.update(prefix)
         cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)

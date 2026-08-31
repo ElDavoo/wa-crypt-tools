@@ -10,6 +10,7 @@ none of them ran it at all, and `wainfo <any crypt14>` died with
 import pytest
 
 from tests.utils.utils import Propen, rm_if_found
+from wa_crypt_tools.lib.utils import encode_varint
 
 BAD_IV = "short-iv.db.crypt15"
 
@@ -26,7 +27,7 @@ def make_short_iv_backup():
     header.backup_metadata.call_log_migration_finished = True
     serialized = header.SerializeToString()
     with open(BAD_IV, 'wb') as f:
-        f.write(len(serialized).to_bytes(1, byteorder='big') + b'\x01' + serialized + b'\xff' * 64)
+        f.write(encode_varint(len(serialized)) + serialized + b'\xff' * 64)
 
 
 class TestWaInfoOnBackups:

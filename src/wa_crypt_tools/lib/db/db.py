@@ -16,8 +16,10 @@ class Database(abc.ABC):
     # DatabaseFactory sets it; encrypt() rebuilds the header on top of it so that anything
     # WhatsApp put there which this schema does not model survives a re-encryption.
     prefix = None
-    # Whether the source carried the 0x01 byte that flags the feature table. None when this
-    # database was not parsed from a file, in which case encrypt() falls back to its own rule.
+    # Whether the source's header carried any migration-finished feature flag. Informational
+    # only -- it does not affect encrypt(), which always sizes the header with a protobuf
+    # varint and never writes a byte of its own for this. None when this database was not
+    # parsed from a file.
     feature_table = None
 
     @abc.abstractmethod

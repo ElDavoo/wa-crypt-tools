@@ -11,6 +11,8 @@ from wa_crypt_tools.lib.db.db14 import Database14
 from wa_crypt_tools.lib.db.db15 import Database15
 from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
 from wa_crypt_tools.lib.errors import HeaderError, IntegrityError
+from wa_crypt_tools.lib.key.keyfactory import KeyFactory
+from wa_crypt_tools.lib.utils import encode_varint
 
 
 def read(path: str) -> bytes:
@@ -33,7 +35,7 @@ def crypt15_header(*, iv: bytes) -> bytes:
     header.backup_metadata.jid_suffix = "67"
     header.backup_metadata.call_log_migration_finished = True
     serialized = header.SerializeToString()
-    return len(serialized).to_bytes(1, byteorder='big') + b'\x01' + serialized
+    return encode_varint(len(serialized)) + serialized
 
 
 def crypt15_header_with_extra(*, iv: bytes, extra: bytes) -> bytes:
@@ -45,7 +47,7 @@ def crypt15_header_with_extra(*, iv: bytes, extra: bytes) -> bytes:
     header.e2ee_key_data.encryption_iv = iv
     header.backup_metadata.app_version = "2.22.5.13"
     serialized = header.SerializeToString() + extra
-    return len(serialized).to_bytes(1, byteorder='big') + b'\x01' + serialized
+    return encode_varint(len(serialized)) + serialized
 
 
 def crypt15_header_with_passkey(*, iv: bytes) -> bytes:
@@ -68,7 +70,51 @@ def crypt15_header_with_passkey(*, iv: bytes) -> bytes:
     meta.server_cypher_key_server_salt = bytes(range(16, 32))
     meta.client_metadata = b'client-metadata'
     serialized = header.SerializeToString()
-    return len(serialized).to_bytes(1, byteorder='big') + b'\x01' + serialized
+    return encode_varint(len(serialized)) + serialized
+
+
+def crypt15_header_over_255_bytes(*, iv: bytes) -> bytes:
+    """A crypt15 header padded past 255 bytes -- the shape a real device wrote once
+    passkey_encryption_metadata.client_metadata carried a real HPKE-wrapped blob. The size
+    prefix here cannot be mistaken for the old single-byte model with a coincidental 0x01
+    continuation: its second byte is well past 1, and a third byte is required too."""
+    from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
+    from wa_crypt_tools.proto import key_type_pb2 as key_type
+    header = prefix.BackupPrefix()
+    header.key_type_deprecated = key_type.Key_Type.E2EE_DEPRECATED
+    header.key_type_new = key_type.Key_Type.E2EE_PASSKEY
+    header.e2ee_key_data.encryption_iv = iv
+    header.backup_metadata.app_version = "2.26.34.7"
+    header.passkey_encryption_metadata.client_metadata = bytes(range(256)) * 2
+    serialized = header.SerializeToString()
+    assert len(serialized) > 255
+    return encode_varint(len(serialized)) + serialized
+
+
+class TestHeaderSizeVarint:
+    """
+    The header size prefix is a protobuf varint, not a single byte capped at 255. A real
+    passkey-protected backup (tests/res has no fixture; this was checked against one pulled
+    off a device outside the repo) carries a header just over 500 bytes, which the old
+    single-byte reader silently truncated into garbage instead of failing loudly.
+    """
+
+    def test_a_header_over_255_bytes_is_read_in_full(self):
+        db = DatabaseFactory.from_file(as_stream(crypt15_header_over_255_bytes(iv=b'\x00' * 16)))
+        assert len(db.prefix.passkey_encryption_metadata.client_metadata) == 512
+
+    def test_it_survives_a_re_encryption(self):
+        key = KeyFactory.new("tests/res/encrypted_backup.key")
+        reference = DatabaseFactory.from_file(
+            as_stream(crypt15_header_over_255_bytes(iv=bytes(range(16)))))
+        db = Database15(iv=bytes(range(16)))
+        db.prefix = reference.prefix
+        db.feature_table = reference.feature_table
+        from wa_crypt_tools.lib.props import Props
+        out = db.encrypt(key, Props(v_features=reference.prefix.backup_metadata), b'payload')
+        written = DatabaseFactory.from_file(as_stream(out))
+        assert written.prefix.passkey_encryption_metadata.client_metadata == \
+            reference.prefix.passkey_encryption_metadata.client_metadata
 
 
 class TestUnknownFields:
