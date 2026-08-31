@@ -1,0 +1,13 @@
+edition = "2023";
+
+// What a backup encrypted with a passkey carries instead of a bare IV. No backup this project
+// has seen sets it -- it is here so the field is named rather than unknown.
+message PasskeyEncryptionMetadata {
+    string encapsulated_root_key = 1;
+    string credential_id_deprecated = 2;
+    bytes prf_salt_deprecated = 3;
+    string server_cypher_key_version = 4;
+    bytes server_cypher_key_account_salt = 5;
+    bytes server_cypher_key_server_salt = 6;
+    bytes client_metadata = 7;
+}

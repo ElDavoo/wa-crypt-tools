@@ -73,6 +73,17 @@ logged its failure and then continued anyway.
   underlying hole is fixed too: `Props(v_features=...)`, which is how a parsed header becomes
   props, never set `max_feature`, so `get_features()` raised on every props built that way.
   It is taken from the protobuf schema now.
+- **The protobuf schema uses WhatsApp's own field names.** They were read out of the app
+  (`com.whatsapp` 2.26.34.7), not guessed: `key_type` is `key_type_deprecated`, `c14_cipher` is
+  `wa_provided_key_data`, `c15_iv` is `e2ee_key_data`, `info` is `backup_metadata`, and the
+  `f_5`..`f_39` flags turn out to be `<migration>_migration_finished` -- the "feature table" is
+  a record of which database migrations had run. Three fields this library did not model are in
+  the schema now: `passkey_encryption_metadata` (5), `key_type_new` (6), and, inside
+  `BackupExpiry`, `backup_encrypted_hash_salt`/`backup_encrypted_hash` (40, 41) which every
+  backup that is not a msgstore carries. `Key_Type` gained the values it was missing --
+  `E2EE_PASSWORD`, `E2EE_ENCRYPTION_KEY`, `E2EE_PASSKEY` -- and what this project called
+  `HSM_CONTROLLED` is really `E2EE_DEPRECATED`. Renaming a field cannot change the wire format,
+  so nothing about what is read or written changes.
 - `wainfo` printed the crypt15 IV on the same line as the heading that introduces it, unlike
   the crypt14 branch beside it, so anything reading its output line by line missed the IV.
 

@@ -78,22 +78,22 @@ class DatabaseFactory:
 
                 # Checking and printing WA version and phone number. Neither is used for
                 # anything cryptographic, so a surprise here is worth a message and no more.
-                version = findall(r"\d(?:\.\d{1,3}){3}", header.info.app_version)
+                version = findall(r"\d(?:\.\d{1,3}){3}", header.backup_metadata.app_version)
                 if len(version) != 1:
                     log.error('WhatsApp version not found')
                 else:
                     log.debug("WhatsApp version: {}".format(version[0]))
-                if len(header.info.jidSuffix) != 2:
+                if len(header.backup_metadata.jid_suffix) != 2:
                     log.error("The phone number end is not 2 characters long")
-                log.debug("Your phone number ends with {}".format(header.info.jidSuffix))
+                log.debug("Your phone number ends with {}".format(header.backup_metadata.jid_suffix))
 
-                if len(header.c15_iv.IV) != 0:
+                if len(header.e2ee_key_data.encryption_iv) != 0:
                     # DB Header is crypt15
-                    iv = header.c15_iv.IV
+                    iv = header.e2ee_key_data.encryption_iv
                     is_crypt15 = True
-                elif len(header.c14_cipher.IV) != 0:
+                elif len(header.wa_provided_key_data.encryption_iv) != 0:
                     # DB Header is crypt14
-                    iv = header.c14_cipher.IV
+                    iv = header.wa_provided_key_data.encryption_iv
                     is_crypt15 = False
                 else:
                     # Not a crypt14/15 header at all: fall back to crypt12 below.
@@ -102,7 +102,7 @@ class DatabaseFactory:
                 # We are done here
                 log.debug(header_info(header))
 
-                props = Props(v_features=header.info)
+                props = Props(v_features=header.backup_metadata)
                 # The database is built even when the IV is the wrong length, so that --force
                 # has something to go on with; the caller gets it through IntegrityError.data.
                 db = Database15(props=props) if is_crypt15 else Database14(props=props)

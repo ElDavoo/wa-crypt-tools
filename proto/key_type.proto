@@ -1,8 +1,13 @@
 edition = "2023";
 
-// This enum describes if the key is self-managed by WhatsApp of if it is stored in the HSM.
-// In other words, traditional = 0, end-to-end = 1
+// Both key type fields of BackupPrefix are verified against this one enum -- the app builds a
+// single Internal$EnumVerifier and puts it at both positions in the message schema.
+// The value names are WhatsApp's own; the enum's own name does not survive into the binary,
+// so Key_Type is this project's.
 enum Key_Type {
-    WA_PROVIDED = 0;
-    HSM_CONTROLLED = 1;
+    WA_PROVIDED = 0;         // WhatsApp holds the key: crypt12 and crypt14
+    E2EE_DEPRECATED = 1;     // end-to-end, from before the kind of key was spelled out
+    E2EE_PASSWORD = 2;       // derived from a user password
+    E2EE_ENCRYPTION_KEY = 3; // the 64-digit key: what crypt15 backups carry today
+    E2EE_PASSKEY = 4;        // derived from a passkey
 }

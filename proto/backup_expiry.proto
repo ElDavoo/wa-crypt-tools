@@ -1,45 +1,56 @@
 edition = "2023";
 // This describes the metadata, e.g. the version, the ph number and various features.
+//
+// The names are WhatsApp's own. What this project called the "feature table" is a set of
+// database migration flags: every one of fields 5 to 37 is named <migration>_migration_finished
+// in the app, and says that that migration had already run when the backup was written.
 message BackupExpiry {
     string app_version = 1; // Whatsapp version, for example "2.22.4.14"
-    // optional string device_model = 2; // Device model, unused
-    string jidSuffix = 3; // The last two numbers of the user's Jid (phone number)
-    // These bools are only written if the backup is a msgstore backup.
+    string device_model = 2;
+    string jid_suffix = 3; // The last two numbers of the user's Jid (phone number)
+    // The migration flags below are only written if the backup is a msgstore backup.
     int32 backup_version = 4;
-    // Booleans that indicate various features
-    bool f_5 = 5; // call_log
-    bool f_6 = 6; // labeled_jid
-    bool f_7 = 7; // message_fts
-    bool f_8 = 8; // blank_me_jid
-    bool f_9 = 9; // message_link
-    bool f_10 = 10; // message_main
-    bool f_11 = 11; // message_text
-    bool f_12 = 12; // missed_calls
-    bool f_13 = 13; // receipt_user
-    bool f_14 = 14; // message_media
-    bool f_15 = 15; // message_vcard
-    bool f_16 = 16; // message_future
-    bool f_17 = 17; // message_quoted
-    bool f_18 = 18; // message_system
-    bool f_19 = 19; // receipt_device
-    bool f_20 = 20; // message_mention
-    bool f_21 = 21; // message_revoked
-    bool f_22 = 22; // broadcast_me_jid
-    bool f_23 = 23; // message_frequent
-    bool f_24 = 24; // message_location
-    bool f_25 = 25; // participant_user
-    bool f_26 = 26; // message_thumbnail
-    bool f_27 = 27; // message_send_count
-    bool f_28 = 28; // migration_jid_store
-    bool f_29 = 29; // payment_transaction
-    bool f_30 = 30; // migration_chat_store
-    bool f_31 = 31; // quoted_order_message
-    bool f_32 = 32; // media_migration_fixer
-    bool f_33 = 33; // quoted_order_message_v2
-    bool f_34 = 34; // message_main_verification
-    bool f_35 = 35; // quoted_ui_elements_reply_message
-    bool f_36 = 36; // alter_message_ephemeral_to_message_ephemeral_remove_column
-    bool f_37 = 37; // alter_message_ephemeral_setting_to_message_ephemeral_setting_remove_column
-    // optional int32 backup_export_file_size = 38; // The size of the backup file, unused
-    bool f_39 = 39; // cleaned_db, does not show in incremental backups
+    bool call_log_migration_finished = 5;
+    bool labeled_jid_migration_finished = 6;
+    bool message_fts_migration_finished = 7;
+    bool blank_me_jid_migration_finished = 8;
+    bool message_link_migration_finished = 9;
+    bool message_main_migration_finished = 10;
+    bool message_text_migration_finished = 11;
+    bool missed_calls_migration_finished = 12;
+    bool receipt_user_migration_finished = 13;
+    bool message_media_migration_finished = 14;
+    bool message_vcard_migration_finished = 15;
+    bool message_future_migration_finished = 16;
+    bool message_quoted_migration_finished = 17;
+    bool message_system_migration_finished = 18;
+    bool receipt_device_migration_finished = 19;
+    bool message_mention_migration_finished = 20;
+    bool message_revoked_migration_finished = 21;
+    bool broadcast_me_jid_migration_finished = 22;
+    bool message_frequent_migration_finished = 23;
+    bool message_location_migration_finished = 24;
+    bool participant_user_migration_finished = 25;
+    bool message_thumbnail_migration_finished = 26;
+    bool message_send_count_migration_finished = 27;
+    bool migration_jid_store_migration_finished = 28;
+    bool payment_transaction_migration_finished = 29;
+    bool migration_chat_store_migration_finished = 30;
+    bool quoted_order_message_migration_finished = 31;
+    bool media_migration_fixer_migration_finished = 32;
+    bool quoted_order_message_v2_migration_finished = 33;
+    bool message_main_verification_migration_finished = 34;
+    bool quoted_ui_elements_reply_message_migration_finished = 35;
+    bool alter_message_ephemeral_to_message_ephemeral_remove_column_migration_finished = 36;
+    bool alter_message_ephemeral_setting_to_message_ephemeral_setting_remove_column_migration_finished = 37;
+    int64 backup_export_file_size = 38; // The size of the backup file
+    bool cleaned_db = 39; // does not show in incremental backups
+    // Set on the backups that are not a msgstore -- wa.db carries both.
+    bytes backup_encrypted_hash_salt = 40;
+    bytes backup_encrypted_hash = 41;
+    // An enum in the app, kept as an int here: it is a varint on the wire either way, and its
+    // values were not recovered.
+    int32 identifier_type = 42;
+    string lid_suffix = 43;
+    string display_suffix = 44;
 }

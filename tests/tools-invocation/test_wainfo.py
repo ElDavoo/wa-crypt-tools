@@ -19,11 +19,11 @@ def make_short_iv_backup():
     from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
     from wa_crypt_tools.proto import key_type_pb2 as key_type
     header = prefix.BackupPrefix()
-    header.key_type = key_type.Key_Type.HSM_CONTROLLED
-    header.c15_iv.IV = b'\x00' * 8
-    header.info.app_version = "2.22.5.13"
-    header.info.jidSuffix = "67"
-    header.info.f_5 = True
+    header.key_type_deprecated = key_type.Key_Type.E2EE_DEPRECATED
+    header.e2ee_key_data.encryption_iv = b'\x00' * 8
+    header.backup_metadata.app_version = "2.22.5.13"
+    header.backup_metadata.jid_suffix = "67"
+    header.backup_metadata.call_log_migration_finished = True
     serialized = header.SerializeToString()
     with open(BAD_IV, 'wb') as f:
         f.write(len(serialized).to_bytes(1, byteorder='big') + b'\x01' + serialized + b'\xff' * 64)

@@ -3,16 +3,25 @@ import "C14_cipher.proto";
 import "C15_IV.proto";
 import "key_type.proto";
 import "backup_expiry.proto";
+import "passkey_encryption_metadata.proto";
 
 /*
 This file describes the header you can find near the start of an encrypted backup file.
+
+The field names are WhatsApp's own. Fields 2 and 3 are not a oneof in the app: its message
+schema lists them as two ordinary optional fields, so a header may in principle set neither.
  */
 message BackupPrefix {
-    Key_Type key_type = 1; // 0 if traditional (crypt14), 1 if end-to-end (crypt15)
-    oneof cipher_info {
-        C14_cipher c14_cipher = 2; // If DB is crypt14
-        C15_IV c15_iv = 3; // If DB is crypt15
-    }
+    // Which of the two ciphers a backup uses is really told by whichever of fields 2 and 3 is
+    // set. This one has been deprecated in favour of key_type_new, but is still written.
+    Key_Type key_type_deprecated = 1;
+    C14_cipher wa_provided_key_data = 2; // If DB is crypt14
+    C15_IV e2ee_key_data = 3; // If DB is crypt15
     // Version that generated backup and other infos
-    BackupExpiry info = 4;
+    BackupExpiry backup_metadata = 4;
+    PasskeyEncryptionMetadata passkey_encryption_metadata = 5;
+    // What key_type_deprecated became once password and passkey backups arrived, and it was no
+    // longer enough to say only whether the key is end-to-end. Every crypt15 backup seen from
+    // WhatsApp 2.26 carries E2EE_ENCRYPTION_KEY here.
+    Key_Type key_type_new = 6;
 }
