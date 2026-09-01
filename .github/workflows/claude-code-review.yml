@@ -12,17 +12,19 @@ on:
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-
+    # `agent/issue-*` pull requests already get this exact plugin invocation as pass one of
+    # agent-review.yml, which then votes on the merge. Running it here as well would file
+    # every finding twice and pay for the review twice.
+    if: ${{ !startsWith(github.head_ref, 'agent/issue-') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
+      # write, not read: `--comment` files the findings as inline review comments, which is
+      # the whole point of this stage. agent-review.yml's equivalent pass carries the same.
+      pull-requests: write
       issues: read
+      # The action fetches a GitHub OIDC token on every run, including the OAuth path, and
+      # fails after three retries without this.
       id-token: write
 
     steps:
@@ -43,7 +45,24 @@ jobs:
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
           prompt: '/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
-          claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment"'
+          # --allowedTools is an allowlist, not an addition to a default, so it has to name
+          # everything the plugin's procedure uses -- and that procedure is subagents almost
+          # end to end: a Haiku triage agent, a CLAUDE.md locator, a summariser, five parallel
+          # reviewers and a scorer per finding, then `gh` to post. The inline-comment tool
+          # alone, which is what this workflow shipped with, leaves it no way to perform a
+          # single one of its steps. Runs 33022803884 and 33035520610 are what that looks
+          # like: ten denials and nothing posted, then seven denials and an approval claiming
+          # an inline comment that was never filed, with "No buffered inline comments" in the
+          # action's own post-step both times.
+          #
+          # Kept identical to agent-review.yml's list, minus its `--model` pin: the safety here
+          # is that the allowlist is default-deny, so a gh verb nobody predicted is refused
+          # without anyone having had to predict it. The denies are redundant on paper and are
+          # here because prefix matching on a chained command is not worth betting a reviewer's
+          # write access on.
+          claude_args: >-
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Task,Read,Glob,Grep,Bash(git:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr comment:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh search:*),Bash(rg:*),Bash(jq:*),Bash(find:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(sort:*),Bash(uniq:*),Bash(diff:*)"
+            --disallowedTools "Write,Edit,Bash(gh pr review:*),Bash(gh pr merge:*),Bash(gh pr edit:*),Bash(gh api:*),Bash(gh workflow:*),Bash(gh run:*),Bash(gh secret:*),Bash(gh ruleset:*),Bash(curl:*),Bash(wget:*),Bash(nc:*),Bash(ssh:*),Bash(scp:*),Bash(git push:*),Bash(git remote:*),Bash(git config:*),WebFetch,WebSearch"
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
 
