@@ -95,6 +95,11 @@ You need to supply the following parameters:
 1) The feature list: Only for 2019+ databases. These are really the database migration flags
    WhatsApp records in the header, and there is no way to infer them from a database file. The
    defaults are what a 2.26.34.7 msgstore carries, which is all of them.
+   Only a msgstore has them. Every other backup -- `wa.db`, `stickers.db`, the rest of
+   `WhatsApp/Backups/` -- carries no feature information at all, which is what `wainfo` means
+   by "No feature table found (not a msgstore DB or very old)". To write a header of that
+   shape, pass `--enable-features` with nothing after it: an empty list writes neither the
+   migration flags nor the backup version, and `--max-feature` then does nothing.
 2) The max feature number, which is 39 at the time of writing
 3) The version of the app that encrypted the file: defaults to 2.26.34.7.
 4) Jid: The last 2 numbers of your phone number -- this one really is yours, and defaults to 00
