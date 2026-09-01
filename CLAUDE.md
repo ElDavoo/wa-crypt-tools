@@ -36,11 +36,37 @@ suite under `xvfb-run` for the same reason.
 Without the venv on `PATH`, the 14 `tools-invocation` tests fail with
 `FileNotFoundError: 'wacreatekey'` while everything else passes.
 
-Lint (CI treats only the first as blocking):
+Lint and formatting (both block; ruff replaced flake8):
 
 ```bash
-flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+ruff check .           # --fix applies the mechanical ones
+ruff format .          # --check --diff is what CI runs
+mypy src/wa_crypt_tools # advisory: CI reports it, does not fail on it
+```
+
+The rule set lives in `[tool.ruff.lint]` in `pyproject.toml` and is selected **explicitly**
+rather than left to ruff's default. Dependabot bumps ruff daily here and ruff grows its default
+set between minor releases, so an implicit set means a dependency bump can turn CI red on code
+nobody touched; the `ruff >= 0.16.5, < 0.17` range in the `test` extra is the other half of that
+and the upper bound should stay. Generated protobuf classes are excluded via `extend-exclude`;
+`proto/fix_imports.py` sits at the repo root and *is* linted.
+
+Two `per-file-ignores` are deliberate and should not be "cleaned up": `E402` in
+`src/wa_crypt_tools/__init__.py`, because the `NullHandler` has to be attached before the
+submodules are imported, and `SIM115` in `tests/`, because a test hands an open handle to
+`DatabaseFactory` and then reads the rest itself -- a `with` block would close it mid-assertion.
+Three `# noqa: BLE001` carry their reason at the point of use. The same suppression in
+`db15.py`/`dbfactory.py` was drift rather than intent, and those imports are at the top now.
+
+Lint runs in its own CI job, not on each of the ten matrix legs -- the answer does not depend on
+the OS or the Python version. `all-green`'s `needs` lists it, so adding another such job means
+adding it there too, or the branch ruleset gates on nothing.
+
+`.git-blame-ignore-revs` holds the whole-tree `ruff format` commit. GitHub honours it
+automatically; locally it is one opt-in per clone:
+
+```bash
+git config blame.ignoreRevsFile .git-blame-ignore-revs
 ```
 
 Regenerating protobuf classes (from `proto/`, needs only a `protoc` binary — see README
@@ -76,7 +102,10 @@ fields -- and fields 1 and 6 share one enum, so `Key_Type` carries all five of i
 Renaming a field cannot change the wire format, so none of this affects what is read or written;
 it only stops the header being half-anonymous.
 
-`git-hooks/pre-commit` (not installed by default) runs `python3 -m pytest -q`.
+`git-hooks/pre-commit` (not installed by default) runs `ruff check`, `ruff format --check` and
+then `python3 -m pytest -q`. It and `.github/scripts/agent-gates.sh` deliberately call the same
+bare `ruff check .` that CI does, taking the rule set from `pyproject.toml` rather than each
+repeating a selection -- three copies of a `--select` list is how they drifted before.
 
 ## Architecture
 
@@ -302,6 +331,20 @@ not encode a workaround for it.
   TOTAL is the package's own number (~94%): `lib/` sits around 97%, the `wa*.py` entry points
   between 81% and 97%, and `gui/` at 97% for `core.py` and 91% for `app.py` -- the latter only
   reaches that where a display exists, so a headless run reports it far lower.
+- `fail_under` in `.coveragerc` makes that number load-bearing, and it lives there rather than
+  as `--cov-fail-under` on CI's pytest call so a local `python -m pytest --cov` fails the same
+  way CI does. It is set below the current number on purpose -- at the current number, any
+  refactor that moves a few lines goes red -- and low enough that a **headless** run still
+  clears it, because `tests/gui/test_app.py` skips without a display and takes `app.py`'s
+  coverage down with it. CI's Ubuntu leg runs under xvfb and so sees the higher number; a
+  developer running `pytest --cov` on a machine with no display sees the lower one, and the
+  floor has to be under that, not under CI's.
+- mypy is wired up but advisory (`continue-on-error` in the lint job), and the config in
+  `[tool.mypy]` only sets `ignore_missing_imports` (javaobj and pycryptodomex ship no types)
+  and excludes the generated protobuf. Blocking on it needs an annotation pass or a baseline
+  file first. What is left is mostly `attr-defined` on protobuf messages, Liskov `override`
+  complaints where `Database12`/`Key14` narrow a base-class parameter, and `str-bytes-safe` on
+  diagnostics that render bytes as `b'...'` intentionally.
 - `tests/tools-invocation/` shells out to the console scripts, and those subprocesses are measured
   too. It takes three pieces together and breaks silently — as 0% on every `wa*.py` — if any one
   of them goes: `parallel = true` in `.coveragerc`, the root `conftest.py` exporting

@@ -21,7 +21,8 @@ except ModuleNotFoundError:
     try:
         # pycryptodome
         # noinspection PyUnresolvedReferences
-        from Crypto.Cipher import AES
+        # The rebind is the whole point of the fallback, so mypy's no-redef does not apply.
+        from Crypto.Cipher import AES  # type: ignore[no-redef]
 
         if not hasattr(AES, "MODE_GCM"):
             # pycrypto

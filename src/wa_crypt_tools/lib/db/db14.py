@@ -61,16 +61,16 @@ class Database14(Database):
         header.wa_provided_key_data.CopyFrom(cipher)
 
         header.backup_metadata.CopyFrom(props.get_proto())
-        prefix = header.SerializeToString()
+        serialized_prefix = header.SerializeToString()
         out = b""
         file_hash = md5()
         # The size prefix is a protobuf varint, not a raw byte capped at 255: what looked like
         # a separate "feature table" flag byte was always just that varint's own mandatory
         # continuation byte for sizes in [128, 255], never an independent flag.
-        out += encode_varint(len(prefix))
+        out += encode_varint(len(serialized_prefix))
         file_hash.update(out)
-        out += prefix
-        file_hash.update(prefix)
+        out += serialized_prefix
+        file_hash.update(serialized_prefix)
         cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)
         encrypted_data, authentication_tag = cipher.encrypt_and_digest(decrypted)
         out += encrypted_data

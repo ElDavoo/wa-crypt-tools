@@ -28,7 +28,8 @@ except ModuleNotFoundError:
     try:
         # pycryptodome
         # noinspection PyUnresolvedReferences
-        from Crypto.Cipher import AES
+        # The rebind is the whole point of the fallback, so mypy's no-redef does not apply.
+        from Crypto.Cipher import AES  # type: ignore[no-redef]
 
         if not hasattr(AES, "MODE_GCM"):
             # pycrypto
@@ -122,8 +123,13 @@ def guess_offsets(key: bytes, encrypted: io.BufferedReader, def_iv_offset: int, 
     """Gets the IV, shifts the stream to the beginning of the encrypted data and returns the cipher.
     It does so by guessing the offset."""
 
-    # Assign variables to suppress warnings
-    db_header, data_offset, iv_offset = None, None, None
+    # -1 is what find_data_offset returns for "not found", and what the check after the loop
+    # tests for. Starting there means an oscillate() that yields nothing -- so the loop never
+    # runs and never binds these -- takes the same "could not guess the offsets" exit as a
+    # search that ran and failed, rather than reaching the slice below with None and raising
+    # TypeError. def_iv_offset is range-checked in guess(), so the CLI cannot get there, but
+    # guess_offsets does not depend on its caller having done that.
+    data_offset, iv_offset = -1, -1
 
     # Restart the file stream
     encrypted.seek(0)
