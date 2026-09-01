@@ -20,8 +20,16 @@ runs:
         python-version: '3.12'
         cache: 'pip'
 
+    # tesseract is what the screenshot key reader shells out to. Without it those tests skip
+    # silently, so an agent would run a suite that says nothing about that feature.
+    - name: Install tesseract
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y tesseract-ocr
+
     - name: Install the package and its test dependencies
       shell: bash
       run: |
         python -m pip install --upgrade pip
-        python -m pip install -e '.[test]'
+        python -m pip install -e '.[test,ocr]'

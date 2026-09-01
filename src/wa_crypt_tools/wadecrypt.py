@@ -5,11 +5,21 @@ This script decrypts WhatsApp's DB files encrypted with Crypt12, Crypt14 or Cryp
 
 from __future__ import annotations
 
+from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
-from wa_crypt_tools.lib.errors import DecryptionError, HeaderError, IntegrityError, WaCryptError
+from wa_crypt_tools.lib.errors import (
+    DecryptionError,
+    HeaderError,
+    IntegrityError,
+    ScreenshotKeyError,
+    WaCryptError,
+)
+from wa_crypt_tools.lib.key.key15 import Key15
 from wa_crypt_tools.lib.key.keyfactory import KeyFactory
+from wa_crypt_tools.lib.key.nearby import typo_keys
+from wa_crypt_tools.lib.key.ocr import alternative_keys, looks_like_image
 from wa_crypt_tools.lib.logformat import setup_logging
-from wa_crypt_tools.lib.utils import test_decompression
+from wa_crypt_tools.lib.utils import encryptionloop, test_decompression
 
 # AES import party!
 # pycryptodome and PyCryptodomex's implementations of AES are the same,
@@ -292,6 +302,115 @@ def main():
         log.info("Done")
 
 
+#: How much ciphertext to decrypt when checking whether a candidate key is the right one.
+#: Two bytes is enough to reject almost everything; this much is enough for zlib to prove it.
+PROBE_BYTES = 512
+
+#: How often to say something while searching, at debug level. A candidate costs about 400us
+#: and the search runs to roughly 15,000 of them.
+PROGRESS_EVERY = 4000
+
+
+def key_works(root: bytes, iv: bytes, probe: bytes) -> bool:
+    """
+    Whether a candidate root key decrypts the start of this backup into something meaningful.
+
+    The same trick waguess uses on offsets, applied to keys: decrypt the first two bytes and
+    compare them against the headers a compressed or zipped payload has to start with. That
+    rejects a wrong key in microseconds, and only a candidate that gets past it is worth
+    decompressing a few hundred bytes of to be sure.
+
+    A payload that is neither zlib nor a ZIP -- a backup written with --no-compress -- cannot
+    be recognised this way, so this says no and the caller simply does not correct anything.
+    """
+    try:
+        # Key15.get() by hand. Building a Key15 per candidate would be correct and would also
+        # log "Crypt15 / Raw key loaded" tens of thousands of times on the way to an answer.
+        cipher_key = encryptionloop(first_iteration_data=root, message=Key15.BACKUP_ENCRYPTION, output_bytes=32)
+        if AES.new(cipher_key, AES.MODE_GCM, iv).decrypt(probe[:2]) not in C.ZLIB_HEADERS:
+            return False
+        # A two-byte match comes up by chance about once in every 13000 keys, so confirm it
+        # with a real decompression. GCM keeps internal state, so the cipher is rebuilt.
+        return test_decompression(AES.new(cipher_key, AES.MODE_GCM, iv).decrypt(probe))
+    except (ValueError, zlib.error):
+        return False
+
+
+def transcribed(keyfile) -> bool | None:
+    """
+    Whether this key was transcribed by anything, and if so by what.
+
+    True for a screenshot -- OCR transcribed it. False for 64 digits given on the command
+    line -- a person did. None for a key file, where nobody did: those digits came out of
+    WhatsApp's own file byte for byte, so a near miss of them is not a thing that exists.
+    """
+    if looks_like_image(keyfile):
+        return True
+    return None if Path(keyfile).is_file() else False
+
+
+def corrected(key, keyfile, encrypted, iv):
+    """
+    Returns `key`, or the near miss of it that actually decrypts this backup.
+
+    A key reaches this program transcribed two ways -- read off a screenshot, or typed in off
+    one -- and either way a single wrong digit fails exactly like a completely wrong key,
+    with nothing in the message to tell those apart. This is what tells them apart: it tries
+    the candidates near the key against the backup itself, so what comes back has decrypted
+    something. It never returns a guess, only a key that was proved right.
+
+    It is meant to be unnoticeable when it succeeds -- the user asked for a decryption, not
+    for a report on how their key was arrived at -- so the whole search is at debug level.
+    Only a screenshot that could not be read is worth interrupting anyone about, because that
+    one is the program's own failure and has a specific way out. A typed key that cannot be
+    repaired says nothing and lets the decryption fail on its own terms: the user can see
+    what they typed, and the key may simply belong to a different backup.
+
+    Anything unexpected leaves the original key alone. This is a recovery path for a run that
+    was about to fail anyway, and it must not be able to make that worse.
+    """
+    from_a_picture = transcribed(keyfile)
+    if not isinstance(key, Key15) or from_a_picture is None:
+        return key
+    try:
+        here = encrypted.tell()
+        probe = encrypted.read(PROBE_BYTES)
+        encrypted.seek(here)
+    except OSError as e:
+        # Not every stream can be rewound. Nothing has been consumed that matters, so the
+        # decryption goes ahead unchecked exactly as it did before this existed.
+        log.debug("Could not probe the backup to check the key: %s", e)
+        return key
+
+    if key_works(key.get_root(), iv, probe):
+        return key
+
+    # Built only now: for a screenshot this reaches back into the OCR reading, and there is
+    # no reason to do that for a key that turns out to work.
+    guesses = alternative_keys(keyfile) if from_a_picture else typo_keys(key.get_root().hex())
+
+    log.debug("The key does not decrypt this backup; trying near misses...")
+    for attempt, candidate in enumerate(guesses, start=1):
+        if attempt % PROGRESS_EVERY == 0:
+            log.debug("    tried %d keys...", attempt)
+        root = bytes.fromhex(candidate)
+        if key_works(root, iv, probe):
+            log.debug("It was a digit or two out; %s works, found after %d tries", candidate, attempt)
+            return Key15(keyarray=root)
+
+    if from_a_picture:
+        # Blaming the reader is the honest reading of it: the key is 64 digits the user can
+        # see with their own eyes, and the program is the part that got them wrong.
+        raise ScreenshotKeyError(
+            "Could not read the key from the screenshot: what it says does not decrypt this "
+            "backup,\n    and neither does any near miss of it.\n    "
+            "Transcribe the 64 digits from the screenshot by hand and pass those instead of "
+            "the image."
+        )
+    log.debug("No near miss of the given key decrypts this backup either.")
+    return key
+
+
 def decrypt(args):
     """Decrypts the database, honouring --force for the checks that can be survived."""
     # Before anything else, and before the output is opened: refusing after the fact would
@@ -311,6 +430,10 @@ def decrypt(args):
         db = DatabaseFactory.from_file(args.encrypted)
     except IntegrityError as e:
         db = forced(args, e)
+
+    # A screenshot read with one digit wrong fails exactly like a wrong key. Before spending
+    # the whole decryption on it, check it against the backup and repair it if it is close.
+    key = corrected(key, args.keyfile, args.encrypted, db.get_iv())
 
     cipher = AES.new(key.get(), AES.MODE_GCM, db.get_iv())
 

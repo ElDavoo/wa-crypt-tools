@@ -46,6 +46,14 @@ wainfo = "wa_crypt_tools.wainfo:main"
 wagui = "wa_crypt_tools.gui:main"
 
 [project.optional-dependencies]
+# Reading a key off a screenshot (KeyFactory.new on an image). Needs the tesseract binary too:
+# Debian/Ubuntu "apt install tesseract-ocr", macOS "brew install tesseract",
+# Windows "winget install UB-Mannheim.TesseractOCR".
+ocr = [
+    "pytesseract >= 0.3.13",
+    # pytesseract depends on Pillow already, but lib/key/ocr.py imports PIL itself.
+    "Pillow >= 10.0.0"
+]
 test = [
     "pytest >= 8.0.0",
     "pytest-cov >= 4.0.0",

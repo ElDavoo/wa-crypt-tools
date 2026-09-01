@@ -23,3 +23,24 @@ def rm_if_found(file: str):
     path = Path(file)
     if path.is_file():
         path.unlink(missing_ok=True)
+
+
+def requires_ocr():
+    """
+    Skips the calling test unless a key can actually be read off a screenshot.
+
+    That needs both halves of the optional [ocr] extra -- the Python packages and the
+    tesseract binary they shell out to -- and either can be missing on a perfectly good
+    machine, so this skips rather than fails.
+    """
+    import pytest
+
+    pytest.importorskip("pytesseract", reason="needs the [ocr] extra")
+    pytest.importorskip("PIL", reason="needs the [ocr] extra")
+    import pytesseract
+
+    try:
+        pytesseract.get_tesseract_version()
+    except Exception:  # noqa: BLE001 -- a skip guard; anything that goes wrong here means
+        # tesseract cannot be used, and what exactly went wrong is not this test's business.
+        pytest.skip("the tesseract binary is not installed or not on PATH")

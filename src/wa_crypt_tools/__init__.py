@@ -14,6 +14,7 @@ from wa_crypt_tools.lib.errors import (
     HeaderError,
     IntegrityError,
     InvalidKeyError,
+    ScreenshotKeyError,
     WaCryptError,
 )
 from wa_crypt_tools.lib.key.key import Key
@@ -37,5 +38,6 @@ __all__ = [
     "Key15",
     "KeyFactory",
     "Props",
+    "ScreenshotKeyError",
     "WaCryptError",
 ]
