@@ -52,6 +52,61 @@ test = [
     # Subprocess coverage for tests/tools-invocation/ relies on the .pth file coverage
     # installs into site-packages; see conftest.py. Pinned to a version known to ship it.
     "coverage >= 7.16.0",
-    "flake8 >= 7.0.0",
+    # Rule selection lives in [tool.ruff.lint] below. The upper bound is deliberate: ruff adds
+    # rules to existing groups in minor releases, so an unbounded range lets a routine dependabot
+    # bump turn CI red on code nobody touched.
+    "ruff >= 0.16.5, < 0.17",
+    # Advisory only -- CI reports mypy but does not fail on it. See the workflow for why.
+    "mypy >= 1.18.0",
     "coveralls >= 3.3.0"
 ]
+
+[tool.ruff]
+line-length = 127
+# Generated protobuf classes. protoc writes them, `proto/fix_imports.py` rewrites five import
+# lines in one of them, and nothing here is hand-maintained -- linting them only produces
+# findings no one may act on. `proto/fix_imports.py` itself lives at the repo root and IS linted.
+extend-exclude = ["src/wa_crypt_tools/proto"]
+
+[tool.ruff.lint]
+# Selected explicitly rather than left to ruff's default set. Dependabot bumps ruff daily here,
+# and the default set grows between minor releases -- an implicit set means a dependency bump can
+# turn CI red on code nobody touched. The version range in the `test` extra is the other half of
+# that: patch releases fix bugs, minor releases add rules.
+select = [
+    "E", "W",      # pycodestyle
+    "F",           # pyflakes -- unused imports and names, the gap the old flake8 select left open
+    "I",           # isort
+    "UP",          # pyupgrade
+    "B",           # flake8-bugbear
+    "SIM",         # flake8-simplify
+    "C4",          # flake8-comprehensions
+    "PIE",         # flake8-pie
+    "RET",         # flake8-return
+    "BLE",         # flake8-blind-except
+    "RUF",         # ruff's own
+    "PLE", "PLW",  # pylint errors and warnings
+    "PLR1722",     # exit() -- which only exists when `site` ran -- instead of sys.exit()
+    "PLR1730",     # if-stmt-min-max
+    "TRY201",      # `raise e` inside `except ... as e` instead of a bare `raise`
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The NullHandler has to be attached before the submodules are imported, or importing this
+# library as a library warns on any log record it emits. That puts the re-exports below it.
+"src/wa_crypt_tools/__init__.py" = ["E402"]
+# Tests open fixtures and hand the handle to a factory that reads the header off it, then read
+# the rest themselves -- a `with` block around that would close the file mid-assertion.
+"tests/*" = ["SIM115"]
+
+[tool.mypy]
+python_version = "3.10"
+# Third-party packages that ship no type information: javaobj and pycryptodomex. Without this
+# every import of them is an error, which buries the findings that are about this code.
+ignore_missing_imports = true
+# Generated protobuf classes, and the stubs protoc does not write for them.
+exclude = "^src/wa_crypt_tools/proto/"
+
+[[tool.mypy.overrides]]
+module = "wa_crypt_tools.proto.*"
+ignore_errors = true

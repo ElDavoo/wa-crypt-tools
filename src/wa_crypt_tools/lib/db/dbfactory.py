@@ -1,4 +1,6 @@
 import logging
+from hashlib import md5
+from re import findall
 
 from google.protobuf.message import DecodeError
 
@@ -10,9 +12,6 @@ from wa_crypt_tools.lib.props import Props
 from wa_crypt_tools.lib.utils import header_info, unknown_header_fields
 
 log = logging.getLogger(__name__)
-
-from hashlib import md5
-from re import findall
 
 
 class _NotCrypt1415(Exception):
@@ -29,21 +28,20 @@ class DatabaseFactory:
     def from_file(encrypted):
         try:
             from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
-            from wa_crypt_tools.proto import key_type_pb2 as key_type
         except ImportError as e:
-            log.error("Could not import the proto classes: {}".format(e))
+            log.error(f"Could not import the proto classes: {e}")
             if str(e).startswith("cannot import name 'builder' from 'google.protobuf.internal'"):
                 log.error("You need to upgrade the protobuf library to at least 3.20.0.\n"
                           "    python -m pip install --upgrade protobuf")
             elif str(e).startswith("no module named"):
                 log.error("Please download them and put them in the \"proto\" sub folder.")
-            raise e
+            raise
         except AttributeError as e:
-            log.error("Could not import the proto classes: {}\n    ".format(e) +
+            log.error(f"Could not import the proto classes: {e}\n    " +
                       "Your protobuf library is probably too old.\n    "
                       "Please upgrade to at least version 3.20.0 , by running:\n    "
                       "python -m pip install --upgrade protobuf")
-            raise e
+            raise
 
         header = prefix.BackupPrefix()
 
@@ -79,8 +77,8 @@ class DatabaseFactory:
                 file_hash.update(protobuf_raw)
 
                 if header.ParseFromString(protobuf_raw) != protobuf_size:
-                    raise HeaderError("Protobuf message not fully read: the header claims {} bytes. "
-                                      "Please report a bug.".format(protobuf_size))
+                    raise HeaderError(f"Protobuf message not fully read: the header claims {protobuf_size} bytes. "
+                                      "Please report a bug.")
 
                 # Checking and printing WA version and phone number. Neither is used for
                 # anything cryptographic, so a surprise here is worth a message and no more.
@@ -88,10 +86,10 @@ class DatabaseFactory:
                 if len(version) != 1:
                     log.error('WhatsApp version not found')
                 else:
-                    log.debug("WhatsApp version: {}".format(version[0]))
+                    log.debug(f"WhatsApp version: {version[0]}")
                 if len(header.backup_metadata.jid_suffix) != 2:
                     log.error("The phone number end is not 2 characters long")
-                log.debug("Your phone number ends with {}".format(header.backup_metadata.jid_suffix))
+                log.debug(f"Your phone number ends with {header.backup_metadata.jid_suffix}")
 
                 if len(header.e2ee_key_data.encryption_iv) != 0:
                     # DB Header is crypt15
@@ -116,7 +114,7 @@ class DatabaseFactory:
                                 "still reads, and re-encrypting keeps the field, but please "
                                 "report it."
                                 .format("a field" if len(extra) == 1 else
-                                        "{} fields".format(len(extra)), ", ".join(extra)))
+                                        f"{len(extra)} fields", ", ".join(extra)))
 
                 props = Props(v_features=header.backup_metadata)
                 # The database is built even when the IV is the wrong length, so that --force
@@ -127,8 +125,8 @@ class DatabaseFactory:
                 db.prefix = header
                 db.feature_table = len(props.get_features()) > 0
                 if len(iv) != 16:
-                    raise IntegrityError("IV is not 16 bytes long but is {} bytes long"
-                                         .format(len(iv)), data=db)
+                    raise IntegrityError(f"IV is not 16 bytes long but is {len(iv)} bytes long"
+                                         , data=db)
                 return db
 
             except (DecodeError, _NotCrypt1415):
@@ -138,8 +136,8 @@ class DatabaseFactory:
                 try:
                     encrypted.seek(0)
                 except OSError as e:
-                    raise HeaderError("Could not reset the file pointer: {}".format(e)) from e
+                    raise HeaderError(f"Could not reset the file pointer: {e}") from e
                 return Database12(encrypted=encrypted)
 
         except OSError as e:
-            raise HeaderError("Reading database header failed: {}".format(e)) from e
+            raise HeaderError(f"Reading database header failed: {e}") from e

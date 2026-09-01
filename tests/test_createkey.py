@@ -1,11 +1,8 @@
-import os
-import zlib
 
-from wa_crypt_tools.lib.key.key15 import Key15
-from wa_crypt_tools.lib.key.key14 import Key14
-from wa_crypt_tools.lib.key.keyfactory import KeyFactory
-from wa_crypt_tools.lib.props import Props
 from hashlib import sha512
+
+from wa_crypt_tools.lib.key.key14 import Key14
+from wa_crypt_tools.lib.key.key15 import Key15
 
 
 class TestCreatekey:

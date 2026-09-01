@@ -5,13 +5,12 @@ This script transforms a password_data.key file into a hashcat hash.
 from __future__ import annotations
 
 import argparse
+import sys
+from base64 import b64encode
 
 # noinspection PyPackageRequirements
 # This is from javaobj-py3
 import javaobj.v2 as javaobj
-
-from base64 import b64encode
-
 
 # password_data.key file format:
 # The password_data.key file is a serialized Java object, composed by:
@@ -29,13 +28,13 @@ class Log:
     @staticmethod
     def i(msg: str):
         """Always prints message."""
-        print('[I] {}'.format(msg))
+        print(f'[I] {msg}')
 
     @staticmethod
     def f(msg: str):
         """Always prints message and exit."""
-        print('[F] {}'.format(msg))
-        exit(1)
+        print(f'[F] {msg}')
+        sys.exit(1)
 
 
 def parsecmdline() -> argparse.Namespace:
@@ -61,21 +60,21 @@ def javaintlist2bytes(barr: javaobj.beans.JavaArray) -> bytes:
 
 def read_password_data_key(passworddatakeyfilestream) -> str:
     # Assign variables to suppress warnings
-    deserialized: list = list()
+    deserialized: list = []
 
     try:
         deserialized: list = javaobj.load(passworddatakeyfilestream)
     except OSError as e:
-        Log.f("Couldn't read keyfile: {}".format(e))
+        Log.f(f"Couldn't read keyfile: {e}")
     except (ValueError, RuntimeError) as e:
-        Log.f("The keyfile is not a valid Java object: {}".format(e))
+        Log.f(f"The keyfile is not a valid Java object: {e}")
 
     if len(deserialized) != 4:
         Log.f("The keyfile has more fields than expected.")
 
     version: int = barrtoint(deserialized[0])
     if version != 1:
-        Log.f("Unexpected key version: {}".format(version))
+        Log.f(f"Unexpected key version: {version}")
 
     encoded = javaintlist2bytes(deserialized[1])
     if len(encoded) != 64:
@@ -87,7 +86,7 @@ def read_password_data_key(passworddatakeyfilestream) -> str:
 
     permutations: int = barrtoint(deserialized[3])
     if permutations != 100000:
-        Log.i("Unexpected permutation number: {}".format(permutations))
+        Log.i(f"Unexpected permutation number: {permutations}")
 
     return "sha512:{}:{}:{}".format(
         permutations,

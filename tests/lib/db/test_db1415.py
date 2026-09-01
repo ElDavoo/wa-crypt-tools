@@ -82,7 +82,7 @@ class TestStr:
         # It used to print Database12's fields, none of which Database14 has, so any attempt
         # to print one died with an AttributeError.
         iv = bytes(range(16))
-        assert str(Database14(iv=iv)) == "Database14(iv: {})".format(iv.hex())
+        assert str(Database14(iv=iv)) == f"Database14(iv: {iv.hex()})"
 
 
 class TestCrypt14KeyVersionIsCarriedThrough:

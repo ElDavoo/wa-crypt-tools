@@ -5,10 +5,10 @@ This script decrypts WhatsApp's DB files encrypted with Crypt12, Crypt14 or Cryp
 
 from __future__ import annotations
 
-from wa_crypt_tools.lib.logformat import setup_logging
-from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
 from wa_crypt_tools.lib.errors import DecryptionError, HeaderError, IntegrityError, WaCryptError
+from wa_crypt_tools.lib.key.keyfactory import KeyFactory
+from wa_crypt_tools.lib.logformat import setup_logging
 from wa_crypt_tools.lib.utils import test_decompression
 
 # AES import party!
@@ -36,21 +36,20 @@ except ModuleNotFoundError:
                                   "python -m pip install pycryptodome\n"
                                   "Or: python -m pip install pycryptodome\n"
                                   "You can also remove \"crypto\" if you have it installed\n"
-                                  "python -m pip uninstall crypto")
+                                  "python -m pip uninstall crypto") from None
 # noinspection PyPackageRequirements
 # This is from javaobj-py3
 
 # noinspection PyPackageRequirements
 
+import argparse
 import io
+import sys
+import zlib
+from datetime import date
 from pathlib import Path
 from re import findall
-from sys import maxsize
 from time import sleep
-from datetime import date
-
-import argparse
-import zlib
 
 __author__ = 'ElDavo'
 __copyright__ = 'Copyright (C) 2023'
@@ -80,8 +79,7 @@ def parsecmdline() -> argparse.Namespace:
                         help='Does not load files in RAM, stresses the disk more. '
                              'Default: load files into RAM')
     parser.add_argument('-bs', '--buffer-size', type=int, help='How many bytes of data to process at a time. '
-                                                               'Implies -nm. Default: {}'.format(
-        io.DEFAULT_BUFFER_SIZE))
+                                                               f'Implies -nm. Default: {io.DEFAULT_BUFFER_SIZE}')
     parser.add_argument('-nd', '--no-decompress', action='store_true',
                         help='Does not decompress the decrypted data. '
                              'Default: decompresses the decrypted data')
@@ -113,7 +111,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
     try:
 
         if buffer_size < 17:
-            log.info("Invalid buffer size, will use default of {}".format(io.DEFAULT_BUFFER_SIZE))
+            log.info(f"Invalid buffer size, will use default of {io.DEFAULT_BUFFER_SIZE}")
             buffer_size = io.DEFAULT_BUFFER_SIZE
 
         # Does the thing above but only with DEFAULT_BUFFER_SIZE bytes at a time.
@@ -129,107 +127,106 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
 
         if not chunk:
             raise HeaderError("Encrypted file is empty or truncated.")
-        else:
-            while True:
-                # We will need to manage two chunks at a time, because we might have
-                # the checksum in both the last chunk and the chunk before that.
-                # This makes the logic more complicated, but it's the only way to.
+        while True:
+            # We will need to manage two chunks at a time, because we might have
+            # the checksum in both the last chunk and the chunk before that.
+            # This makes the logic more complicated, but it's the only way to.
 
-                checksum = None
+            checksum = None
 
-                try:
-                    next_chunk = encrypted.read(buffer_size)
-                except MemoryError:
-                    log.fatal("Out of RAM, please use a smaller buffer size.")
-                    break
+            try:
+                next_chunk = encrypted.read(buffer_size)
+            except MemoryError:
+                log.fatal("Out of RAM, please use a smaller buffer size.")
+                break
 
-                if len(next_chunk) <= 36:
-                    # Last bytes read. Three cases:
-                    # 1. The checksum is entirely in the last chunk
-                    if len(next_chunk) == 36:
-                        checksum = next_chunk
-                    # 2. The checksum is entirely in the chunk before the last
-                    elif len(next_chunk) == 0:
-                        checksum = chunk[-36:]
-                        chunk = chunk[:-36]
-                    # 3. The checksum is split between the last two chunks
-                    else:
-                        checksum = chunk[-(36 - len(next_chunk)):] + next_chunk
-                        chunk = chunk[:-(36 - len(next_chunk))]
-
-                file_hash.update(chunk)
-
-                decrypted_chunk = cipher.decrypt(chunk)
-                if is_zip:
-                    try:
-                        if no_decompress:
-                            decrypted.write(decrypted_chunk)
-                        else:
-                            decrypted.write(z_obj.decompress(decrypted_chunk))
-                    except zlib.error:
-                        if test_decompression(decrypted_chunk):
-                            log.info("Decrypted data is a ZIP file that I will not decompress automatically.")
-                        else:
-                            log.error("I can't recognize decrypted data. Decryption not successful.\n    "
-                                      "The key probably does not match with the encrypted file.")
-                        is_zip = False
-                        decrypted.write(decrypted_chunk)
+            if len(next_chunk) <= 36:
+                # Last bytes read. Three cases:
+                # 1. The checksum is entirely in the last chunk
+                if len(next_chunk) == 36:
+                    checksum = next_chunk
+                # 2. The checksum is entirely in the chunk before the last
+                elif len(next_chunk) == 0:
+                    checksum = chunk[-36:]
+                    chunk = chunk[:-36]
+                # 3. The checksum is split between the last two chunks
                 else:
+                    checksum = chunk[-(36 - len(next_chunk)):] + next_chunk
+                    chunk = chunk[:-(36 - len(next_chunk))]
+
+            file_hash.update(chunk)
+
+            decrypted_chunk = cipher.decrypt(chunk)
+            if is_zip:
+                try:
+                    if no_decompress:
+                        decrypted.write(decrypted_chunk)
+                    else:
+                        decrypted.write(z_obj.decompress(decrypted_chunk))
+                except zlib.error:
+                    if test_decompression(decrypted_chunk):
+                        log.info("Decrypted data is a ZIP file that I will not decompress automatically.")
+                    else:
+                        log.error("I can't recognize decrypted data. Decryption not successful.\n    "
+                                  "The key probably does not match with the encrypted file.")
+                    is_zip = False
                     decrypted.write(decrypted_chunk)
+            else:
+                decrypted.write(decrypted_chunk)
 
-                # The presence of the checksum tells us it's the last chunk
-                if checksum is not None:
-                    is_multifile_backup = False
+            # The presence of the checksum tells us it's the last chunk
+            if checksum is not None:
+                is_multifile_backup = False
 
-                    crypt12_footer = str(checksum[-4:])
-                    jid = findall(r"(?:-|\d)(?:-|\d)(\d\d)", crypt12_footer)
-                    if len(jid) == 1:
-                        # Confirmed to be crypt12
-                        checksum = checksum[:-4]
-                        log.debug("Your phone number ends with {}".format(jid[0]))
-                    else:
-                        # Shift everything forward by 4 bytes
-                        chunk = checksum[:4]
-                        file_hash.update(chunk)
-                        decrypted_chunk = cipher.decrypt(chunk)
-                        if is_zip:
-                            try:
-                                if no_decompress:
-                                    decrypted.write(decrypted_chunk)
-                                else:
-                                    decrypted.write(z_obj.decompress(decrypted_chunk))
-                            except zlib.error:
-                                log.error("Backup is corrupted.")
+                crypt12_footer = str(checksum[-4:])
+                jid = findall(r"(?:-|\d)(?:-|\d)(\d\d)", crypt12_footer)
+                if len(jid) == 1:
+                    # Confirmed to be crypt12
+                    checksum = checksum[:-4]
+                    log.debug(f"Your phone number ends with {jid[0]}")
+                else:
+                    # Shift everything forward by 4 bytes
+                    chunk = checksum[:4]
+                    file_hash.update(chunk)
+                    decrypted_chunk = cipher.decrypt(chunk)
+                    if is_zip:
+                        try:
+                            if no_decompress:
                                 decrypted.write(decrypted_chunk)
-                        else:
+                            else:
+                                decrypted.write(z_obj.decompress(decrypted_chunk))
+                        except zlib.error:
+                            log.error("Backup is corrupted.")
                             decrypted.write(decrypted_chunk)
-                        checksum = checksum[4:]
-
-                    file_hash.update(checksum[:16])
-                    if file_hash.digest() != checksum[16:]:
-                        is_multifile_backup = True
                     else:
-                        log.debug("Checksum OK ({})!".format(file_hash.hexdigest()))
-                    try:
-                        if is_multifile_backup:
-                            decrypted.write(cipher.decrypt(checksum[:16]))
-                            cipher.verify(checksum[16:])
-                        else:
-                            cipher.verify(checksum[:16])
-                    except ValueError as e:
-                        integrity_problems.append("Authentication tag mismatch: {}."
-                                                  "\n    This probably means your backup is corrupted."
-                                                  .format(e))
-                    break
+                        decrypted.write(decrypted_chunk)
+                    checksum = checksum[4:]
 
-                # If there is no more data, we should already have seen a checksum.
-                if not next_chunk:
-                    integrity_problems.append("The encrypted database file is truncated "
-                                              "(no checksum found).")
-                    break
+                file_hash.update(checksum[:16])
+                if file_hash.digest() != checksum[16:]:
+                    is_multifile_backup = True
+                else:
+                    log.debug(f"Checksum OK ({file_hash.hexdigest()})!")
+                try:
+                    if is_multifile_backup:
+                        decrypted.write(cipher.decrypt(checksum[:16]))
+                        cipher.verify(checksum[16:])
+                    else:
+                        cipher.verify(checksum[:16])
+                except ValueError as e:
+                    integrity_problems.append(f"Authentication tag mismatch: {e}."
+                                              "\n    This probably means your backup is corrupted."
+                                              )
+                break
 
-                # Move the sliding window forward.
-                chunk = next_chunk
+            # If there is no more data, we should already have seen a checksum.
+            if not next_chunk:
+                integrity_problems.append("The encrypted database file is truncated "
+                                          "(no checksum found).")
+                break
+
+            # Move the sliding window forward.
+            chunk = next_chunk
 
         if is_zip and not no_decompress and not z_obj.eof:
             integrity_problems.append("The encrypted database file is truncated (damaged).")
@@ -237,7 +234,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
         decrypted.flush()
 
     except OSError as e:
-        raise DecryptionError("I/O error: {}".format(e)) from e
+        raise DecryptionError(f"I/O error: {e}") from e
 
     finally:
         decrypted.close()
@@ -255,11 +252,11 @@ def main():
         decrypt(args)
     except IntegrityError as e:
         # Only reached when --force was not given: the forced path handles these itself.
-        log.critical("{}\n    Use --force to write the output anyway.".format(e))
-        exit(1)
+        log.critical(f"{e}\n    Use --force to write the output anyway.")
+        sys.exit(1)
     except WaCryptError as e:
         log.critical(str(e))
-        exit(1)
+        sys.exit(1)
 
     if date.today().day == 1 and date.today().month == 4:
         log.info("Done. Uploading messages to the developer's server...")
@@ -278,9 +275,8 @@ def decrypt(args):
         # code, and the GUI -- which calls this function directly -- gets something it can
         # catch instead of a SystemExit through the middle of its event loop.
         raise WaCryptError("The output file already exists. Use --yes to overwrite it.")
-    if args.buffer_size is not None:
-        if not 1 < args.buffer_size < maxsize:
-            raise WaCryptError("Invalid buffer size: {}".format(args.buffer_size))
+    if args.buffer_size is not None and not 1 < args.buffer_size < sys.maxsize:
+        raise WaCryptError(f"Invalid buffer size: {args.buffer_size}")
     # Get the decryption key from the key file or the hex encoded string.
     key = KeyFactory.new(args.keyfile)
     log.debug(str(key))
@@ -333,7 +329,7 @@ def forced(args, error: IntegrityError):
     """Re-raises unless --force was given, in which case it hands back the salvaged result."""
     if not args.force:
         raise error
-    log.error("{}\n    Continuing anyway because --force was given.".format(error))
+    log.error(f"{error}\n    Continuing anyway because --force was given.")
     return error.data
 
 

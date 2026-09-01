@@ -250,24 +250,21 @@ class TestProtobufImportFailures:
         # The message protobuf < 3.20 actually produces.
         self.failing_import(monkeypatch, ImportError(
             "cannot import name 'builder' from 'google.protobuf.internal'"))
-        with caplog.at_level(logging.ERROR, logger="wa_crypt_tools.lib.db.dbfactory"):
-            with pytest.raises(ImportError):
-                DatabaseFactory.from_file(as_stream(read("tests/res/msgstore.db.crypt15")))
+        with caplog.at_level(logging.ERROR, logger="wa_crypt_tools.lib.db.dbfactory"), pytest.raises(ImportError):
+            DatabaseFactory.from_file(as_stream(read("tests/res/msgstore.db.crypt15")))
         assert "upgrade the protobuf library" in caplog.text
 
     def test_a_missing_proto_package_says_where_to_put_it(self, monkeypatch, caplog):
         import logging
         self.failing_import(monkeypatch, ImportError("no module named backup_prefix_pb2"))
-        with caplog.at_level(logging.ERROR, logger="wa_crypt_tools.lib.db.dbfactory"):
-            with pytest.raises(ImportError):
-                DatabaseFactory.from_file(as_stream(read("tests/res/msgstore.db.crypt15")))
+        with caplog.at_level(logging.ERROR, logger="wa_crypt_tools.lib.db.dbfactory"), pytest.raises(ImportError):
+            DatabaseFactory.from_file(as_stream(read("tests/res/msgstore.db.crypt15")))
         assert "proto" in caplog.text
 
     def test_an_attribute_error_is_re_raised_with_the_upgrade_advice(self, monkeypatch, caplog):
         import logging
         # A too-old protobuf fails inside the generated module rather than on the import.
         self.failing_import(monkeypatch, AttributeError("module 'google.protobuf' has no attribute 'runtime_version'"))
-        with caplog.at_level(logging.ERROR, logger="wa_crypt_tools.lib.db.dbfactory"):
-            with pytest.raises(AttributeError):
-                DatabaseFactory.from_file(as_stream(read("tests/res/msgstore.db.crypt15")))
+        with caplog.at_level(logging.ERROR, logger="wa_crypt_tools.lib.db.dbfactory"), pytest.raises(AttributeError):
+            DatabaseFactory.from_file(as_stream(read("tests/res/msgstore.db.crypt15")))
         assert "too old" in caplog.text

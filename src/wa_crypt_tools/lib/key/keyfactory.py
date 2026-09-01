@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import javaobj.v2 as javaobj
@@ -5,10 +6,7 @@ import javaobj.v2 as javaobj
 from wa_crypt_tools.lib.errors import InvalidKeyError
 from wa_crypt_tools.lib.key.key14 import Key14
 from wa_crypt_tools.lib.key.key15 import Key15
-
-import logging
-
-from wa_crypt_tools.lib.utils import javaintlist2bytes, hexstring2bytes
+from wa_crypt_tools.lib.utils import hexstring2bytes, javaintlist2bytes
 
 log = logging.getLogger(__name__)
 class KeyFactory:
@@ -38,24 +36,23 @@ class KeyFactory:
                 keyfile: bytes = javaintlist2bytes(jarr)
 
             except (ValueError, RuntimeError) as e:
-                raise InvalidKeyError("The keyfile is not a valid Java object: {}".format(e)) from e
+                raise InvalidKeyError(f"The keyfile is not a valid Java object: {e}") from e
 
         # We guess the key type from its length
         if len(keyfile) == 131:
             return Key14(keyarray=keyfile)
-        elif len(keyfile) == 32:
+        if len(keyfile) == 32:
             return Key15(keyarray=keyfile)
-        else:
-            raise InvalidKeyError("Unrecognized key file format: the key is {} bytes long, "
-                                  "expected 131 (crypt14) or 32 (crypt15).".format(len(keyfile)))
+        raise InvalidKeyError(f"Unrecognized key file format: the key is {len(keyfile)} bytes long, "
+                              "expected 131 (crypt14) or 32 (crypt15).")
 
     @staticmethod
     def from_hex(hexstring: str) -> Key15:
         if hexstring is None or len(hexstring) != 64:
             raise InvalidKeyError("The key file specified does not exist, and it is not a valid key either.\n    "
                                   "If you tried to specify the key directly, note it should be "
-                                  "64 characters long and not {} characters long."
-                                  .format(0 if hexstring is None else len(hexstring)))
+                                  f"64 characters long and not {0 if hexstring is None else len(hexstring)} characters long."
+                                  )
         barr: bytes = hexstring2bytes(hexstring)
         if len(barr) != 32:
             raise InvalidKeyError("The key is invalid or of the wrong length.")

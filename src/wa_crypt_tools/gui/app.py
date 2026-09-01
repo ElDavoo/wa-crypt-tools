@@ -255,7 +255,7 @@ class Window(ttk.Frame):
             return
         headline = found.headline
         if found.warning:
-            headline += "\n⚠ {}".format(found.warning)
+            headline += f"\n⚠ {found.warning}"
         self._say_info(headline, "#a05000" if found.warning else "grey30")
         # The full header goes where it is available without being in the way.
         self._show_detail(path, found.detail)
@@ -337,12 +337,12 @@ class Window(ttk.Frame):
         self.status.configure(text="Working…", foreground="grey30")
         self._busy(True)
 
-        self.worker = threading.Thread(target=self._work, daemon=True, kwargs=dict(
-            key="".join(key.split()) if self.key_mode.get() == "hex" else key,
-            encrypted=self.encrypted.get(), output=self.output.get(),
-            force=self.force.get(), overwrite=self.overwrite.get(),
-            no_decompress=self.no_decompress.get(), low_memory=self.low_memory.get(),
-            try_harder=self.try_harder.get(), verbose=self.verbose.get()))
+        self.worker = threading.Thread(target=self._work, daemon=True, kwargs={
+            "key": "".join(key.split()) if self.key_mode.get() == "hex" else key,
+            "encrypted": self.encrypted.get(), "output": self.output.get(),
+            "force": self.force.get(), "overwrite": self.overwrite.get(),
+            "no_decompress": self.no_decompress.get(), "low_memory": self.low_memory.get(),
+            "try_harder": self.try_harder.get(), "verbose": self.verbose.get()})
         self.worker.start()
 
     def _work(self, verbose: bool, **kwargs) -> None:
@@ -375,7 +375,7 @@ class Window(ttk.Frame):
     def _finished(self, error: BaseException | None) -> None:
         self._busy(False)
         if error is None:
-            self.status.configure(text="Saved to {}".format(self.output.get()),
+            self.status.configure(text=f"Saved to {self.output.get()}",
                                   foreground="#1b7f3b")
             return
         self.status.configure(text="Could not decrypt this backup.", foreground="#b00020")
@@ -389,12 +389,12 @@ def build(master: tk.Misc | None = None) -> Window:
     root = master if master is not None else tk.Tk()
     root.title("WhatsApp Crypt Tools")
     root.minsize(640, 700)
-    if "clam" in root.tk.call("ttk::themes"):
-        # The default X11 theme is a Motif throwback; clam is the closest thing Tk has to a
-        # neutral modern look, and it exists everywhere. Windows and macOS keep their native
-        # themes, which are already right.
-        if root.tk.call("tk", "windowingsystem") == "x11":
-            ttk.Style(root).theme_use("clam")
+    # The default X11 theme is a Motif throwback; clam is the closest thing Tk has to a
+    # neutral modern look, and it exists everywhere. Windows and macOS keep their native
+    # themes, which are already right.
+    if ("clam" in root.tk.call("ttk::themes")
+            and root.tk.call("tk", "windowingsystem") == "x11"):
+        ttk.Style(root).theme_use("clam")
     return Window(root)
 
 
@@ -410,7 +410,9 @@ def version() -> str:
     try:
         from importlib.metadata import version as _version
         return _version("wa-crypt-tools")
-    except Exception:  # pragma: no cover - only in a build without metadata
+    # Reporting the version must not be able to stop the program starting, and a frozen
+    # build can fail this in more ways than ImportError.
+    except Exception:  # noqa: BLE001  # pragma: no cover - only in a build without metadata
         return "unknown"
 
 
@@ -419,7 +421,7 @@ def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     # Parsed before Tk is touched, so a windowed binary can still be smoke-tested in CI.
     if "--version" in argv or "-V" in argv:
-        print("wagui (wa-crypt-tools {})".format(version()))
+        print(f"wagui (wa-crypt-tools {version()})")
         return 0
     if "--selftest" in argv:
         # What CI runs against each frozen binary. --version alone proves too little: the
@@ -428,8 +430,8 @@ def main(argv: list[str] | None = None) -> int:
         # otherwise reach a user as a window that dies on the first backup they open.
         from wa_crypt_tools.proto import backup_prefix_pb2
         backup_prefix_pb2.BackupPrefix()
-        print("wagui selftest ok (wa-crypt-tools {}, tkinter available: {})"
-              .format(version(), _has_tkinter()))
+        print(f"wagui selftest ok (wa-crypt-tools {version()}, tkinter available: {_has_tkinter()})"
+              )
         return 0
     if "--help" in argv or "-h" in argv:
         print("usage: wagui\n\nOpens the WhatsApp Crypt Tools window.\n"

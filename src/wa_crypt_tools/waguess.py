@@ -3,16 +3,16 @@
 # so we try to import one of these twos.
 import argparse
 import io
+import logging
+import sys
 import zlib
 from datetime import date
 from re import findall
-
-import logging
 from time import sleep
 
 from wa_crypt_tools.lib.constants import C
-from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 from wa_crypt_tools.lib.errors import DecryptionError, HeaderError, WaCryptError
+from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 from wa_crypt_tools.lib.logformat import setup_logging
 from wa_crypt_tools.lib.utils import test_decompression
 
@@ -43,7 +43,7 @@ except ModuleNotFoundError:
                                   "python -m pip install pycryptodome\n"
                                   "Or: python -m pip install pycryptodome\n"
                                   "You can also remove \"crypto\" if you have it installed\n"
-                                  "python -m pip uninstall crypto")
+                                  "python -m pip uninstall crypto") from None
 
 
 def oscillate(n: int, n_min: int, n_max: int):
@@ -54,8 +54,7 @@ def oscillate(n: int, n_min: int, n_max: int):
     oscillate(8, 2, 10) => 8, 7, 9, 6, 10, 5, 4, 3, 2
     """
 
-    if n_min < 0:
-        n_min = 0
+    n_min = max(n_min, 0)
 
     i = n
     c = 1
@@ -154,9 +153,9 @@ def guess_offsets(key: bytes, encrypted: io.BufferedReader, def_iv_offset: int,
     for iv_offset in oscillate(n=def_iv_offset, n_min=0, n_max=C.HEADER_SIZE - 128):
         data_offset = find_data_offset(db_header, iv_offset, key, def_data_offset)
         if data_offset != -1:
-            log.info("Offsets guessed (IV: {}, data: {}).".format(iv_offset, data_offset))
+            log.info(f"Offsets guessed (IV: {iv_offset}, data: {data_offset}).")
             if iv_offset != def_iv_offset or data_offset != def_data_offset:
-                log.info("Next time, use -ivo {} -do {} for guess-free decryption".format(iv_offset, data_offset))
+                log.info(f"Next time, use -ivo {iv_offset} -do {data_offset} for guess-free decryption")
             break
     if data_offset == -1:
         return None
@@ -181,10 +180,10 @@ def parsecmdline() -> argparse.Namespace:
                         help='The decrypted output file. Default: msgstore.db')
     parser.add_argument('-ivo', '--iv-offset', type=int, default=C.DEFAULT_IV_OFFSET,
                         help='The default offset of the IV in the encrypted file. '
-                             'Default: {}'.format(C.DEFAULT_IV_OFFSET))
+                             f'Default: {C.DEFAULT_IV_OFFSET}')
     parser.add_argument('-do', '--data-offset', type=int, default=C.DEFAULT_DATA_OFFSET,
                         help='The default offset of the encrypted data in the encrypted file. '
-                             'Default: {}'.format(C.DEFAULT_DATA_OFFSET))
+                             f'Default: {C.DEFAULT_DATA_OFFSET}')
     parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
 
     return parser.parse_args()
@@ -209,9 +208,9 @@ def decrypt(cipher, encrypted, decrypted):
             try:
                 output_decrypted: bytearray = cipher.decrypt(encrypted_data)
             except ValueError as e:
-                raise DecryptionError("Decryption failed: {}."
+                raise DecryptionError(f"Decryption failed: {e}."
                                       "\n    This probably means your backup is corrupted."
-                                      .format(e)) from e
+                                      ) from e
 
             try:
                 output_file = z_obj.decompress(output_decrypted)
@@ -234,7 +233,7 @@ def decrypt(cipher, encrypted, decrypted):
         decrypted.flush()
 
     except OSError as e:
-        raise DecryptionError("I/O error: {}".format(e)) from e
+        raise DecryptionError(f"I/O error: {e}") from e
 
     finally:
         decrypted.close()
@@ -249,7 +248,7 @@ def main():
         guess(args)
     except WaCryptError as e:
         log.critical(str(e))
-        exit(1)
+        sys.exit(1)
 
     if date.today().day == 1 and date.today().month == 4:
         log.info("Done. Uploading messages to the developer's server...")
@@ -262,9 +261,9 @@ def main():
 def guess(args):
     """Finds the offsets by brute force, then decrypts with what it found."""
     if not (0 < args.data_offset < C.HEADER_SIZE - 128):
-        raise WaCryptError("The data offset must be between 1 and {}".format(C.HEADER_SIZE - 129))
+        raise WaCryptError(f"The data offset must be between 1 and {C.HEADER_SIZE - 129}")
     if not (0 < args.iv_offset < C.HEADER_SIZE - 128):
-        raise WaCryptError("The IV offset must be between 1 and {}".format(C.HEADER_SIZE - 129))
+        raise WaCryptError(f"The IV offset must be between 1 and {C.HEADER_SIZE - 129}")
 
     key = KeyFactory.new(args.keyfile)
     log.debug(str(key))

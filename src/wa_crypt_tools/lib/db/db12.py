@@ -1,11 +1,9 @@
+import logging
 from hashlib import md5
 from os import urandom
-from pathlib import Path
 from re import findall
 
 from Cryptodome.Cipher import AES
-
-import logging
 
 from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.lib.db.db import Database
@@ -21,9 +19,10 @@ class Database12(Database):
     Implementation of a crypt12 database.
     """
 
-    def __init__(self, key: Key14 = None, encrypted=None,
-                 cipher_version: bytes = None, key_version: bytes = None, serversalt: bytes = None,
-                 googleid: bytes = None, iv: bytes = None):
+    def __init__(self, key: Key14 | None = None, encrypted=None,
+                 cipher_version: bytes | None = None, key_version: bytes | None = None,
+                 serversalt: bytes | None = None,
+                 googleid: bytes | None = None, iv: bytes | None = None):
         """Checks if the file is a Crypt12 file.
         Returns the cipher if it is, None otherwise."""
 
@@ -43,26 +42,26 @@ class Database12(Database):
         if encrypted and key:
             self.cipher_version = encrypted.read(2)
             if self.cipher_version != key.get_cipher_version():
-                raise IntegrityError("Cipher version mismatch: {} != {}"
-                                     .format(self.cipher_version, key.get_cipher_version()))
+                raise IntegrityError(f"Cipher version mismatch: {self.cipher_version} != {key.get_cipher_version()}"
+                                     )
             self.file_hash.update(self.cipher_version)
 
             self.key_version = encrypted.read(1)
             if self.key_version != key.get_key_version():
-                raise IntegrityError("Key version mismatch: {} != {}"
-                                     .format(self.key_version, key.get_key_version()))
+                raise IntegrityError(f"Key version mismatch: {self.key_version} != {key.get_key_version()}"
+                                     )
             self.file_hash.update(self.key_version)
 
             self.serversalt = encrypted.read(32)
             if self.serversalt != key.get_serversalt():
-                raise IntegrityError("Server salt mismatch: {} != {}"
-                                     .format(self.serversalt, key.get_serversalt()))
+                raise IntegrityError(f"Server salt mismatch: {self.serversalt} != {key.get_serversalt()}"
+                                     )
             self.file_hash.update(self.serversalt)
 
             self.googleid = encrypted.read(16)
             if self.googleid != key.get_googleid():
-                raise IntegrityError("Google ID mismatch: {} != {}"
-                                     .format(self.googleid, key.get_googleid()))
+                raise IntegrityError(f"Google ID mismatch: {self.googleid} != {key.get_googleid()}"
+                                     )
             self.file_hash.update(self.googleid)
 
             self.iv = encrypted.read(16)
@@ -73,9 +72,9 @@ class Database12(Database):
             # real one apart from any other file that happens to be long enough. Without it
             # DatabaseFactory's crypt12 fallback accepts arbitrary input and reports garbage.
             if self.cipher_version != C.SUPPORTED_CIPHER_VERSION:
-                raise IntegrityError("Unsupported cipher version: {}.\n    "
+                raise IntegrityError(f"Unsupported cipher version: {self.cipher_version.hex()}.\n    "
                                      "This does not look like a crypt12, 14 or 15 database."
-                                     .format(self.cipher_version.hex()))
+                                     )
             self.file_hash.update(self.cipher_version)
 
             self.key_version = encrypted.read(1)
@@ -115,7 +114,7 @@ class Database12(Database):
                     self.cipher_version = cipher_version
                     self.file_hash.update(self.cipher_version)
                 else:
-                    raise InvalidKeyError("Unsupported cipher version provided: {}".format(cipher_version.hex()))
+                    raise InvalidKeyError(f"Unsupported cipher version provided: {cipher_version.hex()}")
             else:
                 self.cipher_version = C.SUPPORTED_CIPHER_VERSION
                 self.file_hash.update(self.cipher_version)
@@ -125,7 +124,7 @@ class Database12(Database):
                     self.key_version = key_version
                     self.file_hash.update(self.key_version)
                 else:
-                    raise InvalidKeyError("Unsupported key version provided: {}".format(key_version.hex()))
+                    raise InvalidKeyError(f"Unsupported key version provided: {key_version.hex()}")
             else:
                 self.key_version = C.SUPPORTED_KEY_VERSIONS[-1]
                 self.file_hash.update(self.key_version)
@@ -164,7 +163,7 @@ class Database12(Database):
         if len(jid) != 1:
             log.error("The phone number end is not 2 characters long")
         else:
-            log.debug("Your phone number ends with {}".format(jid[0]))
+            log.debug(f"Your phone number ends with {jid[0]}")
         checksum = encrypted[-20:-4]
         authentication_tag = encrypted[-36:-20]
         encrypted_data = encrypted[:-36]
@@ -178,14 +177,14 @@ class Database12(Database):
             # TODO do crypt12 multifiles actually exist?
             is_multifile_backup = True
         else:
-            log.debug("Checksum OK ({}). Decrypting...".format(self.file_hash.hexdigest()))
+            log.debug(f"Checksum OK ({self.file_hash.hexdigest()}). Decrypting...")
 
         cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)
         try:
             output_decrypted: bytes = cipher.decrypt(encrypted_data)
         except ValueError as e:
-            raise DecryptionError("Decryption failed: {}."
-                                  "\n    This probably means your backup is corrupted.".format(e)) from e
+            raise DecryptionError(f"Decryption failed: {e}."
+                                  "\n    This probably means your backup is corrupted.") from e
 
         # Verify the authentication tag
         try:
@@ -200,9 +199,9 @@ class Database12(Database):
             else:
                 cipher.verify(authentication_tag)
         except ValueError as e:
-            raise IntegrityError("Authentication tag mismatch: {}."
+            raise IntegrityError(f"Authentication tag mismatch: {e}."
                                  "\n    This probably means your backup is corrupted."
-                                 .format(e), data=output_decrypted) from e
+                                 , data=output_decrypted) from e
 
         return output_decrypted
 
@@ -223,7 +222,7 @@ class Database12(Database):
         jid = props.get_jid()
         if len(jid) != 2:
             log.error("The phone number end is not 2 characters long")
-        out += "--{}".format(jid).encode()
+        out += f"--{jid}".encode()
         return out
 
     def get_iv(self) -> bytes:

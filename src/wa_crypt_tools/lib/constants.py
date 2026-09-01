@@ -1,3 +1,6 @@
+from typing import ClassVar
+
+
 class C:
     # These constants are only used by the guessing logic.
     # The first two bytes of the decrypted data are a zlib header for a single file backup,
@@ -5,7 +8,7 @@ class C:
     # what every level uses -- the check byte leaves exactly four possible headers, one per
     # band of compression levels. WhatsApp compressed at level 1 historically and at level 9
     # now, so a list holding only 78 01 stopped recognising current backups entirely.
-    ZLIB_HEADERS = [
+    ZLIB_HEADERS: ClassVar[list[bytes]] = [
         b'x\x01',  # levels 0-1
         b'x\x5e',  # levels 2-5
         b'x\x9c',  # level 6, zlib's default
@@ -15,7 +18,7 @@ class C:
     # A zlib header names a band of levels, not one level, so reproducing a stream from its
     # header alone means picking a representative: the top of each band, which is exact for
     # the only two levels WhatsApp has ever used, 1 and 9.
-    ZLIB_HEADER_LEVELS = {
+    ZLIB_HEADER_LEVELS: ClassVar[dict[bytes, int]] = {
         b'x\x01': 1,
         b'x\x5e': 5,
         b'x\x9c': 6,
@@ -46,7 +49,7 @@ class C:
     DEFAULT_C14_KEY_VERSION = b'2'
     # Every migration flag the schema has. A current msgstore sets all of them -- 34 was the
     # one missing from this list, and 38 is not a flag at all but backup_export_file_size.
-    DEFAULT_FEATURE_LIST = [5, 6, 7, 8, 9,
+    DEFAULT_FEATURE_LIST: ClassVar[list[int]] = [5, 6, 7, 8, 9,
                             10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
                             20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
                             30, 31, 32, 33, 34, 35, 36, 37, 39]
@@ -55,4 +58,4 @@ class C:
 
     # Constants for crypt12/14 key and db
     SUPPORTED_CIPHER_VERSION = b'\x00\x01'
-    SUPPORTED_KEY_VERSIONS = [b'\x01', b'\x02', b'\x03']
+    SUPPORTED_KEY_VERSIONS: ClassVar[list[bytes]] = [b'\x01', b'\x02', b'\x03']

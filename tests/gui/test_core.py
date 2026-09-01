@@ -12,6 +12,7 @@ import queue
 
 import pytest
 
+from tests.utils.utils import cmp_files
 from wa_crypt_tools.gui import core
 from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
 from wa_crypt_tools.lib.errors import (
@@ -22,8 +23,6 @@ from wa_crypt_tools.lib.errors import (
     WaCryptError,
 )
 from wa_crypt_tools.lib.key.keyfactory import KeyFactory
-
-from tests.utils.utils import cmp_files
 
 KEY15 = "tests/res/encrypted_backup.key"
 KEY14 = "tests/res/key"
@@ -135,9 +134,9 @@ class TestSuggestOutput:
 
 class TestProblems:
     def good(self, tmp_path, **over):
-        kwargs = dict(key=KEY15, key_is_file=True,
-                      encrypted="tests/res/msgstore.db.crypt15",
-                      output=str(tmp_path / "out.db"), overwrite=False)
+        kwargs = {"key": KEY15, "key_is_file": True,
+                  "encrypted": "tests/res/msgstore.db.crypt15",
+                  "output": str(tmp_path / "out.db"), "overwrite": False}
         kwargs.update(over)
         return core.problems(**kwargs)
 
@@ -258,9 +257,8 @@ class TestLogCapture:
     def test_the_handler_is_removed_even_when_the_work_raises(self):
         logger = logging.getLogger("wa_crypt_tools")
         before = list(logger.handlers)
-        with pytest.raises(RuntimeError):
-            with core.captured_logs(queue.Queue()):
-                raise RuntimeError("boom")
+        with pytest.raises(RuntimeError), core.captured_logs(queue.Queue()):
+            raise RuntimeError("boom")
         assert logger.handlers == before
 
 

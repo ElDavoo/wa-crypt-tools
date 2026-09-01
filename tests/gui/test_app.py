@@ -27,7 +27,7 @@ def window():
     try:
         root = tk.Tk()
     except tk.TclError as e:
-        pytest.skip("no display available: {}".format(e))
+        pytest.skip(f"no display available: {e}")
     root.withdraw()
     w = build(root)
     try:

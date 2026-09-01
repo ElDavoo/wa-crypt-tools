@@ -23,8 +23,19 @@ from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 from wa_crypt_tools.lib.props import Props
 
 __all__ = [
-    "Database", "Database12", "Database14", "Database15", "DatabaseFactory",
-    "Key", "Key14", "Key15", "KeyFactory",
+    "Database",
+    "Database12",
+    "Database14",
+    "Database15",
+    "DatabaseFactory",
+    "DecryptionError",
+    "HeaderError",
+    "IntegrityError",
+    "InvalidKeyError",
+    "Key",
+    "Key14",
+    "Key15",
+    "KeyFactory",
     "Props",
-    "WaCryptError", "InvalidKeyError", "HeaderError", "DecryptionError", "IntegrityError",
+    "WaCryptError",
 ]

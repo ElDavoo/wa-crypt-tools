@@ -37,7 +37,7 @@ def ciphertext_length(backup: str) -> int:
 class TestEveryFormatThroughTheCli:
     def test_in_ram(self, key, backup):
         try:
-            out, ret = Propen("wadecrypt {} {} {}".format(key, backup, OUT))
+            out, ret = Propen(f"wadecrypt {key} {backup} {OUT}")
             assert ret == 0, out
             assert cmp_files(OUT, "tests/res/msgstore.db")
         finally:
@@ -45,7 +45,7 @@ class TestEveryFormatThroughTheCli:
 
     def test_streaming(self, key, backup):
         try:
-            out, ret = Propen("wadecrypt -nm {} {} {}".format(key, backup, OUT))
+            out, ret = Propen(f"wadecrypt -nm {key} {backup} {OUT}")
             assert ret == 0, out
             assert cmp_files(OUT, "tests/res/msgstore.db")
         finally:
@@ -62,7 +62,7 @@ class TestEveryFormatThroughTheCli:
             "exact-multiple": n,       # the final read returns nothing; the trailer is behind
         }[case]
         try:
-            out, ret = Propen("wadecrypt -bs {} {} {} {}".format(buffer_size, key, backup, OUT))
+            out, ret = Propen(f"wadecrypt -bs {buffer_size} {key} {backup} {OUT}")
             assert ret == 0, out
             assert cmp_files(OUT, "tests/res/msgstore.db")
         finally:
@@ -70,7 +70,7 @@ class TestEveryFormatThroughTheCli:
 
     def test_a_small_buffer_walks_the_whole_file_in_many_chunks(self, key, backup):
         try:
-            out, ret = Propen("wadecrypt -bs 1024 {} {} {}".format(key, backup, OUT))
+            out, ret = Propen(f"wadecrypt -bs 1024 {key} {backup} {OUT}")
             assert ret == 0, out
             assert cmp_files(OUT, "tests/res/msgstore.db")
         finally:
@@ -80,7 +80,7 @@ class TestEveryFormatThroughTheCli:
         # Under 17 bytes the window logic cannot work, so the tool ignores the request
         # rather than producing nonsense.
         try:
-            out, ret = Propen("wadecrypt -bs 8 {} {} {}".format(key, backup, OUT))
+            out, ret = Propen(f"wadecrypt -bs 8 {key} {backup} {OUT}")
             assert ret == 0, out
             assert "Invalid buffer size" in out
             assert cmp_files(OUT, "tests/res/msgstore.db")
@@ -89,7 +89,7 @@ class TestEveryFormatThroughTheCli:
 
     def test_no_decompress_writes_the_raw_zlib_stream(self, key, backup):
         try:
-            out, ret = Propen("wadecrypt -nd {} {} {}".format(key, backup, OUT))
+            out, ret = Propen(f"wadecrypt -nd {key} {backup} {OUT}")
             assert ret == 0, out
             with open(OUT, 'rb') as f:
                 raw = f.read()
@@ -114,13 +114,13 @@ class TestTruncatedBackups:
         rm_if_found(OUT)
 
     def test_streaming_reports_the_damaged_stream_as_well_as_the_tag(self):
-        out, ret = Propen("wadecrypt -nm {} {} {}".format(KEY15, TRUNCATED, OUT))
+        out, ret = Propen(f"wadecrypt -nm {KEY15} {TRUNCATED} {OUT}")
         assert ret != 0
         assert "Authentication tag mismatch" in out
         assert "truncated (damaged)" in out
 
     def test_force_writes_the_partial_output_anyway(self):
-        out, ret = Propen("wadecrypt -nm -f {} {} {}".format(KEY15, TRUNCATED, OUT))
+        out, ret = Propen(f"wadecrypt -nm -f {KEY15} {TRUNCATED} {OUT}")
         assert ret == 0, out
         from os.path import exists, getsize
         assert exists(OUT) and getsize(OUT) > 0
@@ -140,15 +140,15 @@ class TestMultiFileBackups:
 
     @pytest.mark.parametrize("mode", ["", "-nm "], ids=["in-ram", "streaming"])
     def test_a_zip_payload_is_written_out_undecompressed(self, mode):
-        out, ret = Propen("wadecrypt {}{} tests/res/stickers.backup.crypt15 {}"
-                          .format(mode, KEY15, self.OUT_ZIP))
+        out, ret = Propen(f"wadecrypt {mode}{KEY15} tests/res/stickers.backup.crypt15 {self.OUT_ZIP}"
+                          )
         assert ret == 0, out
         assert "ZIP file that I will not decompress automatically" in out
         assert cmp_files(self.OUT_ZIP, "tests/res/test9.zip")
 
     def test_the_wrong_key_is_reported_as_unrecognisable_rather_than_as_a_zip(self):
         # Same zlib.error, different cause: the ZIP message must not be the catch-all.
-        out, ret = Propen("wadecrypt -f {} tests/res/stickers.backup.crypt15 {}"
-                          .format(KEY14, self.OUT_ZIP))
+        out, _ret = Propen(f"wadecrypt -f {KEY14} tests/res/stickers.backup.crypt15 {self.OUT_ZIP}"
+                          )
         assert "I can't recognize decrypted data" in out
         assert "ZIP file" not in out

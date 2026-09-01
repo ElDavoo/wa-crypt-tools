@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import abc
 
+
 class Key(abc.ABC):
     @abc.abstractmethod
-    def __init__(self, keyarray: bytes = None):
+    def __init__(self, keyarray: bytes | None = None):
         pass
 
     @abc.abstractmethod

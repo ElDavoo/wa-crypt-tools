@@ -5,11 +5,12 @@ Props to protobuf_inspector for the parser.
 
 from __future__ import annotations
 
-from protobuf_inspector.types import StandardParser
+import argparse
+import sys
 from io import BytesIO
 from os.path import getsize
 
-import argparse
+from protobuf_inspector.types import StandardParser
 
 
 def parsecmdline() -> argparse.Namespace:
@@ -49,9 +50,9 @@ def load_file(file_name: str, byte_range=0, reverse=False) -> bytes:
 
             return f.read(byte_range)
 
-    except IOError:
+    except OSError:
         print("File not found or other IO error")
-        exit(1)
+        sys.exit(1)
 
 
 def get_truncated_stream(content: bytes, start: int, end: int) -> BytesIO:
@@ -83,7 +84,7 @@ def main():
         print("Finished")
     else:
         print("Nothing found")
-        exit(1)
+        sys.exit(1)
 
 
 def protoparse(stream):
@@ -109,13 +110,16 @@ def search(whole_file: bytes, keep_going: bool, offset=0):
                 message.last_good_j = j
                 message.last_good_i = i
 
-            except Exception:
+            except Exception:  # noqa: BLE001 -- this walks every offset in the file and
+                # asks protobuf to parse from there. Failure is the expected answer for
+                # almost all of them, and narrowing it would mean enumerating every way
+                # protobuf can reject arbitrary bytes.
                 pass
         if message.last_good_j and message.last_good_i == i:
-            print("\n Message from byte {} to {}".format(message.last_good_i + offset, message.last_good_j + offset))
+            print(f"\n Message from byte {message.last_good_i + offset} to {message.last_good_j + offset}")
             print(message.output)
             if not keep_going:
-                exit(0)
+                sys.exit(0)
 
 
 if __name__ == "__main__":

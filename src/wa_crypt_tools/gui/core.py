@@ -96,10 +96,10 @@ def _headline(fmt: str, prefix) -> str:
     meta = prefix.backup_metadata
     facts = []
     if meta.app_version:
-        facts.append("WhatsApp {}".format(meta.app_version))
+        facts.append(f"WhatsApp {meta.app_version}")
     if meta.jid_suffix:
-        facts.append("phone number ending {}".format(meta.jid_suffix))
-    return "{} backup".format(fmt) + (" — " + ", ".join(facts) if facts else "")
+        facts.append(f"phone number ending {meta.jid_suffix}")
+    return f"{fmt} backup" + (" — " + ", ".join(facts) if facts else "")
 
 
 def suggest_output(encrypted_path: str) -> str:
@@ -126,7 +126,7 @@ def problems(*, key: str, key_is_file: bool, encrypted: str, output: str,
     if not encrypted.strip():
         found.append("Choose the encrypted backup you want to decrypt.")
     elif not Path(encrypted).is_file():
-        found.append("That backup file does not exist: {}".format(encrypted))
+        found.append(f"That backup file does not exist: {encrypted}")
 
     if not output.strip():
         found.append("Choose where to save the decrypted file.")
@@ -135,8 +135,8 @@ def problems(*, key: str, key_is_file: bool, encrypted: str, output: str,
         found.append("That would overwrite the backup you are decrypting. "
                      "Pick a different name for the decrypted file.")
     elif Path(output).is_file() and not overwrite:
-        found.append("{} already exists. Tick \"Overwrite the output file\" under Advanced "
-                     "to replace it.".format(Path(output).name))
+        found.append(f"{Path(output).name} already exists. Tick \"Overwrite the output file\" under Advanced "
+                     "to replace it.")
     return found
 
 
@@ -146,13 +146,13 @@ def _key_problems(key: str, key_is_file: bool) -> list[str]:
                 else "Paste your 64-character key."]
     if key_is_file:
         if not Path(key).is_file():
-            return ["That key file does not exist: {}".format(key)]
+            return [f"That key file does not exist: {key}"]
         return []
     # A key transcribed off a screenshot usually arrives in groups, so whitespace is not a
     # mistake worth reporting.
     cleaned = "".join(key.split())
     if len(cleaned) != 64:
-        return ["A key is 64 characters long; this one is {}.".format(len(cleaned))]
+        return [f"A key is 64 characters long; this one is {len(cleaned)}."]
     try:
         bytes.fromhex(cleaned)
     except ValueError:
@@ -194,7 +194,7 @@ def friendly(error: BaseException) -> str:
     if isinstance(error, OSError):
         # filename is the useful half; strerror without it reads as a riddle.
         if error.filename:
-            return "{}: {}".format(error.strerror or error.__class__.__name__, error.filename)
+            return f"{error.strerror or error.__class__.__name__}: {error.filename}"
         return str(error)
     return str(error) or error.__class__.__name__
 
@@ -217,7 +217,9 @@ class QueueLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         try:
             self.records.put((record.levelno, self.format(record)))
-        except Exception:  # pragma: no cover - the queue is unbounded
+        # A handler that raises breaks the call that logged, which is the one thing emit()
+        # must never do; handleError is the documented way out.
+        except Exception:  # noqa: BLE001  # pragma: no cover - the queue is unbounded
             self.handleError(record)
 
 

@@ -10,3 +10,12 @@ parallel = true
 omit =
     */tests/*
     */proto/*
+
+[report]
+# The package sits around 94%. The floor is set below that on purpose: it is a ratchet against a
+# real regression, not a target to chase, and a threshold set at the current number turns every
+# refactor that moves a few lines into a red build. Raise it when the headroom stops being used.
+#
+# It lives here rather than as --cov-fail-under on CI's pytest call so that a local
+# `python -m pytest --cov` fails the same way CI does.
+fail_under = 90

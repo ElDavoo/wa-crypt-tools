@@ -40,10 +40,11 @@ gate() {
   fi
 }
 
-# The blocking half of CI's flake8 step: syntax errors and undefined names only. The second
-# flake8 pass in CI is --exit-zero style advice, so failing a push on it would gate the agent on
-# something CI itself does not gate a human on.
-gate flake8 flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+# CI's lint job, minus the advisory mypy leg. The rule set is not repeated here -- it lives in
+# [tool.ruff.lint] in pyproject.toml, which both this and CI read, so the two cannot drift into
+# different definitions of "lint passes". That drift is exactly what the old copy of flake8's
+# `--select=E9,F63,F7,F82` invited.
+gate ruff ruff check .
 
 # pytest must run from the repo root: tests/test_*.py open fixtures by relative path
 # (tests/res/...), and tests/tools-invocation/ shells out to the installed console scripts

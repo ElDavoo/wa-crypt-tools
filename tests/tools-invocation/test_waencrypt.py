@@ -33,7 +33,7 @@ def roundtrip(key: str, *extra: str) -> str:
     """Encrypts the reference database, decrypts it back, and returns wadecrypt's output."""
     out, ret = Propen(["waencrypt", *extra, key, PLAIN, OUT])
     assert ret == 0, out
-    out, ret = Propen("wadecrypt {} {} {}".format(key, OUT, ROUNDTRIP))
+    out, ret = Propen(f"wadecrypt {key} {OUT} {ROUNDTRIP}")
     assert ret == 0, out
     return out
 
@@ -107,6 +107,7 @@ def without_feature_table_flag(source: str, dest: str):
     features.
     """
     import io
+
     from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
     from wa_crypt_tools.lib.utils import encode_varint
     raw = open(source, 'rb').read()
@@ -132,12 +133,12 @@ class TestReference:
     def test_a_crypt15_reference_reproduces_the_original(self):
         # The fixture is a 2.22 backup, compressed at level 1, and no -c is passed here:
         # reproducing it byte-for-byte means the level has to come off the reference too.
-        out, ret = Propen("waencrypt --reference tests/res/msgstore.db.crypt15 {} {} {}"
-                          .format(KEY15, PLAIN, OUT))
+        out, ret = Propen(f"waencrypt --reference tests/res/msgstore.db.crypt15 {KEY15} {PLAIN} {OUT}"
+                          )
         assert ret == 0, out
         if CLASSIC_ZLIB:
             assert cmp_files(OUT, "tests/res/msgstore.db.crypt15")
-        out, ret = Propen("wadecrypt {} {} {}".format(KEY15, OUT, ROUNDTRIP))
+        out, ret = Propen(f"wadecrypt {KEY15} {OUT} {ROUNDTRIP}")
         assert ret == 0, out
         assert cmp_files(ROUNDTRIP, PLAIN)
 
@@ -168,7 +169,7 @@ class TestReference:
         # the props whether to write the feature table flag and props built from a reference
         # never set it. It reads the flag off the reference now and never asks.
         out, ret = Propen("waencrypt --type 14 --reference tests/res/msgstore.db.crypt14 "
-                          "{} {} {}".format(KEY14, PLAIN, OUT))
+                          f"{KEY14} {PLAIN} {OUT}")
         assert ret == 0, out
 
 
@@ -190,7 +191,7 @@ class TestExistingOutput:
 
     def test_an_existing_output_stops_the_run(self):
         self.write_something()
-        out, ret = Propen("waencrypt {} {} {}".format(KEY15, PLAIN, OUT))
+        out, ret = Propen(f"waencrypt {KEY15} {PLAIN} {OUT}")
         assert ret != 0
         assert "output file already exists" in out
         with open(OUT, 'rb') as f:
@@ -198,16 +199,16 @@ class TestExistingOutput:
 
     def test_yes_overwrites_it(self):
         self.write_something()
-        out, ret = Propen("waencrypt --yes {} {} {}".format(KEY15, PLAIN, OUT))
+        out, ret = Propen(f"waencrypt --yes {KEY15} {PLAIN} {OUT}")
         assert ret == 0, out
-        out, ret = Propen("wadecrypt {} {} {}".format(KEY15, OUT, ROUNDTRIP))
+        out, ret = Propen(f"wadecrypt {KEY15} {OUT} {ROUNDTRIP}")
         assert ret == 0, out
         assert cmp_files(ROUNDTRIP, PLAIN)
 
     def test_a_run_that_fails_leaves_the_output_alone(self):
         # Even with --yes: the file is opened only once there is something to write to it.
         self.write_something()
-        out, ret = Propen("waencrypt --yes tests/res/test.json {} {}".format(PLAIN, OUT))
+        _out, ret = Propen(f"waencrypt --yes tests/res/test.json {PLAIN} {OUT}")
         assert ret != 0
         with open(OUT, 'rb') as f:
             assert f.read() == b'PRECIOUS'
@@ -218,13 +219,13 @@ class TestFailures:
         cleanup()
 
     def test_a_file_that_is_not_a_key_fails(self):
-        out, ret = Propen("waencrypt tests/res/test.json {} {}".format(PLAIN, OUT))
+        out, ret = Propen(f"waencrypt tests/res/test.json {PLAIN} {OUT}")
         assert ret != 0
         assert "not a valid Java object" in out
 
     def test_a_reference_that_is_not_a_backup_fails(self):
-        out, ret = Propen("waencrypt --reference tests/res/test.json {} {} {}"
-                          .format(KEY15, PLAIN, OUT))
+        out, ret = Propen(f"waencrypt --reference tests/res/test.json {KEY15} {PLAIN} {OUT}"
+                          )
         assert ret != 0
         assert "does not look like a crypt12, 14 or 15 database" in out
 

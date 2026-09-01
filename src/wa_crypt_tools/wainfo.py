@@ -5,12 +5,13 @@ This script prints info on WhatsApp's DB files.
 
 from __future__ import annotations
 
-from wa_crypt_tools.lib.errors import IntegrityError, WaCryptError
-from wa_crypt_tools.lib.logformat import setup_logging
-from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
-from wa_crypt_tools.lib.key.keyfactory import KeyFactory
-
 import argparse
+import sys
+
+from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
+from wa_crypt_tools.lib.errors import IntegrityError, WaCryptError
+from wa_crypt_tools.lib.key.keyfactory import KeyFactory
+from wa_crypt_tools.lib.logformat import setup_logging
 
 __author__ = 'ElDavo'
 __copyright__ = 'Copyright (C) 2024'
@@ -54,10 +55,10 @@ def main():
         log.error(str(e))
         if e.data is not None:
             print(e.data)
-        exit(1)
+        sys.exit(1)
     except WaCryptError as e:
         log.critical(str(e))
-        exit(1)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

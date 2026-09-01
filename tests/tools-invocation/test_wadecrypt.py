@@ -160,7 +160,7 @@ class TestExistingOutput:
     def test_a_run_that_fails_leaves_the_output_alone(self):
         # Even with --yes: the file is opened only once there is something to write to it.
         self.write_something()
-        out, ret = Propen("wadecrypt --yes tests/res/test.json "
+        _out, ret = Propen("wadecrypt --yes tests/res/test.json "
                           "tests/res/msgstore.db.crypt15 " + OUT)
         assert ret != 0
         assert self.read_output() == b'PRECIOUS'

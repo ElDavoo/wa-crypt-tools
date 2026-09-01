@@ -1,15 +1,14 @@
 import base64
 import hmac
 import json
+import logging
 import math
 import zlib
 from hashlib import sha256
 
 from Cryptodome.Cipher import AES
 from javaobj import JavaByteArray
-from javaobj.v2.beans import JavaArray, JavaClassDesc, ClassDescType
-
-import logging
+from javaobj.v2.beans import ClassDescType, JavaArray, JavaClassDesc
 
 from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.lib.errors import HeaderError, IntegrityError, InvalidKeyError
@@ -42,8 +41,7 @@ def test_decompression(test_data: bytes) -> bool:
         if zlib_obj[:15].decode('ascii') != 'SQLite format 3':
             log.error("Test decompression: Decryption and decompression ok but not a valid SQLite database")
             return False
-        else:
-            return True
+        return True
     except (zlib.error, UnicodeDecodeError):
         return False
 
@@ -65,13 +63,13 @@ def hexstring2bytes(string: str) -> bytes:
     if len(string) != 64:
         raise InvalidKeyError("The key file specified does not exist.\n    "
                               "If you tried to specify the key directly, note it should be "
-                              "64 characters long and not {} characters long.".format(len(string)))
+                              f"64 characters long and not {len(string)} characters long.")
 
     try:
         barr = bytes.fromhex(string)
     except ValueError as e:
         raise InvalidKeyError("Couldn't convert the hex string.\n    "
-                              "Exception: {}".format(e)) from e
+                              f"Exception: {e}") from e
     return barr
 
 
@@ -90,7 +88,7 @@ def encryptionloop(*, first_iteration_data: bytes, privateseed: bytes = b'\x00' 
 
     data = b''
     output = b''
-    permutations = int(math.ceil(float(output_bytes) / float(32)))
+    permutations = math.ceil(output_bytes / 32)
     i = 1
     while i < permutations + 1:
         hasher = hmac.new(privatekey, msg=data, digestmod=sha256)
@@ -114,7 +112,9 @@ def mcrypt1_metadata_decrypt(*, key, encoded: str):
     # Base64 decoding
     encoded = base64.b64decode(encoded)
     # PKCS5Padding is not natively supported
-    unpad = lambda s: s[:-ord(s[len(s) - 1:])]
+    def unpad(s):
+        return s[:-ord(s[len(s) - 1:])]
+
     iv_size = encoded[0]
     if iv_size != 16:
         raise HeaderError("IV Size is not 16")
@@ -153,8 +153,7 @@ def get_mcrypt1_name(*, key, name: str, md5: bytes) -> bytes:
         md5 = bytes.fromhex(md5)
     # Now pour the MD5 into the HMAC
     hmac_n.update(md5)
-    media_hash = hmac_n.digest()
-    return media_hash
+    return hmac_n.digest()
 
 
 def encode_varint(value: int) -> bytes:
@@ -193,7 +192,7 @@ def unknown_header_fields(header) -> list[str]:
         except (NotImplementedError, TypeError):  # pragma: no cover - implementation-dependent
             return
         for field in unknown:
-            found.append("{} field {}".format(message.DESCRIPTOR.name, field.field_number))
+            found.append(f"{message.DESCRIPTOR.name} field {field.field_number}")
         for descriptor, value in message.ListFields():
             # is_repeated rather than the old label constant: protobuf 7 dropped label with
             # the move to editions.
@@ -212,30 +211,30 @@ def header_info(header):
     string: str = ""
     if header.e2ee_key_data.encryption_iv:
         string += "Crypt15 info:\n"
-        string += str("Header information in your crypt15 file:\n")
-        string += str("IV: {}\n".format(header.e2ee_key_data.encryption_iv.hex()))
+        string += "Header information in your crypt15 file:\n"
+        string += str(f"IV: {header.e2ee_key_data.encryption_iv.hex()}\n")
     if header.wa_provided_key_data.encryption_iv:
         cipher = header.wa_provided_key_data
-        string += str("Header information in your crypt14 file:\n")
-        string += str("Cipher version: {}\n".format(cipher.backup_cipher_header.hex()))
-        string += str("Key version: {}\n".format(cipher.key_version.hex()))
-        string += str("Server salt: {}\n".format(cipher.server_salt.hex()))
-        string += str("Google ID: {}\n".format(cipher.google_id_salt.hex()))
-        string += str("IV: {}\n".format(cipher.encryption_iv.hex()))
-    string += str("Key type: {}\n".format(header.key_type_deprecated))
-    string += str("WhatsApp version: {}\n".format(header.backup_metadata.app_version))
+        string += "Header information in your crypt14 file:\n"
+        string += str(f"Cipher version: {cipher.backup_cipher_header.hex()}\n")
+        string += str(f"Key version: {cipher.key_version.hex()}\n")
+        string += str(f"Server salt: {cipher.server_salt.hex()}\n")
+        string += str(f"Google ID: {cipher.google_id_salt.hex()}\n")
+        string += str(f"IV: {cipher.encryption_iv.hex()}\n")
+    string += str(f"Key type: {header.key_type_deprecated}\n")
+    string += str(f"WhatsApp version: {header.backup_metadata.app_version}\n")
     #string += str("Device model: {}".format(header.backup_metadata.device_model))
-    string += str("The last two numbers of the user's Jid: {}\n".format(header.backup_metadata.jid_suffix))
-    string += str("Backup version: {}\n".format(header.backup_metadata.backup_version))
+    string += str(f"The last two numbers of the user's Jid: {header.backup_metadata.jid_suffix}\n")
+    string += str(f"Backup version: {header.backup_metadata.backup_version}\n")
     #string += str("Size of the backup file: {}".format(header.backup_metadata.backup_export_file_size))
     # The migration flags, by field number: the numbers are what this project has always called
     # features, and the schema is what says which fields are flags rather than metadata.
     features = [f.number for f in header.backup_metadata.DESCRIPTOR.fields
                 if f.type == f.TYPE_BOOL and getattr(header.backup_metadata, f.name)]
     if len(features) > 0:
-        string += str("Features: {}\n".format(features))
-        string += str("Max feature number: {}\n".format(max(features)))
+        string += str(f"Features: {features}\n")
+        string += str(f"Max feature number: {max(features)}\n")
     else:
-        string += str("No feature table found (not a msgstore DB or very old)\n")
+        string += "No feature table found (not a msgstore DB or very old)\n"
 
     return string

@@ -31,22 +31,21 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
+    # `.[test]` pins every tool this needs, lint included, so CI and a local venv run the same
+    # versions. It used to also `pip install flake8 pytest codecov pytest-cov coveralls`
+    # unpinned alongside it, which meant the lint gate was whatever PyPI served that morning --
+    # and `codecov` was installed but never called.
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install flake8 pytest codecov pytest-cov coveralls
         python -m pip install -e '.[test]'
-    - name: Lint with flake8
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     # tests/gui/test_app.py builds a real Tk window, so it needs a display; without one it
     # skips, and the widget code would then be covered on the Windows leg alone.
     - name: Install xvfb
       if: runner.os == 'Linux'
       run: sudo apt-get update && sudo apt-get install -y xvfb
+    # The coverage floor lives in .coveragerc, so `python -m pytest --cov` enforces it locally
+    # too rather than only in CI.
     - name: Test with pytest (under xvfb)
       if: runner.os == 'Linux'
       run: xvfb-run -a python -m pytest --cov
@@ -60,6 +59,48 @@ jobs:
       env:
         COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # Lint, formatting and types run once, not once per matrix leg: the answer does not depend on
+  # the OS or the Python version, and ruff is fast enough that a dedicated job costs less than
+  # ten repetitions of it.
+  #
+  # ruff replaces flake8 here. The old gate only ever blocked on `--select=E9,F63,F7,F82` --
+  # syntax errors and undefined names -- with a second `--exit-zero` pass that could not fail
+  # and so was never read. That left 17 unused imports, 2 unused locals and a redefinition in
+  # the tree with CI green. The rule set is selected explicitly in pyproject.toml; see the
+  # comment there for why it is not left to ruff's default.
+  #
+  # mypy is deliberately advisory. The codebase is partly annotated, so a blocking type gate
+  # would mean either a large annotation pass first or a baseline file to carry the debt --
+  # neither of which belongs in the same change as the lint switch. `continue-on-error` keeps
+  # its output one click away in the run without letting it hold up a merge.
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        persist-credentials: false
+
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -e '.[test]'
+
+    # --output-format=github turns each finding into an annotation on the diff.
+    - name: Lint with ruff
+      run: ruff check --output-format=github .
+
+    - name: Type-check with mypy (advisory)
+      continue-on-error: true
+      run: mypy src/wa_crypt_tools
+
   # actionlint type-checks every ${{ }} expression against the event payload and runs shellcheck
   # over each `run:` block; zizmor audits the same files for the supply-chain and permissions
   # mistakes that shellcheck has no opinion about. Between them they are the only test these
@@ -112,13 +153,15 @@ jobs:
   # when it is supposed to bite.
   all-green:
     if: always()
-    needs: [job, workflows]
+    needs: [job, lint, workflows]
     runs-on: ubuntu-latest
 
     steps:
       - name: Check matrix result
         run: |
-          echo "matrix result:   ${{ needs.job.result }}"
+          echo "matrix result:    ${{ needs.job.result }}"
+          echo "lint result:      ${{ needs.lint.result }}"
           echo "workflows result: ${{ needs.workflows.result }}"
           [ "${{ needs.job.result }}" = success ] \
+            && [ "${{ needs.lint.result }}" = success ] \
             && [ "${{ needs.workflows.result }}" = success ]

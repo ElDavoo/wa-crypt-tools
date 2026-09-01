@@ -52,5 +52,5 @@ class TestKey15:
 
     def test_str_shows_the_root_key(self):
         key = Key15(key=ROOT)
-        assert str(key) == "Key15(key: {})".format(ROOT.hex())
+        assert str(key) == f"Key15(key: {ROOT.hex()})"
         assert repr(key) == str(key)

@@ -1,21 +1,18 @@
 import argparse
-import hashlib
-import os
-import zlib
 import logging
+import sys
+import zlib
 from pathlib import Path
 
 from Cryptodome.Cipher import AES
 
 from wa_crypt_tools.lib.constants import C
-from wa_crypt_tools.lib.db.db import Database
 from wa_crypt_tools.lib.db.db12 import Database12
 from wa_crypt_tools.lib.db.db14 import Database14
 from wa_crypt_tools.lib.db.db15 import Database15
 from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
-from wa_crypt_tools.lib.key.key import Key
-from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 from wa_crypt_tools.lib.errors import IntegrityError, WaCryptError
+from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 from wa_crypt_tools.lib.logformat import setup_logging
 from wa_crypt_tools.lib.props import Props
 
@@ -62,17 +59,18 @@ def parsecmdline() -> argparse.Namespace:
     parser.add_argument('--backup-version', type=int, default=C.DEFAULT_BACKUP_VERSION,
                         help='The backup version to use in the header of the encrypted file. Default: 0')
     parser.add_argument('--no-compress', action='store_true',
-                        help='Do not compress the file. This will make the backup not working. Only used in development. Default: false')
+                        help='Do not compress the file. This will make the backup not working. '
+                             'Only used in development. Default: false')
     # This was hardcoded to 1, which is what WhatsApp itself used when it was written.
     # Current WhatsApp compresses at 9, so that is the default now -- but old backups were
     # built at 1 and reproducing one has to stay possible, hence the option. The default is
     # resolved in encrypt(), not here, so that --reference can supply it instead.
-    parser.add_argument('-c', '--compression-level', type=int, choices=range(0, 10),
+    parser.add_argument('-c', '--compression-level', type=int, choices=range(10),
                         metavar='[0-9]', default=None,
                         help='The zlib compression level to use. Lower is faster and bigger. '
                              'WhatsApp used 1 historically and uses 9 now. '
-                             'Default: the level of --reference, else {}.'
-                             .format(C.DEFAULT_COMPRESSION_LEVEL))
+                             f'Default: the level of --reference, else {C.DEFAULT_COMPRESSION_LEVEL}.'
+                             )
     return parser.parse_args()
 
 
@@ -86,11 +84,11 @@ def main():
     try:
         encrypt(args)
     except IntegrityError as e:
-        log.critical("{}\n    Use --force to carry on anyway.".format(e))
-        exit(1)
+        log.critical(f"{e}\n    Use --force to carry on anyway.")
+        sys.exit(1)
     except WaCryptError as e:
         log.critical(str(e))
-        exit(1)
+        sys.exit(1)
 
 
 def compression_level_of(key, reference, stream):
@@ -105,11 +103,11 @@ def compression_level_of(key, reference, stream):
     level = C.ZLIB_HEADER_LEVELS.get(head)
     if level is None:
         # A multi-file reference is a ZIP, and --no-compress leaves anything at all there.
-        log.warning("Cannot tell the compression level of the reference: it starts {}, "
-                    "which is not a zlib header. Using {}."
-                    .format(head.hex(), C.DEFAULT_COMPRESSION_LEVEL))
+        log.warning(f"Cannot tell the compression level of the reference: it starts {head.hex()}, "
+                    f"which is not a zlib header. Using {C.DEFAULT_COMPRESSION_LEVEL}."
+                    )
     else:
-        log.debug("Reference was compressed at level {}".format(level))
+        log.debug(f"Reference was compressed at level {level}")
     return level
 
 
@@ -118,7 +116,7 @@ def encrypt(args):
     # mean the file had already been emptied.
     if Path(args.encrypted).is_file() and not args.yes:
         log.fatal("The output file already exists. Use --yes to overwrite it.")
-        exit(1)
+        sys.exit(1)
     # Read the key file
     key = KeyFactory.new(args.keyfile)
     # If specified, use the IV from the command line
@@ -138,7 +136,7 @@ def encrypt(args):
         except IntegrityError as e:
             if not args.force:
                 raise
-            log.error("{}\n    Continuing anyway because --force was given.".format(e))
+            log.error(f"{e}\n    Continuing anyway because --force was given.")
             reference = e.data
         iv: bytes = reference.get_iv()
         props = reference.props

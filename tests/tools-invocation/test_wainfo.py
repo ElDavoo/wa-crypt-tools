@@ -92,5 +92,5 @@ class TestWaInfoOnKeys:
         assert "not a valid Java object" in out
 
     def test_a_backup_read_as_a_key_fails(self):
-        out, ret = Propen("wainfo -k tests/res/msgstore.db.crypt15")
+        _out, ret = Propen("wainfo -k tests/res/msgstore.db.crypt15")
         assert ret != 0

@@ -5,13 +5,14 @@ This script decrypts WhatsApp's DB files encrypted with Crypt12, Crypt14 or Cryp
 
 from __future__ import annotations
 
+import argparse
 import os
+import sys
 from pathlib import Path
 
 from wa_crypt_tools.lib.key.key14 import Key14
 from wa_crypt_tools.lib.key.key15 import Key15
 from wa_crypt_tools.lib.logformat import CustomFormatter
-import argparse
 
 __author__ = 'ElDavo'
 __copyright__ = 'Copyright (C) 2023'
@@ -63,7 +64,7 @@ def main():
             hex_key: bytes = bytes.fromhex(args.hex)
         except ValueError:
             lo.critical("Key is not in hexadecimal format")
-            exit(1)
+            sys.exit(1)
 
 
     if args.output is None:
@@ -87,7 +88,7 @@ def main():
                            key=hex_key)
         except ValueError as e:
             lo.critical(f"Something was not right: {e}")
-            exit(1)
+            sys.exit(1)
     else:
         if args.cipher_version is not None:
             lo.warning("Cipher version specified, but it is not used for crypt15 keys, ignoring.")
@@ -101,18 +102,18 @@ def main():
             key: Key15 = Key15(keyarray=hex_key)
         except ValueError as e:
             lo.critical(f"Error while creating the key: {e}")
-            exit(1)
+            sys.exit(1)
     # Check if the output file exists
     output_file = Path(args.output)
     print(os.getcwd())
     if output_file.is_file() and not args.yes:
         lo.fatal("The output file already exists.")
-        exit(1)
+        sys.exit(1)
 
     # Write the key file
     key.file_dump(output_file)
 
-    lo.info("Key file \"{}\" created.".format(args.output))
+    lo.info(f"Key file \"{args.output}\" created.")
 
 
 if __name__ == "__main__":

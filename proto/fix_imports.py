@@ -22,7 +22,7 @@ def fix(source: str, siblings: set[str]) -> str:
     """Make top-level imports of `siblings` relative."""
     names = "|".join(sorted(map(re.escape, siblings)))
     return re.sub(
-        r"^import ({})( as \w+)?$".format(names),
+        rf"^import ({names})( as \w+)?$",
         lambda m: "from . import {}{}".format(m.group(1), m.group(2) or ""),
         source,
         flags=re.MULTILINE,
@@ -37,7 +37,7 @@ def main(argv: list[str]) -> int:
     out = Path(argv[1])
     generated = sorted(out.glob("*_pb2.py"))
     if not generated:
-        print("no *_pb2.py files found in {}".format(out), file=sys.stderr)
+        print(f"no *_pb2.py files found in {out}", file=sys.stderr)
         return 1
 
     siblings = {path.stem for path in generated}
@@ -48,7 +48,7 @@ def main(argv: list[str]) -> int:
         if result != source:
             path.write_text(result)
             fixed += 1
-    print("fixed imports in {} of {} files".format(fixed, len(generated)))
+    print(f"fixed imports in {fixed} of {len(generated)} files")
     return 0
 
 

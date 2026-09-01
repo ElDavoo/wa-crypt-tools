@@ -1,6 +1,7 @@
-from pathlib import Path
 from hashlib import sha512
-from subprocess import Popen, STDOUT, PIPE
+from pathlib import Path
+from subprocess import PIPE, STDOUT, Popen
+
 
 def Propen(command):
     if isinstance(command, str):

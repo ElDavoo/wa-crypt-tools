@@ -1,5 +1,6 @@
 import io
 import zlib
+from hashlib import sha512
 
 from wa_crypt_tools.lib.db.db12 import Database12
 from wa_crypt_tools.lib.db.db14 import Database14
@@ -7,7 +8,6 @@ from wa_crypt_tools.lib.db.db15 import Database15
 from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
 from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 from wa_crypt_tools.lib.props import Props
-from hashlib import sha512
 
 # zlib-ng (used by CPython 3.14+ on Windows) produces different compressed
 # bytes than classic zlib, so the encrypted output can only be compared

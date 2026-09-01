@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import contextlib
+
 from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.proto import backup_expiry_pb2 as backup_expiry
+
 
 def _highest_feature(descriptor) -> int:
     """
@@ -34,10 +37,8 @@ class Props:
             return
         self.props.backup_version = backup_version
         for f in range(5, max_feature + 1):
-            try:
+            with contextlib.suppress(AttributeError):
                 self.disable_feature(f)
-            except AttributeError:
-                pass
         for f in features:
             self.enable_feature(f)
 
@@ -45,7 +46,7 @@ class Props:
         """The schema's name for the flag with this number, or AttributeError if there is none."""
         field = self.props.DESCRIPTOR.fields_by_number.get(feature)
         if field is None or field.type != field.TYPE_BOOL:
-            raise AttributeError("No feature numbered {}".format(feature))
+            raise AttributeError(f"No feature numbered {feature}")
         return field.name
 
     def enable_feature(self, feature: int):

@@ -23,6 +23,8 @@ from wa_crypt_tools.lib.utils import (
     hexstring2bytes,
     javaintlist2bytes,
     mcrypt1_metadata_decrypt,
+)
+from wa_crypt_tools.lib.utils import (
     test_decompression as decompresses_to_a_database,
 )
 
@@ -209,7 +211,7 @@ class TestHeaderInfo:
         # "...in your crypt15 file:" ran straight into "IV: ", unlike the crypt14 branch just
         # below it, so anything reading wainfo's output line by line never saw the IV.
         header = self.header_of("tests/res/msgstore.db.crypt15")
-        assert "IV: {}".format(header.e2ee_key_data.encryption_iv.hex()) in header_info(header).splitlines()
+        assert f"IV: {header.e2ee_key_data.encryption_iv.hex()}" in header_info(header).splitlines()
 
     def test_a_backup_without_a_feature_table(self):
         string = header_info(self.header_of("tests/res/msgstore-noexpiry.db.crypt14"))
