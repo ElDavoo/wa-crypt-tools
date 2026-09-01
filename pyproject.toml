@@ -40,6 +40,11 @@ waencrypt = "wa_crypt_tools.waencrypt:main"
 waguess = "wa_crypt_tools.waguess:main"
 wainfo = "wa_crypt_tools.wainfo:main"
 
+# gui-scripts, not scripts: this is what makes Windows build a console-less wagui.exe, so a
+# double-click opens the window and nothing else.
+[project.gui-scripts]
+wagui = "wa_crypt_tools.gui:main"
+
 [project.optional-dependencies]
 test = [
     "pytest >= 8.0.0",

@@ -42,7 +42,16 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    # tests/gui/test_app.py builds a real Tk window, so it needs a display; without one it
+    # skips, and the widget code would then be covered on the Windows leg alone.
+    - name: Install xvfb
+      if: runner.os == 'Linux'
+      run: sudo apt-get update && sudo apt-get install -y xvfb
+    - name: Test with pytest (under xvfb)
+      if: runner.os == 'Linux'
+      run: xvfb-run -a python -m pytest --cov
     - name: Test with pytest
+      if: runner.os != 'Linux'
       run: |
         python -m pytest --cov
     - name: Coveralls

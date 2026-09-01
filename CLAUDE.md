@@ -22,9 +22,15 @@ python -m pytest --cov          # with coverage (as CI runs it)
 python -m pytest tests/test_decrypt.py::TestDecryption::test_decryption15   # single test
 ```
 
-The full suite takes around two and a half minutes: `tests/tools-invocation/` runs the console
+The full suite takes around four minutes: `tests/tools-invocation/` runs the console
 scripts as subprocesses, and `waguess` brute-forces offsets over a 240 KB backup for each of the
-three formats.
+three formats -- plus once more for `tests/gui/`, which exercises the same search behind the
+window's "try harder" checkbox.
+
+`tests/gui/test_app.py` builds a real Tk window, so it needs both `_tkinter` and a display; it
+skips cleanly without either, which is why a plain run here reports eleven skips unless the venv
+was built as "Running the window on this machine" below describes. CI's Ubuntu leg runs the
+suite under `xvfb-run` for the same reason.
 
 
 Without the venv on `PATH`, the 14 `tools-invocation` tests fail with
@@ -227,12 +233,75 @@ ZIP of JSON changesets, but a *compressed* one, so the ZIP header only appears a
 decompression. `lib/utils.py: test_decompression` checks for it both before and after for
 that reason -- before catches `stickers.backup.crypt15`, after catches the real thing.
 
+## The GUI
+
+`src/wa_crypt_tools/gui/` is the `wagui` window, and it is split so that the half worth testing
+needs no display. `core.py` holds every decision -- `describe_backup`, `suggest_output`,
+`problems`, `friendly`, the queue log handler, `run_decrypt` -- and `app.py` is widget wiring.
+`tests/gui/test_core.py` therefore runs anywhere; `tests/gui/test_app.py` builds a real Tk
+window and skips when there is no display.
+
+It calls `wadecrypt.decrypt(args)` in-process with a `SimpleNamespace` rather than shelling
+out: a frozen binary has no `wadecrypt` on `PATH`, and that function already owns the chunked
+low-memory path, the `--force` salvage and the zlib-versus-ZIP sniffing. That is why
+`wadecrypt.decrypt` raises `WaCryptError` for an existing output instead of calling `exit(1)` --
+a `SystemExit` through the middle of a Tk event loop is not something a GUI can act on. The CLI
+is unaffected: `main()` already caught `WaCryptError`, and `log.fatal` *is* `log.critical`.
+
+Two things the window gets right that are easy to break. The info pane shows a one-line
+headline, not `header_info`'s output -- that is `wainfo`'s rendering, three lines of which say
+"crypt15" before reaching a key type and a feature list, so it goes in the Messages pane and the
+headline carries the format, the app version and the jid suffix. And describing is debounced, so
+a timer armed by the last keystroke can land during or after the decryption it triggered:
+`start()` cancels the pending job and `_show_detail` ignores a repeat of the path already shown.
+Without both, the run log is replaced by the header -- which is what a screenshot of the
+finished window actually showed.
+
+`[project.gui-scripts]`, not `[project.scripts]`: that is what makes Windows build a
+console-less `wagui.exe`. tkinter is stdlib, so there is no `gui` extra; the Linux
+`python3-tk` gap is documented in the README instead, since no extra can install a system
+package.
+
+`packaging/wagui.spec` builds the release binaries, and `.gitignore`'s `*.spec` (which is in
+the standard Python template *because* of PyInstaller) would hide it -- hence the
+`!packaging/wagui.spec` negation. The spec is onefile everywhere except macOS, where a windowed
+onefile and a `.app` bundle contradict each other and PyInstaller 7 will make it an error.
+`wagui --selftest` is what CI runs against each built binary: it imports the generated protobuf
+modules, which `DatabaseFactory.from_file` loads lazily and a frozen build can therefore omit
+without `--version` ever noticing.
+
+### Running the window on this machine
+
+The venv's Python needs tkinter, which the system one does not have. Build an interpreter that
+does and make the venv from it:
+
+```bash
+nix build --no-link --print-out-paths --impure --expr \
+  '(builtins.getFlake "flake:nixpkgs").legacyPackages.${builtins.currentSystem}.python3.withPackages (ps: [ ps.tkinter ])'
+<that path>/bin/python -m venv --system-site-packages .venv   # --system-site-packages carries _tkinter in
+.venv/bin/python -m pip install -e '.[test]'
+```
+
+Tk renders through XWayland on `DISPLAY=:0`. For a screenshot that is the same every time, run
+under Xvfb (`nixpkgs.xvfb-run`) with no window manager, so the geometry asked for is the
+geometry rendered, and capture with ImageMagick's `import -window root`; that is how
+`docs/wagui.png` is made. `grim` plus `hyprctl clients -j` works for a quick look at the real
+session, but Hyprland tiles the window to the monitor width, and this Hyprland's `hyprctl
+dispatch` takes Lua-style arguments, so the older `setfloating address:0x...` form fails.
+
+PyInstaller cannot build here without help: nixpkgs ships tcl and tk as separate store paths,
+and PyInstaller guesses Tk's data directory as `$tcl_root/../tkX.Y`, which does not exist. It
+honours `TK_LIBRARY`, so pass the path `root.tk.exprstring('$tk_library')` reports. This is a
+nixpkgs split only -- the CI runners' CPython builds keep the two together, so the spec must
+not encode a workaround for it.
+
 ## Notes
 
 - Protobuf generated code lives in `src/wa_crypt_tools/proto/` and is excluded from coverage
   along with `tests/` (`.coveragerc`). `source` is scoped to `src/wa_crypt_tools`, so the reported
   TOTAL is the package's own number (~94%): `lib/` sits around 97%, the `wa*.py` entry points
-  between 81% and 97%.
+  between 81% and 97%, and `gui/` at 97% for `core.py` and 91% for `app.py` -- the latter only
+  reaches that where a display exists, so a headless run reports it far lower.
 - `tests/tools-invocation/` shells out to the console scripts, and those subprocesses are measured
   too. It takes three pieces together and breaks silently — as 0% on every `wa*.py` — if any one
   of them goes: `parallel = true` in `.coveragerc`, the root `conftest.py` exporting

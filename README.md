@@ -40,6 +40,40 @@ for the development version.
 
 You might have to create a virtual environment to avoid conflicts with other packages.  
 
+# The window: wagui
+
+If you would rather not use a terminal at all, `wagui` is a small window that decrypts a
+backup: pick your key, pick the backup, press Decrypt.
+
+![The wagui window](docs/wagui.png)
+
+**Download it and double-click it.** Every
+[release](https://github.com/ElDavoo/wa-crypt-tools/releases) carries a self-contained build
+that needs no Python and no installation:
+
+| File | For |
+| --- | --- |
+| `wagui-windows-x64.exe` | Windows |
+| `wagui-macos-arm64.zip` | macOS (Apple Silicon) |
+| `wagui-linux-x64` | Linux (`chmod +x` it first) |
+
+The macOS build is not code-signed, so the first time you open it macOS will refuse: right-click
+the app and choose *Open*, then confirm.
+
+If you already installed the package with pip, the same window is one command away:
+
+```bash
+wagui
+```
+
+On Linux, a pip install also needs your distribution's tkinter package (`python3-tk` on
+Debian/Ubuntu, `python3-tkinter` on Fedora) -- it is part of Python but packaged separately.
+The downloadable build has it built in and needs nothing.
+
+The window covers decrypting, which is what most people are here for. It also tells you what a
+file is as soon as you pick it, the way `wainfo` does. Encrypting, creating key files and
+guessing offsets stay in the command-line tools below.
+
 # Quick start
 
 ## Decrypt a file with wadecrypt
@@ -123,6 +157,7 @@ You can get info about a backup file with the `wainfo` tool.
 
 # Tool list
 For usage, run the tool with `-h` option.
+0) `wagui` - The window (see above); the only one that is not a command-line tool
 1) `wacreatekey` - Create key files
 2) `wadecrypt` - Decrypt backups
 3) `waencrypt` - Encrypt backups

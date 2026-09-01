@@ -274,8 +274,10 @@ def decrypt(args):
     # Before anything else, and before the output is opened: refusing after the fact would
     # mean the file had already been emptied.
     if Path(args.decrypted).is_file() and not args.yes:
-        log.fatal("The output file already exists. Use --yes to overwrite it.")
-        exit(1)
+        # Raised rather than exited: main() turns it into the same message and the same exit
+        # code, and the GUI -- which calls this function directly -- gets something it can
+        # catch instead of a SystemExit through the middle of its event loop.
+        raise WaCryptError("The output file already exists. Use --yes to overwrite it.")
     if args.buffer_size is not None:
         if not 1 < args.buffer_size < maxsize:
             raise WaCryptError("Invalid buffer size: {}".format(args.buffer_size))

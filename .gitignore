@@ -34,6 +34,9 @@ MANIFEST
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
+# ...but ours is written by hand and committed on purpose, so that a local build and the
+# release workflow produce the same binary. Without this line the rule above hides it.
+!packaging/wagui.spec
 
 # Installer logs
 pip-log.txt
