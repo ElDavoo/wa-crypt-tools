@@ -17,19 +17,18 @@ OUT = "wadecrypt-test-out.db"
 
 def make_corrupted_backup():
     """A real crypt15 backup with one bit flipped in the ciphertext."""
-    with open("tests/res/msgstore.db.crypt15", 'rb') as f:
+    with open("tests/res/msgstore.db.crypt15", "rb") as f:
         data = bytearray(f.read())
     # Well before the authentication tag and the checksum, so the tag check is what fails.
     data[-40] ^= 0xFF
-    with open(CORRUPT, 'wb') as f:
+    with open(CORRUPT, "wb") as f:
         f.write(bytes(data))
 
 
 class TestWaDecrypt:
     def test_decrypts_a_good_backup(self):
         try:
-            out, ret = Propen("wadecrypt tests/res/encrypted_backup.key "
-                              "tests/res/msgstore.db.crypt15 " + OUT)
+            out, ret = Propen("wadecrypt tests/res/encrypted_backup.key tests/res/msgstore.db.crypt15 " + OUT)
             assert ret == 0, out
             assert cmp_files(OUT, "tests/res/msgstore.db")
         finally:
@@ -74,8 +73,7 @@ class TestWaDecrypt:
     def test_streaming_succeeds_with_force(self):
         try:
             make_corrupted_backup()
-            out, ret = Propen("wadecrypt -nm -f tests/res/encrypted_backup.key "
-                              + CORRUPT + " " + OUT)
+            out, ret = Propen("wadecrypt -nm -f tests/res/encrypted_backup.key " + CORRUPT + " " + OUT)
             assert ret == 0, out
             assert exists(OUT)
         finally:
@@ -85,8 +83,7 @@ class TestWaDecrypt:
     def test_unusable_key_file_fails(self):
         """Used to carry on with a None key and die with an AttributeError."""
         try:
-            out, ret = Propen("wadecrypt tests/res/test.json "
-                              "tests/res/msgstore.db.crypt15 " + OUT)
+            out, ret = Propen("wadecrypt tests/res/test.json tests/res/msgstore.db.crypt15 " + OUT)
             assert ret != 0
             assert "Traceback" not in out
         finally:
@@ -95,8 +92,7 @@ class TestWaDecrypt:
     def test_non_hex_key_of_the_right_length_fails(self):
         """Used to die with "object of type 'NoneType' has no len()"."""
         try:
-            out, ret = Propen("wadecrypt " + "z" * 64 + " "
-                              "tests/res/msgstore.db.crypt15 " + OUT)
+            out, ret = Propen("wadecrypt " + "z" * 64 + " tests/res/msgstore.db.crypt15 " + OUT)
             assert ret != 0
             assert "Traceback" not in out
             assert "TypeError" not in out
@@ -105,8 +101,7 @@ class TestWaDecrypt:
 
     def test_a_file_that_is_not_a_backup_fails(self):
         try:
-            out, ret = Propen("wadecrypt tests/res/encrypted_backup.key "
-                              "tests/res/test.json " + OUT)
+            out, ret = Propen("wadecrypt tests/res/encrypted_backup.key tests/res/test.json " + OUT)
             assert ret != 0
             assert "Traceback" not in out
         finally:
@@ -126,25 +121,23 @@ class TestExistingOutput:
         rm_if_found(OUT)
 
     def write_something(self):
-        with open(OUT, 'wb') as f:
-            f.write(b'PRECIOUS')
+        with open(OUT, "wb") as f:
+            f.write(b"PRECIOUS")
 
     def read_output(self) -> bytes:
-        with open(OUT, 'rb') as f:
+        with open(OUT, "rb") as f:
             return f.read()
 
     def test_an_existing_output_stops_the_run(self):
         self.write_something()
-        out, ret = Propen("wadecrypt tests/res/encrypted_backup.key "
-                          "tests/res/msgstore.db.crypt15 " + OUT)
+        out, ret = Propen("wadecrypt tests/res/encrypted_backup.key tests/res/msgstore.db.crypt15 " + OUT)
         assert ret != 0
         assert "output file already exists" in out
-        assert self.read_output() == b'PRECIOUS'
+        assert self.read_output() == b"PRECIOUS"
 
     def test_yes_overwrites_it(self):
         self.write_something()
-        out, ret = Propen("wadecrypt --yes tests/res/encrypted_backup.key "
-                          "tests/res/msgstore.db.crypt15 " + OUT)
+        out, ret = Propen("wadecrypt --yes tests/res/encrypted_backup.key tests/res/msgstore.db.crypt15 " + OUT)
         assert ret == 0, out
         assert cmp_files(OUT, "tests/res/msgstore.db")
 
@@ -152,15 +145,13 @@ class TestExistingOutput:
         # The streaming path opens the output itself and writes to it chunk by chunk, so it
         # has its own way of reaching the file and needs its own check.
         self.write_something()
-        out, ret = Propen("wadecrypt --yes -nm tests/res/encrypted_backup.key "
-                          "tests/res/msgstore.db.crypt15 " + OUT)
+        out, ret = Propen("wadecrypt --yes -nm tests/res/encrypted_backup.key tests/res/msgstore.db.crypt15 " + OUT)
         assert ret == 0, out
         assert cmp_files(OUT, "tests/res/msgstore.db")
 
     def test_a_run_that_fails_leaves_the_output_alone(self):
         # Even with --yes: the file is opened only once there is something to write to it.
         self.write_something()
-        _out, ret = Propen("wadecrypt --yes tests/res/test.json "
-                          "tests/res/msgstore.db.crypt15 " + OUT)
+        _out, ret = Propen("wadecrypt --yes tests/res/test.json tests/res/msgstore.db.crypt15 " + OUT)
         assert ret != 0
-        assert self.read_output() == b'PRECIOUS'
+        assert self.read_output() == b"PRECIOUS"

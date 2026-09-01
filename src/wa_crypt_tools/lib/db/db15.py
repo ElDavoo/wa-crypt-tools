@@ -21,8 +21,7 @@ class Database15(Database):
         return "Database15"
         # todo
 
-    def __init__(self, *, iv: bytes | None = None, props: Props | None = None,
-                 key_type: int | None = C.DEFAULT_KEY_TYPE):
+    def __init__(self, *, iv: bytes | None = None, props: Props | None = None, key_type: int | None = C.DEFAULT_KEY_TYPE):
         self.file_hash = md5()
         # just store it for now
         self.props = props
@@ -56,8 +55,7 @@ class Database15(Database):
         try:
             output_decrypted: bytes = cipher.decrypt(encrypted_data)
         except ValueError as e:
-            raise DecryptionError(f"Decryption failed: {e}."
-                                  "\n    This probably means your backup is corrupted.") from e
+            raise DecryptionError(f"Decryption failed: {e}.\n    This probably means your backup is corrupted.") from e
 
         # Verify the authentication tag
         try:
@@ -72,19 +70,21 @@ class Database15(Database):
             else:
                 cipher.verify(authentication_tag)
         except ValueError as e:
-            raise IntegrityError(f"Authentication tag mismatch: {e}."
-                                 "\n    This probably means your backup is corrupted."
-                                 , data=output_decrypted) from e
+            raise IntegrityError(
+                f"Authentication tag mismatch: {e}.\n    This probably means your backup is corrupted.", data=output_decrypted
+            ) from e
 
         return output_decrypted
 
     def encrypt(self, key: Key15, props: Props, decrypted: bytes) -> bytes:
         """Encrypts the database using the provided key"""
         from wa_crypt_tools.proto import C15_IV_pb2 as C15_IV
+
         cipher = C15_IV.C15_IV()
         cipher.encryption_iv = self.iv
         from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
         from wa_crypt_tools.proto import key_type_pb2 as key_type
+
         header = prefix.BackupPrefix()
         if self.prefix is not None:
             # Start from the header this database was parsed from, so that whatever WhatsApp
@@ -102,7 +102,7 @@ class Database15(Database):
 
         header.backup_metadata.CopyFrom(props.get_proto())
         prefix = header.SerializeToString()
-        out = b''
+        out = b""
         file_hash = md5()
         # The size prefix is a protobuf varint, not a raw byte capped at 255: what looked like
         # a separate msgstore "feature table" flag byte was always just that varint's own

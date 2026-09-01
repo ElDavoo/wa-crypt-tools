@@ -38,7 +38,7 @@ def test_decompression(test_data: bytes) -> bool:
         if zlib_obj[:4] == C.ZIP_HEADER:
             return True
         # Decoding can fail if first two bytes are a bad UTF-8 char
-        if zlib_obj[:15].decode('ascii') != 'SQLite format 3':
+        if zlib_obj[:15].decode("ascii") != "SQLite format 3":
             log.error("Test decompression: Decryption and decompression ok but not a valid SQLite database")
             return False
         return True
@@ -61,40 +61,40 @@ def create_jba(out: bytes) -> JavaByteArray:
 def hexstring2bytes(string: str) -> bytes:
     """Converts a hex string into a bytes array"""
     if len(string) != 64:
-        raise InvalidKeyError("The key file specified does not exist.\n    "
-                              "If you tried to specify the key directly, note it should be "
-                              f"64 characters long and not {len(string)} characters long.")
+        raise InvalidKeyError(
+            "The key file specified does not exist.\n    "
+            "If you tried to specify the key directly, note it should be "
+            f"64 characters long and not {len(string)} characters long."
+        )
 
     try:
         barr = bytes.fromhex(string)
     except ValueError as e:
-        raise InvalidKeyError("Couldn't convert the hex string.\n    "
-                              f"Exception: {e}") from e
+        raise InvalidKeyError(f"Couldn't convert the hex string.\n    Exception: {e}") from e
     return barr
 
 
 def javaintlist2bytes(barr: JavaArray) -> bytes:
     """Converts a javaobj bytearray which somehow became a list of signed integers back to a Python byte array"""
-    out: bytes = b''
+    out: bytes = b""
     for i in barr:
-        out += i.to_bytes(1, byteorder='big', signed=True)
+        out += i.to_bytes(1, byteorder="big", signed=True)
     return out
 
 
-def encryptionloop(*, first_iteration_data: bytes, privateseed: bytes = b'\x00' * 32, message: bytes,
-                   output_bytes: int):
+def encryptionloop(*, first_iteration_data: bytes, privateseed: bytes = b"\x00" * 32, message: bytes, output_bytes: int):
     # The private key and the seed are used to create the HMAC key
     privatekey = hmac.new(privateseed, msg=first_iteration_data, digestmod=sha256).digest()
 
-    data = b''
-    output = b''
+    data = b""
+    output = b""
     permutations = math.ceil(output_bytes / 32)
     i = 1
     while i < permutations + 1:
         hasher = hmac.new(privatekey, msg=data, digestmod=sha256)
         if message is not None:
             hasher.update(message)
-        hasher.update(i.to_bytes(1, byteorder='big'))
+        hasher.update(i.to_bytes(1, byteorder="big"))
         data = hasher.digest()
         bytestowrite = min(output_bytes, len(data))
         output += data[:bytestowrite]
@@ -111,9 +111,10 @@ def mcrypt1_metadata_decrypt(*, key, encoded: str):
     """
     # Base64 decoding
     encoded = base64.b64decode(encoded)
+
     # PKCS5Padding is not natively supported
     def unpad(s):
-        return s[:-ord(s[len(s) - 1:])]
+        return s[: -ord(s[len(s) - 1 :])]
 
     iv_size = encoded[0]
     if iv_size != 16:
@@ -127,7 +128,7 @@ def mcrypt1_metadata_decrypt(*, key, encoded: str):
     mac = encoded[18:50]
     encrypted_metadata = encoded[50:]
     # Authentication part
-    hmac_auth = hmac.new(key.get_metadata_authentication(), digestmod='sha256')
+    hmac_auth = hmac.new(key.get_metadata_authentication(), digestmod="sha256")
     hmac_auth.update(iv)
     hmac_auth.update(encrypted_metadata)
     hmac_auth = hmac_auth.digest()
@@ -138,14 +139,14 @@ def mcrypt1_metadata_decrypt(*, key, encoded: str):
     decrypted_metadata = cipher.decrypt(encrypted_metadata)
     decrypted_metadata = unpad(decrypted_metadata)
     # Load the JSON
-    return json.loads(decrypted_metadata.decode('utf-8'))
+    return json.loads(decrypted_metadata.decode("utf-8"))
 
 
 def get_mcrypt1_name(*, key, name: str, md5: bytes) -> bytes:
-    hmac_n = hmac.new(key.get_root(), digestmod='sha256')
+    hmac_n = hmac.new(key.get_root(), digestmod="sha256")
     # Calculate SHA256 of the name
     digest = sha256()
-    digest.update(name.encode('utf-8'))
+    digest.update(name.encode("utf-8"))
     # Pour it into the HMAC
     hmac_n.update(digest.digest())
     # If md5 is a string, convert it to bytes
@@ -161,7 +162,7 @@ def encode_varint(value: int) -> bytes:
     prefix: one byte for any header under 128 bytes, more above that."""
     out = bytearray()
     while True:
-        byte = value & 0x7f
+        byte = value & 0x7F
         value >>= 7
         if value:
             out.append(byte | 0x80)
@@ -223,14 +224,17 @@ def header_info(header):
         string += str(f"IV: {cipher.encryption_iv.hex()}\n")
     string += str(f"Key type: {header.key_type_deprecated}\n")
     string += str(f"WhatsApp version: {header.backup_metadata.app_version}\n")
-    #string += str("Device model: {}".format(header.backup_metadata.device_model))
+    # string += str("Device model: {}".format(header.backup_metadata.device_model))
     string += str(f"The last two numbers of the user's Jid: {header.backup_metadata.jid_suffix}\n")
     string += str(f"Backup version: {header.backup_metadata.backup_version}\n")
-    #string += str("Size of the backup file: {}".format(header.backup_metadata.backup_export_file_size))
+    # string += str("Size of the backup file: {}".format(header.backup_metadata.backup_export_file_size))
     # The migration flags, by field number: the numbers are what this project has always called
     # features, and the schema is what says which fields are flags rather than metadata.
-    features = [f.number for f in header.backup_metadata.DESCRIPTOR.fields
-                if f.type == f.TYPE_BOOL and getattr(header.backup_metadata, f.name)]
+    features = [
+        f.number
+        for f in header.backup_metadata.DESCRIPTOR.fields
+        if f.type == f.TYPE_BOOL and getattr(header.backup_metadata, f.name)
+    ]
     if len(features) > 0:
         string += str(f"Features: {features}\n")
         string += str(f"Max feature number: {max(features)}\n")

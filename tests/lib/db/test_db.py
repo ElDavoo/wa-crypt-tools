@@ -28,10 +28,10 @@ class TestDatabase:
                 return "Database16"
 
             def decrypt(self, key, encrypted):
-                return b''
+                return b""
 
             def encrypt(self, key, props, decrypted):
-                return b''
+                return b""
 
         with pytest.raises(TypeError, match="get_iv"):
             Database16()

@@ -97,6 +97,9 @@ jobs:
     - name: Lint with ruff
       run: ruff check --output-format=github .
 
+    - name: Check formatting with ruff
+      run: ruff format --check --diff .
+
     - name: Type-check with mypy (advisory)
       continue-on-error: true
       run: mypy src/wa_crypt_tools

@@ -20,8 +20,7 @@ PLAIN = "tests/res/msgstore.db"
 OUT = "waencrypt-test-out.crypt"
 ROUNDTRIP = "waencrypt-test-roundtrip.db"
 
-CLASSIC_ZLIB = ("zlib-ng" not in zlib.ZLIB_VERSION
-                and "zlib-ng" not in zlib.ZLIB_RUNTIME_VERSION)
+CLASSIC_ZLIB = "zlib-ng" not in zlib.ZLIB_VERSION and "zlib-ng" not in zlib.ZLIB_RUNTIME_VERSION
 
 
 def cleanup():
@@ -42,11 +41,14 @@ class TestRoundTrips:
     def teardown_method(self):
         cleanup()
 
-    @pytest.mark.parametrize("key, type_", [
-        pytest.param(KEY15, "15", id="crypt15"),
-        pytest.param(KEY14, "14", id="crypt14"),
-        pytest.param(KEY14, "12", id="crypt12"),
-    ])
+    @pytest.mark.parametrize(
+        "key, type_",
+        [
+            pytest.param(KEY15, "15", id="crypt15"),
+            pytest.param(KEY14, "14", id="crypt14"),
+            pytest.param(KEY14, "12", id="crypt12"),
+        ],
+    )
     def test_every_type_survives_a_round_trip(self, key, type_):
         roundtrip(key, "--type", type_, "--jid", "67")
         assert cmp_files(ROUNDTRIP, PLAIN)
@@ -66,9 +68,26 @@ class TestRoundTrips:
     def test_features_and_version_end_up_in_the_header(self):
         # --enable-features takes nargs='*', so it has to come before the other options:
         # placed just before the positionals it swallows the keyfile as a feature number.
-        out, ret = Propen(["waencrypt", "--enable-features", "5", "7", "13",
-                           "--type", "15", "--jid", "42", "--wa-version", "2.24.1.1",
-                           "--max-feature", "37", KEY15, PLAIN, OUT])
+        out, ret = Propen(
+            [
+                "waencrypt",
+                "--enable-features",
+                "5",
+                "7",
+                "13",
+                "--type",
+                "15",
+                "--jid",
+                "42",
+                "--wa-version",
+                "2.24.1.1",
+                "--max-feature",
+                "37",
+                KEY15,
+                PLAIN,
+                OUT,
+            ]
+        )
         assert ret == 0, out
         out, ret = Propen("wainfo " + OUT)
         assert ret == 0, out
@@ -77,7 +96,7 @@ class TestRoundTrips:
         assert "Features: [5, 7, 13]" in out
 
 
-def with_unknown_header_field(source: str, dest: str, field: bytes = b'\x30\x03'):
+def with_unknown_header_field(source: str, dest: str, field: bytes = b"\x30\x03"):
     """
     Copies a backup, adding a protobuf field the schema does not model to its header.
 
@@ -85,13 +104,13 @@ def with_unknown_header_field(source: str, dest: str, field: bytes = b'\x30\x03'
     around it -- the size byte grows, and the trailing md5 covers the header, so it has to be
     recomputed -- but the ciphertext and its authentication tag are untouched.
     """
-    raw = open(source, 'rb').read()
+    raw = open(source, "rb").read()
     size = raw[0]
     offset = 2 if raw[1] == 1 else 1
-    proto = raw[offset:offset + size] + field
-    body = raw[offset + size:-16]  # ciphertext and tag, without the md5
+    proto = raw[offset : offset + size] + field
+    body = raw[offset + size : -16]  # ciphertext and tag, without the md5
     header = bytes([len(proto)]) + raw[1:offset] + proto
-    with open(dest, 'wb') as f:
+    with open(dest, "wb") as f:
         f.write(header + body + md5(header + body).digest())
 
 
@@ -110,7 +129,8 @@ def without_feature_table_flag(source: str, dest: str):
 
     from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
     from wa_crypt_tools.lib.utils import encode_varint
-    raw = open(source, 'rb').read()
+
+    raw = open(source, "rb").read()
     stream = io.BufferedReader(io.BytesIO(raw))
     db = DatabaseFactory.from_file(stream)
     header_len = stream.tell()
@@ -120,7 +140,7 @@ def without_feature_table_flag(source: str, dest: str):
             db.prefix.backup_metadata.ClearField(field.name)
     serialized = db.prefix.SerializeToString()
     header = encode_varint(len(serialized)) + serialized
-    with open(dest, 'wb') as f:
+    with open(dest, "wb") as f:
         f.write(header + body + md5(header + body).digest())
 
 
@@ -133,8 +153,7 @@ class TestReference:
     def test_a_crypt15_reference_reproduces_the_original(self):
         # The fixture is a 2.22 backup, compressed at level 1, and no -c is passed here:
         # reproducing it byte-for-byte means the level has to come off the reference too.
-        out, ret = Propen(f"waencrypt --reference tests/res/msgstore.db.crypt15 {KEY15} {PLAIN} {OUT}"
-                          )
+        out, ret = Propen(f"waencrypt --reference tests/res/msgstore.db.crypt15 {KEY15} {PLAIN} {OUT}")
         assert ret == 0, out
         if CLASSIC_ZLIB:
             assert cmp_files(OUT, "tests/res/msgstore.db.crypt15")
@@ -168,8 +187,7 @@ class TestReference:
         # This used to raise AttributeError out of Props.max_feature, because encrypt() asked
         # the props whether to write the feature table flag and props built from a reference
         # never set it. It reads the flag off the reference now and never asks.
-        out, ret = Propen("waencrypt --type 14 --reference tests/res/msgstore.db.crypt14 "
-                          f"{KEY14} {PLAIN} {OUT}")
+        out, ret = Propen(f"waencrypt --type 14 --reference tests/res/msgstore.db.crypt14 {KEY14} {PLAIN} {OUT}")
         assert ret == 0, out
 
 
@@ -186,16 +204,16 @@ class TestExistingOutput:
         cleanup()
 
     def write_something(self):
-        with open(OUT, 'wb') as f:
-            f.write(b'PRECIOUS')
+        with open(OUT, "wb") as f:
+            f.write(b"PRECIOUS")
 
     def test_an_existing_output_stops_the_run(self):
         self.write_something()
         out, ret = Propen(f"waencrypt {KEY15} {PLAIN} {OUT}")
         assert ret != 0
         assert "output file already exists" in out
-        with open(OUT, 'rb') as f:
-            assert f.read() == b'PRECIOUS'
+        with open(OUT, "rb") as f:
+            assert f.read() == b"PRECIOUS"
 
     def test_yes_overwrites_it(self):
         self.write_something()
@@ -210,8 +228,8 @@ class TestExistingOutput:
         self.write_something()
         _out, ret = Propen(f"waencrypt --yes tests/res/test.json {PLAIN} {OUT}")
         assert ret != 0
-        with open(OUT, 'rb') as f:
-            assert f.read() == b'PRECIOUS'
+        with open(OUT, "rb") as f:
+            assert f.read() == b"PRECIOUS"
 
 
 class TestFailures:
@@ -224,8 +242,7 @@ class TestFailures:
         assert "not a valid Java object" in out
 
     def test_a_reference_that_is_not_a_backup_fails(self):
-        out, ret = Propen(f"waencrypt --reference tests/res/test.json {KEY15} {PLAIN} {OUT}"
-                          )
+        out, ret = Propen(f"waencrypt --reference tests/res/test.json {KEY15} {PLAIN} {OUT}")
         assert ret != 0
         assert "does not look like a crypt12, 14 or 15 database" in out
 

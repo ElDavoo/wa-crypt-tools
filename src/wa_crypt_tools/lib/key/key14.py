@@ -15,14 +15,20 @@ log = logging.getLogger(__name__)
 
 class Key14(Key):
     # These constants are only used with crypt12/14 keys.
-    __SUPPORTED_CIPHER_VERSION = b'\x00\x01'
-    __SUPPORTED_KEY_VERSIONS: ClassVar[list[bytes]] = [b'\x01', b'\x02', b'\x03']
+    __SUPPORTED_CIPHER_VERSION = b"\x00\x01"
+    __SUPPORTED_KEY_VERSIONS: ClassVar[list[bytes]] = [b"\x01", b"\x02", b"\x03"]
 
-    def __init__(self, keyarray: bytes | None = None,
-                 cipher_version: bytes | None = None, key_version: bytes | None = None,
-                 serversalt: bytes | None = None, googleid: bytes | None = None,
-                 hashedgoogleid: bytes | None = None,
-                 iv: bytes | None = None, key: bytes | None = None):
+    def __init__(
+        self,
+        keyarray: bytes | None = None,
+        cipher_version: bytes | None = None,
+        key_version: bytes | None = None,
+        serversalt: bytes | None = None,
+        googleid: bytes | None = None,
+        hashedgoogleid: bytes | None = None,
+        iv: bytes | None = None,
+        key: bytes | None = None,
+    ):
         """Extracts the fields from a crypt14 loaded key file."""
         # key file format and encoding explanation:
         # The key file is actually a serialized byte[] object.
@@ -73,11 +79,11 @@ class Key14(Key):
                     raise InvalidKeyError(f"Invalid hashed google id length: {hashedgoogleid.hex()}")
                 self.__hashedgoogleid = hashedgoogleid
             if iv is None:
-                self.__padding = b'\x00' * 16
+                self.__padding = b"\x00" * 16
             else:
                 if len(iv) != 16:
                     raise InvalidKeyError(f"Invalid IV length: {iv.hex()}")
-                if iv != b'\x00' * 16:
+                if iv != b"\x00" * 16:
                     log.warning("IV should be empty")
                 self.__padding = iv
             if key is None:
@@ -93,13 +99,13 @@ class Key14(Key):
         problems: list[str] = []
 
         # Check if the keyfile has a supported cipher version
-        self.__cipher_version = keyarray[:len(self.__SUPPORTED_CIPHER_VERSION)]
+        self.__cipher_version = keyarray[: len(self.__SUPPORTED_CIPHER_VERSION)]
         if self.__cipher_version != self.__SUPPORTED_CIPHER_VERSION:
             problems.append(f"Unsupported cipher version {self.__cipher_version.hex()}")
         index = len(self.__SUPPORTED_CIPHER_VERSION)
 
         # Check if the keyfile has a supported key version
-        self.__key_version = keyarray[index:index + len(self.__SUPPORTED_KEY_VERSIONS[0])]
+        self.__key_version = keyarray[index : index + len(self.__SUPPORTED_KEY_VERSIONS[0])]
         if self.__key_version not in self.__SUPPORTED_KEY_VERSIONS:
             problems.append(f"Unsupported key version {self.__key_version.hex()}")
 
@@ -110,8 +116,9 @@ class Key14(Key):
         expected_digest = sha256(self.__googleid).digest()
         actual_digest = keyarray[51:83]
         if expected_digest != actual_digest:
-            problems.append("Invalid SHA-256 of salt.\n        "
-                            f"Expected: {expected_digest.hex()}\n        Got: {actual_digest.hex()}")
+            problems.append(
+                f"Invalid SHA-256 of salt.\n        Expected: {expected_digest.hex()}\n        Got: {actual_digest.hex()}"
+            )
 
         self.__hashedgoogleid = actual_digest
 
@@ -168,7 +175,7 @@ class Key14(Key):
 
     def dump(self) -> bytes:
         """Dumps the key to a file"""
-        out: bytes = b''
+        out: bytes = b""
         out += self.__cipher_version
         out += self.__key_version
         out += self.__serversalt
@@ -179,5 +186,5 @@ class Key14(Key):
         return JavaObjectMarshaller().dump(create_jba(out))
 
     def file_dump(self, file: Path):
-        with open(file, 'wb') as f:
+        with open(file, "wb") as f:
             f.write(self.dump())

@@ -8,7 +8,7 @@ from wa_crypt_tools.lib.errors import InvalidKeyError
 from wa_crypt_tools.lib.key.key15 import Key15
 from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 
-ROOT = bytes.fromhex('6730a595a1484d0c39c101dc0ac82ec5e401bb6f0e1b8ee2dc104a6b3687f017')
+ROOT = bytes.fromhex("6730a595a1484d0c39c101dc0ac82ec5e401bb6f0e1b8ee2dc104a6b3687f017")
 
 
 class TestKey15:
@@ -33,9 +33,9 @@ class TestKey15:
 
     def test_a_key_of_the_wrong_length_is_rejected(self):
         with pytest.raises(InvalidKeyError, match="Invalid key length"):
-            Key15(key=b'\x00' * 31)
+            Key15(key=b"\x00" * 31)
         with pytest.raises(InvalidKeyError, match="expected 32"):
-            Key15(keyarray=b'\x00' * 31)
+            Key15(keyarray=b"\x00" * 31)
 
     def test_something_that_is_not_bytes_is_rejected(self):
         # KeyFactory hands over whatever javaobj produced; a list of ints used to get this

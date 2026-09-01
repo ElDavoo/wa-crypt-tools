@@ -16,7 +16,6 @@ log = logging.getLogger(__name__)
 
 
 class Database14(Database):
-
     def __init__(self, *, iv: bytes | None = None, props: Props | None = None):
         # DatabaseFactory overwrites this with the hash of the header bytes it consumed;
         # a database built for encryption starts with an empty one.
@@ -50,6 +49,7 @@ class Database14(Database):
         cipher.google_id_salt = key.get_googleid()
         cipher.encryption_iv = self.iv
         from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
+
         header = prefix.BackupPrefix()
         if self.prefix is not None:
             # Start from the header this database was parsed from, so that whatever WhatsApp
@@ -62,7 +62,7 @@ class Database14(Database):
 
         header.backup_metadata.CopyFrom(props.get_proto())
         prefix = header.SerializeToString()
-        out = b''
+        out = b""
         file_hash = md5()
         # The size prefix is a protobuf varint, not a raw byte capped at 255: what looked like
         # a separate "feature table" flag byte was always just that varint's own mandatory
@@ -80,16 +80,13 @@ class Database14(Database):
         out += file_hash.digest()
         return out
 
-
     def __str__(self):
         # A crypt14 header carries none of the key fields Database12 prints: they live in
         # the key file, and the only thing this class holds of its own is the IV.
         return f"Database14(iv: {self.iv.hex()})"
 
-
     def get_iv(self) -> bytes:
         return self.iv
-
 
     def decrypt(self, key: Key14, encrypted: bytes) -> bytes:
         """Decrypts the database using the provided key"""
@@ -111,8 +108,7 @@ class Database14(Database):
         try:
             output_decrypted: bytes = cipher.decrypt(encrypted_data)
         except ValueError as e:
-            raise DecryptionError(f"Decryption failed: {e}."
-                                  "\n    This probably means your backup is corrupted.") from e
+            raise DecryptionError(f"Decryption failed: {e}.\n    This probably means your backup is corrupted.") from e
 
         # Verify the authentication tag
         try:
@@ -127,8 +123,8 @@ class Database14(Database):
             else:
                 cipher.verify(authentication_tag)
         except ValueError as e:
-            raise IntegrityError(f"Authentication tag mismatch: {e}."
-                                 "\n    This probably means your backup is corrupted."
-                                 , data=output_decrypted) from e
+            raise IntegrityError(
+                f"Authentication tag mismatch: {e}.\n    This probably means your backup is corrupted.", data=output_decrypted
+            ) from e
 
         return output_decrypted

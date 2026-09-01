@@ -90,7 +90,7 @@ class TestDescribeBackup:
         # (a 15-byte IV, say), attaching the database it built. wainfo prints that anyway
         # rather than showing nothing, and the info pane should do the same -- with a
         # warning, so the user is not told a broken backup is fine.
-        with open("tests/res/msgstore.db.crypt15", 'rb') as f:
+        with open("tests/res/msgstore.db.crypt15", "rb") as f:
             salvaged = DatabaseFactory.from_file(f)
 
         def suspect(_stream):
@@ -112,16 +112,19 @@ class TestDescribeBackup:
 
 
 class TestSuggestOutput:
-    @pytest.mark.parametrize("given,expected", [
-        ("msgstore.db.crypt15", "msgstore.db"),
-        ("msgstore.db.crypt14", "msgstore.db"),
-        ("msgstore.db.crypt12", "msgstore.db"),
-        ("stickers.backup.crypt15", "stickers.backup"),
-        # The suffix is what WhatsApp writes, but a user's filesystem may have shouted it.
-        ("BACKUP.CRYPT15", "BACKUP"),
-        # Anything else keeps its name and gains a suffix, rather than losing information.
-        ("avatar-password.bkup", "avatar-password.bkup.decrypted"),
-    ])
+    @pytest.mark.parametrize(
+        "given,expected",
+        [
+            ("msgstore.db.crypt15", "msgstore.db"),
+            ("msgstore.db.crypt14", "msgstore.db"),
+            ("msgstore.db.crypt12", "msgstore.db"),
+            ("stickers.backup.crypt15", "stickers.backup"),
+            # The suffix is what WhatsApp writes, but a user's filesystem may have shouted it.
+            ("BACKUP.CRYPT15", "BACKUP"),
+            # Anything else keeps its name and gains a suffix, rather than losing information.
+            ("avatar-password.bkup", "avatar-password.bkup.decrypted"),
+        ],
+    )
     def test_suffix_handling(self, given, expected):
         assert core.suggest_output(given) == expected
 
@@ -134,9 +137,13 @@ class TestSuggestOutput:
 
 class TestProblems:
     def good(self, tmp_path, **over):
-        kwargs = {"key": KEY15, "key_is_file": True,
-                  "encrypted": "tests/res/msgstore.db.crypt15",
-                  "output": str(tmp_path / "out.db"), "overwrite": False}
+        kwargs = {
+            "key": KEY15,
+            "key_is_file": True,
+            "encrypted": "tests/res/msgstore.db.crypt15",
+            "output": str(tmp_path / "out.db"),
+            "overwrite": False,
+        }
         kwargs.update(over)
         return core.problems(**kwargs)
 
@@ -148,7 +155,7 @@ class TestProblems:
 
     def test_hex_key_may_be_spaced_out(self, tmp_path):
         # A key read off a screenshot is often transcribed in groups.
-        spaced = " ".join(hex_key()[i:i + 8] for i in range(0, 64, 8))
+        spaced = " ".join(hex_key()[i : i + 8] for i in range(0, 64, 8))
         assert self.good(tmp_path, key=spaced, key_is_file=False) == []
 
     def test_no_key_file(self, tmp_path):
@@ -199,19 +206,22 @@ class TestProblems:
 
 
 class TestFriendly:
-    @pytest.mark.parametrize("error,expected", [
-        (InvalidKeyError("x"), "key file"),
-        (HeaderError("x"), "right way round"),
-        (DecryptionError("x"), "does not match"),
-        (IntegrityError("x"), "damaged"),
-        (WaCryptError("plain message"), "plain message"),
-    ])
+    @pytest.mark.parametrize(
+        "error,expected",
+        [
+            (InvalidKeyError("x"), "key file"),
+            (HeaderError("x"), "right way round"),
+            (DecryptionError("x"), "does not match"),
+            (IntegrityError("x"), "damaged"),
+            (WaCryptError("plain message"), "plain message"),
+        ],
+    )
     def test_each_error_gets_its_own_sentence(self, error, expected):
         assert expected in core.friendly(error)
 
     def test_a_missing_file_names_the_file(self):
         try:
-            open("tests/res/there-is-no-such-file", 'rb')
+            open("tests/res/there-is-no-such-file", "rb")
         except OSError as e:
             assert "there-is-no-such-file" in core.friendly(e)
 
@@ -220,8 +230,7 @@ class TestFriendly:
 
     def test_no_sentence_is_a_bare_class_name(self):
         # A dialog reading "IntegrityError" helps nobody.
-        for error in (InvalidKeyError("x"), HeaderError("x"), DecryptionError("x"),
-                      IntegrityError("x")):
+        for error in (InvalidKeyError("x"), HeaderError("x"), DecryptionError("x"), IntegrityError("x")):
             assert type(error).__name__ not in core.friendly(error)
 
 
@@ -270,8 +279,7 @@ class TestRunDecrypt:
 
     def test_crypt15_with_a_hex_key(self, tmp_path):
         out = tmp_path / "msgstore.db"
-        core.run_decrypt(key=hex_key(), encrypted="tests/res/msgstore.db.crypt15",
-                         output=str(out))
+        core.run_decrypt(key=hex_key(), encrypted="tests/res/msgstore.db.crypt15", output=str(out))
         assert cmp_files(str(out), PLAIN)
 
     def test_crypt14(self, tmp_path):
@@ -286,47 +294,40 @@ class TestRunDecrypt:
 
     def test_low_memory_takes_the_chunked_path(self, tmp_path):
         out = tmp_path / "msgstore.db"
-        core.run_decrypt(key=KEY15, encrypted="tests/res/msgstore.db.crypt15",
-                         output=str(out), low_memory=True)
+        core.run_decrypt(key=KEY15, encrypted="tests/res/msgstore.db.crypt15", output=str(out), low_memory=True)
         assert cmp_files(str(out), PLAIN)
 
     def test_no_decompress_leaves_the_zlib_stream(self, tmp_path):
         out = tmp_path / "msgstore.zlib"
-        core.run_decrypt(key=KEY15, encrypted="tests/res/msgstore.db.crypt15",
-                         output=str(out), no_decompress=True)
+        core.run_decrypt(key=KEY15, encrypted="tests/res/msgstore.db.crypt15", output=str(out), no_decompress=True)
         assert out.read_bytes()[:2] == bytes.fromhex("7801")
 
     def test_try_harder_finds_the_offsets(self, tmp_path):
         out = tmp_path / "msgstore.db"
-        core.run_decrypt(key=KEY15, encrypted="tests/res/msgstore.db.crypt15",
-                         output=str(out), try_harder=True)
+        core.run_decrypt(key=KEY15, encrypted="tests/res/msgstore.db.crypt15", output=str(out), try_harder=True)
         assert cmp_files(str(out), PLAIN)
 
     def test_the_wrong_key_is_an_error(self, tmp_path):
         out = tmp_path / "msgstore.db"
         with pytest.raises(WaCryptError):
-            core.run_decrypt(key="00" * 32, encrypted="tests/res/msgstore.db.crypt15",
-                             output=str(out))
+            core.run_decrypt(key="00" * 32, encrypted="tests/res/msgstore.db.crypt15", output=str(out))
 
     def test_force_writes_the_output_anyway(self, tmp_path):
         out = tmp_path / "msgstore.db"
-        core.run_decrypt(key="00" * 32, encrypted="tests/res/msgstore.db.crypt15",
-                         output=str(out), force=True)
+        core.run_decrypt(key="00" * 32, encrypted="tests/res/msgstore.db.crypt15", output=str(out), force=True)
         assert out.exists()
 
     def test_an_existing_output_is_refused(self, tmp_path):
         out = tmp_path / "msgstore.db"
         out.write_bytes(b"precious")
         with pytest.raises(WaCryptError):
-            core.run_decrypt(key=KEY15, encrypted="tests/res/msgstore.db.crypt15",
-                             output=str(out))
+            core.run_decrypt(key=KEY15, encrypted="tests/res/msgstore.db.crypt15", output=str(out))
         assert out.read_bytes() == b"precious"
 
     def test_overwrite_allows_it(self, tmp_path):
         out = tmp_path / "msgstore.db"
         out.write_bytes(b"precious")
-        core.run_decrypt(key=KEY15, encrypted="tests/res/msgstore.db.crypt15",
-                         output=str(out), overwrite=True)
+        core.run_decrypt(key=KEY15, encrypted="tests/res/msgstore.db.crypt15", output=str(out), overwrite=True)
         assert cmp_files(str(out), PLAIN)
 
     def test_a_failed_try_harder_leaves_no_output_behind(self, tmp_path):
@@ -335,7 +336,6 @@ class TestRunDecrypt:
         # like a result.
         out = tmp_path / "msgstore.db"
         with pytest.raises(WaCryptError):
-            core.run_decrypt(key="00" * 32, encrypted="tests/res/msgstore.db.crypt15",
-                             output=str(out), try_harder=True)
+            core.run_decrypt(key="00" * 32, encrypted="tests/res/msgstore.db.crypt15", output=str(out), try_harder=True)
         assert not out.exists()
         assert list(tmp_path.iterdir()) == []

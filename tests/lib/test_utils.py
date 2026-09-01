@@ -31,18 +31,18 @@ from wa_crypt_tools.lib.utils import (
 # Imported under another name: pytest would otherwise collect "test_decompression" itself
 # as a test case and fail on its "test_data" argument.
 
-SQLITE = b'SQLite format 3\x00' + b'\x00' * 32
+SQLITE = b"SQLite format 3\x00" + b"\x00" * 32
 
 
 def read(path: str) -> bytes:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         return f.read()
 
 
 class TestUtils:
     # Sample test to test the test infrastructure (!)
     def test_hexstring2bytes(self):
-        assert hexstring2bytes("0"*64) == b'\x00' * 32
+        assert hexstring2bytes("0" * 64) == b"\x00" * 32
 
     def test_hexstring2bytes_rejects_the_wrong_length(self):
         with pytest.raises(InvalidKeyError) as excinfo:
@@ -57,7 +57,7 @@ class TestUtils:
 
     def test_javaintlist2bytes_undoes_the_sign(self):
         # javaobj hands back Java's signed bytes; 0xFF arrives as -1.
-        assert javaintlist2bytes([0, 1, 127, -128, -1]) == b'\x00\x01\x7f\x80\xff'
+        assert javaintlist2bytes([0, 1, 127, -128, -1]) == b"\x00\x01\x7f\x80\xff"
 
     def test_create_jba_round_trips_through_javaobj(self):
         import javaobj.v2 as javaobj
@@ -78,18 +78,18 @@ class TestTestDecompression:
         assert decompresses_to_a_database(read("tests/res/empty-db.zlib1")) is True
 
     def test_data_that_is_not_zlib_is_rejected(self):
-        assert decompresses_to_a_database(b'not compressed at all') is False
+        assert decompresses_to_a_database(b"not compressed at all") is False
 
     def test_a_chunk_too_small_to_judge_is_rejected(self):
-        assert decompresses_to_a_database(zlib.compress(b'tiny')) is False
+        assert decompresses_to_a_database(zlib.compress(b"tiny")) is False
 
     def test_compressed_data_that_is_not_sqlite_is_rejected(self):
-        assert decompresses_to_a_database(zlib.compress(b'x' * 64)) is False
+        assert decompresses_to_a_database(zlib.compress(b"x" * 64)) is False
 
     def test_a_bad_utf8_start_is_rejected_and_not_raised(self):
         # decode('ascii') on the first 15 bytes is what fails here; it must come back as
         # False rather than escaping as a UnicodeDecodeError.
-        assert decompresses_to_a_database(zlib.compress(b'\xff' * 64)) is False
+        assert decompresses_to_a_database(zlib.compress(b"\xff" * 64)) is False
 
     def test_sqlite_header_is_accepted(self):
         assert decompresses_to_a_database(zlib.compress(SQLITE)) is True
@@ -107,45 +107,46 @@ class TestEncryptionLoop:
 
     def test_the_crypt15_key_derivation(self):
         # The one derivation the library actually depends on: root key -> cipher key.
-        root = bytes.fromhex('6730a595a1484d0c39c101dc0ac82ec5e401bb6f0e1b8ee2dc104a6b3687f017')
-        assert encryptionloop(first_iteration_data=root, message=b'backup encryption',
-                              output_bytes=32) == Key15(keyarray=root).get()
+        root = bytes.fromhex("6730a595a1484d0c39c101dc0ac82ec5e401bb6f0e1b8ee2dc104a6b3687f017")
+        assert (
+            encryptionloop(first_iteration_data=root, message=b"backup encryption", output_bytes=32)
+            == Key15(keyarray=root).get()
+        )
 
     def test_it_is_deterministic_and_depends_on_the_message(self):
-        root = b'\x01' * 32
-        first = encryptionloop(first_iteration_data=root, message=b'backup encryption', output_bytes=32)
-        assert first == encryptionloop(first_iteration_data=root, message=b'backup encryption', output_bytes=32)
-        assert first != encryptionloop(first_iteration_data=root, message=b'metadata encryption', output_bytes=32)
+        root = b"\x01" * 32
+        first = encryptionloop(first_iteration_data=root, message=b"backup encryption", output_bytes=32)
+        assert first == encryptionloop(first_iteration_data=root, message=b"backup encryption", output_bytes=32)
+        assert first != encryptionloop(first_iteration_data=root, message=b"metadata encryption", output_bytes=32)
 
     def test_more_than_32_bytes_takes_more_than_one_permutation(self):
         # Each round yields 32 bytes, and the first 32 of a longer output are not the same
         # as a 32-byte output: bytestowrite is min(output_bytes, 32), so it is the same
         # prefix only by accident of the truncation, never of the digest.
-        out = encryptionloop(first_iteration_data=b'\x02' * 32, message=b'backup encryption', output_bytes=64)
+        out = encryptionloop(first_iteration_data=b"\x02" * 32, message=b"backup encryption", output_bytes=64)
         assert len(out) == 64
         assert out[:32] != out[32:]
 
     def test_a_None_message_is_allowed(self):
-        assert len(encryptionloop(first_iteration_data=b'\x03' * 32, message=None, output_bytes=32)) == 32
+        assert len(encryptionloop(first_iteration_data=b"\x03" * 32, message=None, output_bytes=32)) == 32
 
 
 class TestMcrypt1:
     """Google Drive E2E metadata, which nothing else in the test suite touches."""
 
-    key = Key15(keyarray=bytes.fromhex(
-        '6730a595a1484d0c39c101dc0ac82ec5e401bb6f0e1b8ee2dc104a6b3687f017'))
+    key = Key15(keyarray=bytes.fromhex("6730a595a1484d0c39c101dc0ac82ec5e401bb6f0e1b8ee2dc104a6b3687f017"))
 
     @staticmethod
-    def make_metadata(key, payload: dict, *, iv_size: int = 16, mac_size: int = 32,
-                      corrupt_mac: bool = False) -> str:
+    def make_metadata(key, payload: dict, *, iv_size: int = 16, mac_size: int = 32, corrupt_mac: bool = False) -> str:
         """Builds the base64 blob Google Drive would serve, so it can be decrypted back."""
         import hmac
-        plain = json.dumps(payload).encode('utf-8')
+
+        plain = json.dumps(payload).encode("utf-8")
         pad = 16 - len(plain) % 16
         plain += bytes([pad]) * pad
         iv = bytes(range(16))
         encrypted = AES.new(key.get_metadata_encryption(), AES.MODE_CBC, iv).encrypt(plain)
-        mac = hmac.new(key.get_metadata_authentication(), digestmod='sha256')
+        mac = hmac.new(key.get_metadata_authentication(), digestmod="sha256")
         mac.update(iv)
         mac.update(encrypted)
         mac = mac.digest()
@@ -155,8 +156,7 @@ class TestMcrypt1:
 
     def test_round_trip(self):
         payload = {"name": "msgstore.db.crypt15", "size": 1234}
-        assert mcrypt1_metadata_decrypt(
-            key=self.key, encoded=self.make_metadata(self.key, payload)) == payload
+        assert mcrypt1_metadata_decrypt(key=self.key, encoded=self.make_metadata(self.key, payload)) == payload
 
     def test_a_wrong_iv_size_is_rejected(self):
         with pytest.raises(HeaderError, match="IV Size"):
@@ -171,7 +171,7 @@ class TestMcrypt1:
             mcrypt1_metadata_decrypt(key=self.key, encoded=self.make_metadata(self.key, {}, corrupt_mac=True))
 
     def test_media_name_is_stable_and_accepts_the_md5_either_way(self):
-        md5 = 'd41d8cd98f00b204e9800998ecf8427e'
+        md5 = "d41d8cd98f00b204e9800998ecf8427e"
         as_hex = get_mcrypt1_name(key=self.key, name="hello", md5=md5)
         as_bytes = get_mcrypt1_name(key=self.key, name="hello", md5=bytes.fromhex(md5))
         assert as_hex == as_bytes
@@ -185,11 +185,12 @@ class TestHeaderInfo:
     @staticmethod
     def header_of(path: str):
         from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
+
         data = read(path)
         size = data[0]
         offset = 2 if data[1] == 1 else 1
         header = prefix.BackupPrefix()
-        header.ParseFromString(data[offset:offset + size])
+        header.ParseFromString(data[offset : offset + size])
         return header
 
     def test_crypt15(self):

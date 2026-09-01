@@ -14,7 +14,7 @@ from wa_crypt_tools.lib.key.key15 import Key15
 from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 from wa_crypt_tools.lib.utils import create_jba
 
-ROOT = '6730a595a1484d0c39c101dc0ac82ec5e401bb6f0e1b8ee2dc104a6b3687f017'
+ROOT = "6730a595a1484d0c39c101dc0ac82ec5e401bb6f0e1b8ee2dc104a6b3687f017"
 
 
 class TestFromFile:
@@ -30,7 +30,7 @@ class TestFromFile:
         # A well-formed Java byte[] of the wrong size: the deserialization succeeds, so this
         # is the only check that catches it.
         path = tmp_path / "key"
-        path.write_bytes(JavaObjectMarshaller().dump(create_jba(b'\x00' * 64)))
+        path.write_bytes(JavaObjectMarshaller().dump(create_jba(b"\x00" * 64)))
         with pytest.raises(InvalidKeyError, match="64 bytes long"):
             KeyFactory.from_file(path)
 
@@ -71,6 +71,6 @@ class TestNew:
         # The user gets "the keyfile is not a valid Java object", not the hex-string advice
         # for a string they never typed.
         path = tmp_path / "key"
-        path.write_bytes(b'this is not a java object')
+        path.write_bytes(b"this is not a java object")
         with pytest.raises(InvalidKeyError, match="not a valid Java object"):
             KeyFactory.new(path)

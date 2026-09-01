@@ -30,35 +30,34 @@ MSGSTORE = "tests/res/msgstore-2.26.db.crypt15"
 WA_DB = "tests/res/wa-2.26.db.crypt15"
 INCREMENT = "tests/res/msgstore-increment-2.26.crypt15"
 
-CLASSIC_ZLIB = ("zlib-ng" not in zlib.ZLIB_VERSION
-                and "zlib-ng" not in zlib.ZLIB_RUNTIME_VERSION)
+CLASSIC_ZLIB = "zlib-ng" not in zlib.ZLIB_VERSION and "zlib-ng" not in zlib.ZLIB_RUNTIME_VERSION
 
 
 def plaintext(path: str) -> bytes:
     key = KeyFactory.new(KEY)
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         db = DatabaseFactory.from_file(f)
         return zlib.decompress(db.decrypt(key, f.read()))
 
 
 def parsed(path: str):
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         return DatabaseFactory.from_file(f)
 
 
 class TestTheyDecrypt:
     def test_a_current_msgstore_is_a_database(self):
         data = plaintext(MSGSTORE)
-        assert data[:15] == b'SQLite format 3'
+        assert data[:15] == b"SQLite format 3"
 
     def test_a_current_non_msgstore_backup_is_a_database_too(self):
-        assert plaintext(WA_DB)[:15] == b'SQLite format 3'
+        assert plaintext(WA_DB)[:15] == b"SQLite format 3"
 
     def test_an_incremental_backup_is_a_zip(self, tmp_path):
         # The shape the guessing logic could not see: a ZIP that WhatsApp compressed, so its
         # header only shows up after inflating.
         data = plaintext(INCREMENT)
-        assert data[:4] == b'PK\x03\x04'
+        assert data[:4] == b"PK\x03\x04"
         archive = tmp_path / "inc.zip"
         archive.write_bytes(data)
         with zipfile.ZipFile(archive) as z:
@@ -72,11 +71,9 @@ class TestTheyDecrypt:
             cursor = connection.cursor()
             assert cursor.execute("pragma integrity_check").fetchone()[0] == "ok"
             # The real 2.26 schema, with every row removed.
-            tables = [r[0] for r in cursor.execute(
-                "select name from sqlite_master where type='table'")]
+            tables = [r[0] for r in cursor.execute("select name from sqlite_master where type='table'")]
             assert len(tables) > 200
-            assert sum(cursor.execute(f'select count(*) from "{t}"').fetchone()[0]
-                       for t in tables) == 0
+            assert sum(cursor.execute(f'select count(*) from "{t}"').fetchone()[0] for t in tables) == 0
 
 
 class TestTheHeaderIsCurrent:
@@ -109,6 +106,7 @@ class TestTheHeaderIsCurrent:
         # If WhatsApp adds a field and someone refreshes these fixtures, this fails and the
         # schema gets updated -- which is the whole point of keeping real headers around.
         from wa_crypt_tools.lib.utils import unknown_header_fields
+
         for path in (MSGSTORE, WA_DB, INCREMENT):
             assert unknown_header_fields(parsed(path).prefix) == []
 
@@ -121,12 +119,12 @@ class TestTheyReEncrypt:
         if not CLASSIC_ZLIB:
             pytest.skip("zlib-ng compresses differently, so bytes cannot be compared")
         key = KeyFactory.new(KEY)
-        with open(path, 'rb') as f:
+        with open(path, "rb") as f:
             db = DatabaseFactory.from_file(f)
             compressed = db.decrypt(key, f.read())
         rebuilt = Database15(iv=db.get_iv())
         rebuilt.prefix = db.prefix
         rebuilt.feature_table = db.feature_table
         out = rebuilt.encrypt(key, Props(v_features=db.prefix.backup_metadata), compressed)
-        with open(path, 'rb') as f:
+        with open(path, "rb") as f:
             assert out == f.read()

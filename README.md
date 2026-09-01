@@ -172,7 +172,7 @@ Everything the tools do is available through `import wa_crypt_tools`.
 from wa_crypt_tools import DatabaseFactory, KeyFactory, IntegrityError
 import zlib
 
-key = KeyFactory.new("encrypted_backup.key")   # a key file, or the 64-character key itself
+key = KeyFactory.new("encrypted_backup.key")  # a key file, or the 64-character key itself
 
 with open("msgstore.db.crypt15", "rb") as f:
     # Reads the header and leaves the stream at the start of the ciphertext.

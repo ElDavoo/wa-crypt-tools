@@ -22,8 +22,8 @@ class TestErrors:
             assert not issubclass(cls, OSError)
 
     def test_integrity_error_carries_data(self):
-        error = IntegrityError("bad tag", data=b'plaintext')
-        assert error.data == b'plaintext'
+        error = IntegrityError("bad tag", data=b"plaintext")
+        assert error.data == b"plaintext"
         assert "bad tag" in str(error)
 
     def test_integrity_error_data_is_optional(self):

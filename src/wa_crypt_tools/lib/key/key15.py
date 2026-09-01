@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 class Key15(Key):
     # This constant is only used with crypt15 keys.
-    BACKUP_ENCRYPTION = b'backup encryption'
+    BACKUP_ENCRYPTION = b"backup encryption"
 
     def __init__(self, keyarray: bytes | None = None, key: bytes | None = None):
         """Extracts the key from a loaded crypt15 key file."""
@@ -58,10 +58,7 @@ class Key15(Key):
         """
         Returns the key used for encryption, that is not the root key.
         """
-        return encryptionloop(
-            first_iteration_data=self.__key,
-            message=b'backup encryption',
-            output_bytes=32)
+        return encryptionloop(first_iteration_data=self.__key, message=b"backup encryption", output_bytes=32)
 
     def get_root(self) -> bytes:
         """
@@ -73,26 +70,20 @@ class Key15(Key):
         """
         Returns the key used for metadata encryption
         """
-        return encryptionloop(
-            first_iteration_data=self.__key,
-            message=b'metadata encryption',
-            output_bytes=32)
+        return encryptionloop(first_iteration_data=self.__key, message=b"metadata encryption", output_bytes=32)
 
     def get_metadata_authentication(self) -> bytes:
         """
         Returns the key used for metadata authentication
         """
-        return encryptionloop(
-            first_iteration_data=self.__key,
-            message=b'metadata authentication',
-            output_bytes=32)
+        return encryptionloop(first_iteration_data=self.__key, message=b"metadata authentication", output_bytes=32)
 
     def dump(self) -> bytes:
         """Dumps the key"""
         return JavaObjectMarshaller().dump(create_jba(self.__key))
 
     def file_dump(self, file: Path):
-        with open(file, 'wb') as f:
+        with open(file, "wb") as f:
             f.write(self.dump())
 
     def __str__(self) -> str:

@@ -10,12 +10,14 @@ def Propen(command):
     p = Popen(command, stdout=PIPE, stderr=STDOUT, text=True)
     return p.communicate()[0], p.returncode
 
+
 def cmp_files(file1: str, file2: str):
-    with open(file1, 'rb') as f:
+    with open(file1, "rb") as f:
         keyb_digest = sha512(f.read()).digest()
-    with open(file2, 'rb') as f:
+    with open(file2, "rb") as f:
         orig_check = sha512(f.read()).digest()
     return keyb_digest == orig_check
+
 
 def rm_if_found(file: str):
     path = Path(file)

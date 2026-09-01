@@ -13,14 +13,20 @@ def _highest_feature(descriptor) -> int:
     These are the numbers this project calls features. Reading them off the schema rather than
     hardcoding 39 means the range keeps up on its own when the proto grows another flag.
     """
-    return max((f.number for f in descriptor.fields if f.type == f.TYPE_BOOL),
-               default=C.DEFAULT_MAX_FEATURE)
+    return max((f.number for f in descriptor.fields if f.type == f.TYPE_BOOL), default=C.DEFAULT_MAX_FEATURE)
 
 
 class Props:
-    def __init__(self, *, v_features=None, wa_version: str = C.DEFAULT_APP_VERSION, jid: str = C.DEFAULT_JID_SUFFIX,
-                 features: list[int] | None = C.DEFAULT_FEATURE_LIST, max_feature: int = C.DEFAULT_MAX_FEATURE,
-                 backup_version: int = C.DEFAULT_BACKUP_VERSION):
+    def __init__(
+        self,
+        *,
+        v_features=None,
+        wa_version: str = C.DEFAULT_APP_VERSION,
+        jid: str = C.DEFAULT_JID_SUFFIX,
+        features: list[int] | None = C.DEFAULT_FEATURE_LIST,
+        max_feature: int = C.DEFAULT_MAX_FEATURE,
+        backup_version: int = C.DEFAULT_BACKUP_VERSION,
+    ):
         if v_features is not None:
             self.props = v_features
             # max_feature is not part of the protobuf -- it is only how far get_features()

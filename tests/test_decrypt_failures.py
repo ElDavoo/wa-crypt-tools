@@ -23,7 +23,7 @@ def as_stream(data: bytes) -> io.BufferedReader:
 
 
 def read(path: str) -> bytes:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         return f.read()
 
 
@@ -44,7 +44,7 @@ class TestDecryptionFailures:
         # empty or truncated stand-in.
         salvaged = excinfo.value.data
         assert salvaged is not None
-        assert salvaged[:2] in (b'x\x01', b'PK')
+        assert salvaged[:2] in (b"x\x01", b"PK")
         assert len(salvaged) > len(data) // 2
 
     def test_wrong_key_raises(self):

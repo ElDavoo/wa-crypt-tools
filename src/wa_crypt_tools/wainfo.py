@@ -13,10 +13,10 @@ from wa_crypt_tools.lib.errors import IntegrityError, WaCryptError
 from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 from wa_crypt_tools.lib.logformat import setup_logging
 
-__author__ = 'ElDavo'
-__copyright__ = 'Copyright (C) 2024'
-__license__ = 'GPLv3'
-__status__ = 'Beta'
+__author__ = "ElDavo"
+__copyright__ = "Copyright (C) 2024"
+__license__ = "GPLv3"
+__status__ = "Beta"
 
 import logging
 
@@ -25,14 +25,15 @@ log = logging.getLogger(__name__)
 
 def parsecmdline() -> argparse.Namespace:
     """Sets up the argument parser"""
-    parser = argparse.ArgumentParser(description='Prints info on whatsapp crypted files')
-    parser.add_argument('encrypted', nargs='?',
-                        type=str,
-                        default="msgstore.db.crypt15",
-                        help='The encrypted crypt12, 14 or 15 file. Default: msgstore.db.crypt15')
-    parser.add_argument('-k', '--key',
-                        action='store_true',
-                        help='tell the program that the file is a key file')
+    parser = argparse.ArgumentParser(description="Prints info on whatsapp crypted files")
+    parser.add_argument(
+        "encrypted",
+        nargs="?",
+        type=str,
+        default="msgstore.db.crypt15",
+        help="The encrypted crypt12, 14 or 15 file. Default: msgstore.db.crypt15",
+    )
+    parser.add_argument("-k", "--key", action="store_true", help="tell the program that the file is a key file")
     return parser.parse_args()
 
 
@@ -47,7 +48,7 @@ def main():
         if args.key:
             print(KeyFactory.from_file(args.encrypted))
             return
-        with open(args.encrypted, 'rb') as f:
+        with open(args.encrypted, "rb") as f:
             print(DatabaseFactory.from_file(f))
     except IntegrityError as e:
         # This tool only reports on a file, so show what could be read off it and say why

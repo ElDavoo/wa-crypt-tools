@@ -11,6 +11,7 @@ class Database(abc.ABC):
     """
     An abstract class that represents a database.
     """
+
     iv: bytes
     # The header protobuf this database was parsed from, when it was parsed from one.
     # DatabaseFactory sets it; encrypt() rebuilds the header on top of it so that anything

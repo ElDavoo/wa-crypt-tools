@@ -19,10 +19,16 @@ class Database12(Database):
     Implementation of a crypt12 database.
     """
 
-    def __init__(self, key: Key14 | None = None, encrypted=None,
-                 cipher_version: bytes | None = None, key_version: bytes | None = None,
-                 serversalt: bytes | None = None,
-                 googleid: bytes | None = None, iv: bytes | None = None):
+    def __init__(
+        self,
+        key: Key14 | None = None,
+        encrypted=None,
+        cipher_version: bytes | None = None,
+        key_version: bytes | None = None,
+        serversalt: bytes | None = None,
+        googleid: bytes | None = None,
+        iv: bytes | None = None,
+    ):
         """Checks if the file is a Crypt12 file.
         Returns the cipher if it is, None otherwise."""
 
@@ -42,26 +48,22 @@ class Database12(Database):
         if encrypted and key:
             self.cipher_version = encrypted.read(2)
             if self.cipher_version != key.get_cipher_version():
-                raise IntegrityError(f"Cipher version mismatch: {self.cipher_version} != {key.get_cipher_version()}"
-                                     )
+                raise IntegrityError(f"Cipher version mismatch: {self.cipher_version} != {key.get_cipher_version()}")
             self.file_hash.update(self.cipher_version)
 
             self.key_version = encrypted.read(1)
             if self.key_version != key.get_key_version():
-                raise IntegrityError(f"Key version mismatch: {self.key_version} != {key.get_key_version()}"
-                                     )
+                raise IntegrityError(f"Key version mismatch: {self.key_version} != {key.get_key_version()}")
             self.file_hash.update(self.key_version)
 
             self.serversalt = encrypted.read(32)
             if self.serversalt != key.get_serversalt():
-                raise IntegrityError(f"Server salt mismatch: {self.serversalt} != {key.get_serversalt()}"
-                                     )
+                raise IntegrityError(f"Server salt mismatch: {self.serversalt} != {key.get_serversalt()}")
             self.file_hash.update(self.serversalt)
 
             self.googleid = encrypted.read(16)
             if self.googleid != key.get_googleid():
-                raise IntegrityError(f"Google ID mismatch: {self.googleid} != {key.get_googleid()}"
-                                     )
+                raise IntegrityError(f"Google ID mismatch: {self.googleid} != {key.get_googleid()}")
             self.file_hash.update(self.googleid)
 
             self.iv = encrypted.read(16)
@@ -72,9 +74,10 @@ class Database12(Database):
             # real one apart from any other file that happens to be long enough. Without it
             # DatabaseFactory's crypt12 fallback accepts arbitrary input and reports garbage.
             if self.cipher_version != C.SUPPORTED_CIPHER_VERSION:
-                raise IntegrityError(f"Unsupported cipher version: {self.cipher_version.hex()}.\n    "
-                                     "This does not look like a crypt12, 14 or 15 database."
-                                     )
+                raise IntegrityError(
+                    f"Unsupported cipher version: {self.cipher_version.hex()}.\n    "
+                    "This does not look like a crypt12, 14 or 15 database."
+                )
             self.file_hash.update(self.cipher_version)
 
             self.key_version = encrypted.read(1)
@@ -183,8 +186,7 @@ class Database12(Database):
         try:
             output_decrypted: bytes = cipher.decrypt(encrypted_data)
         except ValueError as e:
-            raise DecryptionError(f"Decryption failed: {e}."
-                                  "\n    This probably means your backup is corrupted.") from e
+            raise DecryptionError(f"Decryption failed: {e}.\n    This probably means your backup is corrupted.") from e
 
         # Verify the authentication tag
         try:
@@ -199,9 +201,9 @@ class Database12(Database):
             else:
                 cipher.verify(authentication_tag)
         except ValueError as e:
-            raise IntegrityError(f"Authentication tag mismatch: {e}."
-                                 "\n    This probably means your backup is corrupted."
-                                 , data=output_decrypted) from e
+            raise IntegrityError(
+                f"Authentication tag mismatch: {e}.\n    This probably means your backup is corrupted.", data=output_decrypted
+            ) from e
 
         return output_decrypted
 

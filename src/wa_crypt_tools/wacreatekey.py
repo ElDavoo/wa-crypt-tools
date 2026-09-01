@@ -14,10 +14,10 @@ from wa_crypt_tools.lib.key.key14 import Key14
 from wa_crypt_tools.lib.key.key15 import Key15
 from wa_crypt_tools.lib.logformat import CustomFormatter
 
-__author__ = 'ElDavo'
-__copyright__ = 'Copyright (C) 2023'
-__license__ = 'GPLv3'
-__status__ = 'Production'
+__author__ = "ElDavo"
+__copyright__ = "Copyright (C) 2023"
+__license__ = "GPLv3"
+__status__ = "Production"
 
 import logging
 
@@ -26,19 +26,20 @@ lo = logging.getLogger(__name__)
 
 def parsecmdline() -> argparse.Namespace:
     """Sets up the argument parser"""
-    parser = argparse.ArgumentParser(description='Create a key or encrypted_backup.key from a hex input.'
-                                                 'The only parameter a encrypted_backup.key stores is the key itself.')
-    parser.add_argument('-c14', '--crypt14', action='store_true', default=False, help='Create a traditional key file.')
-    parser.add_argument('-o', '--output', type=str,
-                        help='The output file')
-    parser.add_argument('-y', '--yes', action='store_true', help='Overwrite the output file if it exists.')
-    parser.add_argument('-v', '--verbose', action='store_true', help='Prints all messages')
-    parser.add_argument('--hex', type=str, nargs='?', help='The hex string to convert to a key')
+    parser = argparse.ArgumentParser(
+        description="Create a key or encrypted_backup.key from a hex input."
+        "The only parameter a encrypted_backup.key stores is the key itself."
+    )
+    parser.add_argument("-c14", "--crypt14", action="store_true", default=False, help="Create a traditional key file.")
+    parser.add_argument("-o", "--output", type=str, help="The output file")
+    parser.add_argument("-y", "--yes", action="store_true", help="Overwrite the output file if it exists.")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Prints all messages")
+    parser.add_argument("--hex", type=str, nargs="?", help="The hex string to convert to a key")
 
-    parser.add_argument('-cv', '--cipher-version', type=int, help='The cipher version to use. Default: 1')
-    parser.add_argument('-kv', '--key-version', type=int, help='The key version to use. Default: 3')
-    parser.add_argument('-ss', '--server-salt', type=str, help='The server salt to use. Default: random')
-    parser.add_argument('-gi', '--googleid', type=str, help='The google id salt to use. Default: random')
+    parser.add_argument("-cv", "--cipher-version", type=int, help="The cipher version to use. Default: 1")
+    parser.add_argument("-kv", "--key-version", type=int, help="The key version to use. Default: 3")
+    parser.add_argument("-ss", "--server-salt", type=str, help="The server salt to use. Default: random")
+    parser.add_argument("-gi", "--googleid", type=str, help="The google id salt to use. Default: random")
 
     return parser.parse_args()
 
@@ -66,7 +67,6 @@ def main():
             lo.critical("Key is not in hexadecimal format")
             sys.exit(1)
 
-
     if args.output is None:
         args.output = "key" if args.crypt14 else "encrypted_backup.key"
 
@@ -80,12 +80,14 @@ def main():
         if args.googleid is None:
             lo.warning("Google id not specified, a random one will be generated.")
         try:
-            key: Key14 = Key14(cipher_version=args.cipher_version.to_bytes(2, "big"),
-                           key_version=args.key_version.to_bytes(1, "big"),
-                           serversalt=bytes.fromhex(args.server_salt) if args.server_salt is not None else None,
-                           googleid=bytes.fromhex(args.googleid) if args.googleid is not None else None,
-                           iv=None,
-                           key=hex_key)
+            key: Key14 = Key14(
+                cipher_version=args.cipher_version.to_bytes(2, "big"),
+                key_version=args.key_version.to_bytes(1, "big"),
+                serversalt=bytes.fromhex(args.server_salt) if args.server_salt is not None else None,
+                googleid=bytes.fromhex(args.googleid) if args.googleid is not None else None,
+                iv=None,
+                key=hex_key,
+            )
         except ValueError as e:
             lo.critical(f"Something was not right: {e}")
             sys.exit(1)
@@ -113,7 +115,7 @@ def main():
     # Write the key file
     key.file_dump(output_file)
 
-    lo.info(f"Key file \"{args.output}\" created.")
+    lo.info(f'Key file "{args.output}" created.')
 
 
 if __name__ == "__main__":

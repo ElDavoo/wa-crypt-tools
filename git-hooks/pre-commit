@@ -50,6 +50,7 @@ git diff-index --check --cached $against --
 # The same gates CI runs, in the order that fails fastest. Rule selection and formatting style
 # come from pyproject.toml, so this cannot disagree with CI about what passes.
 ruff check . || exit 1
+ruff format --check . || exit 1
 
 # Run the tests
 exec python3 -m pytest -q

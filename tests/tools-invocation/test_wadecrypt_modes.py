@@ -28,7 +28,8 @@ BACKUPS = [
 def ciphertext_length(backup: str) -> int:
     """How many bytes follow the header -- what the chunk loop actually walks over."""
     from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
-    with open(backup, 'rb') as f:
+
+    with open(backup, "rb") as f:
         DatabaseFactory.from_file(f)
         return len(f.read())
 
@@ -57,9 +58,9 @@ class TestEveryFormatThroughTheCli:
         # entirely on where the last read falls, so the buffer size is chosen to force each.
         n = ciphertext_length(backup)
         buffer_size = {
-            "last-chunk": n - 36,      # the final read returns exactly the 36-byte trailer
-            "split": n - 20,           # the trailer straddles the last two chunks
-            "exact-multiple": n,       # the final read returns nothing; the trailer is behind
+            "last-chunk": n - 36,  # the final read returns exactly the 36-byte trailer
+            "split": n - 20,  # the trailer straddles the last two chunks
+            "exact-multiple": n,  # the final read returns nothing; the trailer is behind
         }[case]
         try:
             out, ret = Propen(f"wadecrypt -bs {buffer_size} {key} {backup} {OUT}")
@@ -91,10 +92,10 @@ class TestEveryFormatThroughTheCli:
         try:
             out, ret = Propen(f"wadecrypt -nd {key} {backup} {OUT}")
             assert ret == 0, out
-            with open(OUT, 'rb') as f:
+            with open(OUT, "rb") as f:
                 raw = f.read()
-            assert raw[:2] == b'x\x01'
-            with open("tests/res/msgstore.db", 'rb') as f:
+            assert raw[:2] == b"x\x01"
+            with open("tests/res/msgstore.db", "rb") as f:
                 assert zlib.decompress(raw) == f.read()
         finally:
             rm_if_found(OUT)
@@ -104,9 +105,9 @@ class TestTruncatedBackups:
     """A backup that stops early fails both the tag check and the zlib stream."""
 
     def setup_method(self):
-        with open("tests/res/msgstore.db.crypt15", 'rb') as f:
+        with open("tests/res/msgstore.db.crypt15", "rb") as f:
             data = f.read()
-        with open(TRUNCATED, 'wb') as f:
+        with open(TRUNCATED, "wb") as f:
             f.write(data[:-200])
 
     def teardown_method(self):
@@ -123,6 +124,7 @@ class TestTruncatedBackups:
         out, ret = Propen(f"wadecrypt -nm -f {KEY15} {TRUNCATED} {OUT}")
         assert ret == 0, out
         from os.path import exists, getsize
+
         assert exists(OUT) and getsize(OUT) > 0
 
 
@@ -140,15 +142,13 @@ class TestMultiFileBackups:
 
     @pytest.mark.parametrize("mode", ["", "-nm "], ids=["in-ram", "streaming"])
     def test_a_zip_payload_is_written_out_undecompressed(self, mode):
-        out, ret = Propen(f"wadecrypt {mode}{KEY15} tests/res/stickers.backup.crypt15 {self.OUT_ZIP}"
-                          )
+        out, ret = Propen(f"wadecrypt {mode}{KEY15} tests/res/stickers.backup.crypt15 {self.OUT_ZIP}")
         assert ret == 0, out
         assert "ZIP file that I will not decompress automatically" in out
         assert cmp_files(self.OUT_ZIP, "tests/res/test9.zip")
 
     def test_the_wrong_key_is_reported_as_unrecognisable_rather_than_as_a_zip(self):
         # Same zlib.error, different cause: the ZIP message must not be the catch-all.
-        out, _ret = Propen(f"wadecrypt -f {KEY14} tests/res/stickers.backup.crypt15 {self.OUT_ZIP}"
-                          )
+        out, _ret = Propen(f"wadecrypt -f {KEY14} tests/res/stickers.backup.crypt15 {self.OUT_ZIP}")
         assert "I can't recognize decrypted data" in out
         assert "ZIP file" not in out

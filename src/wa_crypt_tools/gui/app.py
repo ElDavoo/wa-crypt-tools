@@ -91,23 +91,26 @@ class Window(ttk.Frame):
         box.grid(row=row, column=0, sticky="ew", pady=(0, 8))
         box.columnconfigure(1, weight=1)
 
-        ttk.Radiobutton(box, text="Key file", value="file",
-                        variable=self.key_mode).grid(row=0, column=0, sticky="w")
+        ttk.Radiobutton(box, text="Key file", value="file", variable=self.key_mode).grid(row=0, column=0, sticky="w")
         self.key_file_entry = ttk.Entry(box, textvariable=self.key_file)
         self.key_file_entry.grid(row=0, column=1, sticky="ew", padx=6)
         self.key_file_button = ttk.Button(box, text="Browse…", command=self._pick_key)
         self.key_file_button.grid(row=0, column=2)
 
-        ttk.Radiobutton(box, text="64-character key", value="hex",
-                        variable=self.key_mode).grid(row=1, column=0, sticky="w", pady=(6, 0))
+        ttk.Radiobutton(box, text="64-character key", value="hex", variable=self.key_mode).grid(
+            row=1, column=0, sticky="w", pady=(6, 0)
+        )
         self.key_hex_entry = ttk.Entry(box, textvariable=self.key_hex)
-        self.key_hex_entry.grid(row=1, column=1, columnspan=2, sticky="ew",
-                                padx=(6, 0), pady=(6, 0))
+        self.key_hex_entry.grid(row=1, column=1, columnspan=2, sticky="ew", padx=(6, 0), pady=(6, 0))
 
-        hint = ttk.Label(box, foreground="grey40", justify="left",
-                         text="The key file is \"encrypted_backup.key\", or just \"key\" for "
-                              "older backups. If you kept the 64-character key itself "
-                              "instead, paste it on the second line.")
+        hint = ttk.Label(
+            box,
+            foreground="grey40",
+            justify="left",
+            text='The key file is "encrypted_backup.key", or just "key" for '
+            "older backups. If you kept the 64-character key itself "
+            "instead, paste it on the second line.",
+        )
         hint.grid(row=2, column=0, columnspan=3, sticky="w", pady=(8, 0))
         self._wrapping.append(hint)
         return row + 1
@@ -121,11 +124,9 @@ class Window(ttk.Frame):
         line.grid(row=0, column=0, sticky="ew")
         line.columnconfigure(0, weight=1)
         ttk.Entry(line, textvariable=self.encrypted).grid(row=0, column=0, sticky="ew")
-        ttk.Button(line, text="Browse…",
-                   command=self._pick_backup).grid(row=0, column=1, padx=(6, 0))
+        ttk.Button(line, text="Browse…", command=self._pick_backup).grid(row=0, column=1, padx=(6, 0))
 
-        self.info = ttk.Label(box, foreground="grey40", justify="left",
-                              text="Choose a file and this will say what it is.")
+        self.info = ttk.Label(box, foreground="grey40", justify="left", text="Choose a file and this will say what it is.")
         self.info.grid(row=1, column=0, sticky="w", pady=(8, 0))
         self._wrapping.append(self.info)
         return row + 1
@@ -135,8 +136,7 @@ class Window(ttk.Frame):
         box.grid(row=row, column=0, sticky="ew", pady=(0, 8))
         box.columnconfigure(0, weight=1)
         ttk.Entry(box, textvariable=self.output).grid(row=0, column=0, sticky="ew")
-        ttk.Button(box, text="Browse…",
-                   command=self._pick_output).grid(row=0, column=1, padx=(6, 0))
+        ttk.Button(box, text="Browse…", command=self._pick_output).grid(row=0, column=1, padx=(6, 0))
         return row + 1
 
     def _build_actions(self, row: int) -> int:
@@ -154,24 +154,27 @@ class Window(ttk.Frame):
         return row + 1
 
     def _build_advanced(self, row: int) -> int:
-        self.advanced_button = ttk.Button(self, text="▸  Advanced", width=16,
-                                          command=self._toggle_advanced)
+        self.advanced_button = ttk.Button(self, text="▸  Advanced", width=16, command=self._toggle_advanced)
         self.advanced_button.grid(row=row, column=0, sticky="w")
 
         self.advanced = ttk.Frame(self, padding=(12, 6, 0, 6))
         self.advanced.grid(row=row + 1, column=0, sticky="ew")
         self.advanced.grid_remove()
-        for i, (var, text) in enumerate([
-            (self.overwrite, "Overwrite the output file if it already exists"),
-            (self.force, "Write the output even if the checks fail (the result is not "
-                         "guaranteed to be your data)"),
-            (self.try_harder, "Try harder to find the data (slower; for unusual backups)"),
-            (self.no_decompress, "Do not decompress the result"),
-            (self.low_memory, "Low-memory mode (for very large backups)"),
-            (self.verbose, "Show detailed messages"),
-        ]):
-            ttk.Checkbutton(self.advanced, text=text, variable=var,
-                            ).grid(row=i, column=0, sticky="w")
+        for i, (var, text) in enumerate(
+            [
+                (self.overwrite, "Overwrite the output file if it already exists"),
+                (self.force, "Write the output even if the checks fail (the result is not guaranteed to be your data)"),
+                (self.try_harder, "Try harder to find the data (slower; for unusual backups)"),
+                (self.no_decompress, "Do not decompress the result"),
+                (self.low_memory, "Low-memory mode (for very large backups)"),
+                (self.verbose, "Show detailed messages"),
+            ]
+        ):
+            ttk.Checkbutton(
+                self.advanced,
+                text=text,
+                variable=var,
+            ).grid(row=i, column=0, sticky="w")
         return row + 2
 
     def _build_messages(self, row: int) -> None:
@@ -181,8 +184,9 @@ class Window(ttk.Frame):
         box.rowconfigure(0, weight=1)
         self.rowconfigure(row, weight=1)
 
-        self.log = tk.Text(box, height=8, wrap="word", state="disabled",
-                           relief="flat", background="white", highlightthickness=0)
+        self.log = tk.Text(
+            box, height=8, wrap="word", state="disabled", relief="flat", background="white", highlightthickness=0
+        )
         self.log.grid(row=0, column=0, sticky="nsew")
         bar = ttk.Scrollbar(box, orient="vertical", command=self.log.yview)
         bar.grid(row=0, column=1, sticky="ns")
@@ -195,15 +199,13 @@ class Window(ttk.Frame):
 
     def _sync_key_mode(self) -> None:
         by_file = self.key_mode.get() == "file"
-        for widget, on in ((self.key_file_entry, by_file), (self.key_file_button, by_file),
-                           (self.key_hex_entry, not by_file)):
+        for widget, on in ((self.key_file_entry, by_file), (self.key_file_button, by_file), (self.key_hex_entry, not by_file)):
             widget.state(["!disabled"] if on else ["disabled"])
 
     def _toggle_advanced(self) -> None:
         opening = not self.advanced_open.get()
         self.advanced_open.set(opening)
-        self.advanced_button.configure(text=("▾  Advanced" if opening
-                                             else "▸  Advanced"))
+        self.advanced_button.configure(text=("▾  Advanced" if opening else "▸  Advanced"))
         (self.advanced.grid if opening else self.advanced.grid_remove)()
 
     def _pick_key(self) -> None:
@@ -212,14 +214,14 @@ class Window(ttk.Frame):
             self.key_file.set(chosen)
 
     def _pick_backup(self) -> None:
-        chosen = filedialog.askopenfilename(title="Choose the encrypted backup",
-                                            filetypes=BACKUP_TYPES)
+        chosen = filedialog.askopenfilename(title="Choose the encrypted backup", filetypes=BACKUP_TYPES)
         if chosen:
             self.encrypted.set(chosen)
 
     def _pick_output(self) -> None:
-        chosen = filedialog.asksaveasfilename(title="Save the decrypted file as",
-                                              initialfile=Path(self.output.get()).name or None)
+        chosen = filedialog.asksaveasfilename(
+            title="Save the decrypted file as", initialfile=Path(self.output.get()).name or None
+        )
         if chosen:
             self.output.set(chosen)
             self._suggested = ""
@@ -322,9 +324,13 @@ class Window(ttk.Frame):
         if self._busy_working():
             return
         key = self.key_file.get() if self.key_mode.get() == "file" else self.key_hex.get()
-        found = core.problems(key=key, key_is_file=self.key_mode.get() == "file",
-                              encrypted=self.encrypted.get(), output=self.output.get(),
-                              overwrite=self.overwrite.get())
+        found = core.problems(
+            key=key,
+            key_is_file=self.key_mode.get() == "file",
+            encrypted=self.encrypted.get(),
+            output=self.output.get(),
+            overwrite=self.overwrite.get(),
+        )
         if found:
             messagebox.showwarning("Not ready yet", "\n\n".join(found), parent=self)
             return
@@ -337,12 +343,21 @@ class Window(ttk.Frame):
         self.status.configure(text="Working…", foreground="grey30")
         self._busy(True)
 
-        self.worker = threading.Thread(target=self._work, daemon=True, kwargs={
-            "key": "".join(key.split()) if self.key_mode.get() == "hex" else key,
-            "encrypted": self.encrypted.get(), "output": self.output.get(),
-            "force": self.force.get(), "overwrite": self.overwrite.get(),
-            "no_decompress": self.no_decompress.get(), "low_memory": self.low_memory.get(),
-            "try_harder": self.try_harder.get(), "verbose": self.verbose.get()})
+        self.worker = threading.Thread(
+            target=self._work,
+            daemon=True,
+            kwargs={
+                "key": "".join(key.split()) if self.key_mode.get() == "hex" else key,
+                "encrypted": self.encrypted.get(),
+                "output": self.output.get(),
+                "force": self.force.get(),
+                "overwrite": self.overwrite.get(),
+                "no_decompress": self.no_decompress.get(),
+                "low_memory": self.low_memory.get(),
+                "try_harder": self.try_harder.get(),
+                "verbose": self.verbose.get(),
+            },
+        )
         self.worker.start()
 
     def _work(self, verbose: bool, **kwargs) -> None:
@@ -375,8 +390,7 @@ class Window(ttk.Frame):
     def _finished(self, error: BaseException | None) -> None:
         self._busy(False)
         if error is None:
-            self.status.configure(text=f"Saved to {self.output.get()}",
-                                  foreground="#1b7f3b")
+            self.status.configure(text=f"Saved to {self.output.get()}", foreground="#1b7f3b")
             return
         self.status.configure(text="Could not decrypt this backup.", foreground="#b00020")
         # An error needs reading, and the explanation is longer than the status line: a modal
@@ -392,8 +406,7 @@ def build(master: tk.Misc | None = None) -> Window:
     # The default X11 theme is a Motif throwback; clam is the closest thing Tk has to a
     # neutral modern look, and it exists everywhere. Windows and macOS keep their native
     # themes, which are already right.
-    if ("clam" in root.tk.call("ttk::themes")
-            and root.tk.call("tk", "windowingsystem") == "x11"):
+    if "clam" in root.tk.call("ttk::themes") and root.tk.call("tk", "windowingsystem") == "x11":
         ttk.Style(root).theme_use("clam")
     return Window(root)
 
@@ -401,6 +414,7 @@ def build(master: tk.Misc | None = None) -> Window:
 def _has_tkinter() -> bool:
     try:
         import tkinter  # noqa: F401
+
         return True
     except ImportError:  # pragma: no cover - only in a build that lost Tk
         return False
@@ -409,6 +423,7 @@ def _has_tkinter() -> bool:
 def version() -> str:
     try:
         from importlib.metadata import version as _version
+
         return _version("wa-crypt-tools")
     # Reporting the version must not be able to stop the program starting, and a frozen
     # build can fail this in more ways than ImportError.
@@ -429,14 +444,16 @@ def main(argv: list[str] | None = None) -> int:
         # are the one thing a PyInstaller build can silently leave out, and the failure would
         # otherwise reach a user as a window that dies on the first backup they open.
         from wa_crypt_tools.proto import backup_prefix_pb2
+
         backup_prefix_pb2.BackupPrefix()
-        print(f"wagui selftest ok (wa-crypt-tools {version()}, tkinter available: {_has_tkinter()})"
-              )
+        print(f"wagui selftest ok (wa-crypt-tools {version()}, tkinter available: {_has_tkinter()})")
         return 0
     if "--help" in argv or "-h" in argv:
-        print("usage: wagui\n\nOpens the WhatsApp Crypt Tools window.\n"
-              "For the command-line tools, see wadecrypt, waencrypt, wainfo, "
-              "wacreatekey and waguess.")
+        print(
+            "usage: wagui\n\nOpens the WhatsApp Crypt Tools window.\n"
+            "For the command-line tools, see wadecrypt, waencrypt, wainfo, "
+            "wacreatekey and waguess."
+        )
         return 0
     window = build()
     window.winfo_toplevel().mainloop()

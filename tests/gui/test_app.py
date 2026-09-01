@@ -24,6 +24,7 @@ BACKUP = "tests/res/msgstore.db.crypt15"
 def window():
     """A real window, or a skip if this machine cannot show one."""
     from wa_crypt_tools.gui.app import build
+
     try:
         root = tk.Tk()
     except tk.TclError as e:
@@ -114,7 +115,7 @@ class TestWindow:
 
     def test_starting_cancels_a_pending_describe(self, window, tmp_path):
         window.key_file.set(KEY15)
-        window.encrypted.set(BACKUP)          # arms the debounce timer
+        window.encrypted.set(BACKUP)  # arms the debounce timer
         window.output.set(str(tmp_path / "msgstore.db"))
         assert window._describe_job is not None
         window.start()
@@ -123,8 +124,9 @@ class TestWindow:
 
     def test_the_wrong_key_reports_without_writing(self, window, tmp_path, monkeypatch):
         shown = {}
-        monkeypatch.setattr("tkinter.messagebox.showerror",
-                            lambda title, message, **kw: shown.update(title=title, text=message))
+        monkeypatch.setattr(
+            "tkinter.messagebox.showerror", lambda title, message, **kw: shown.update(title=title, text=message)
+        )
         out = tmp_path / "msgstore.db"
         window.key_mode.set("hex")
         window.key_hex.set("00" * 32)
@@ -138,8 +140,7 @@ class TestWindow:
 
     def test_a_form_with_problems_never_starts_a_worker(self, window, monkeypatch):
         warned = {}
-        monkeypatch.setattr("tkinter.messagebox.showwarning",
-                            lambda title, message, **kw: warned.update(text=message))
+        monkeypatch.setattr("tkinter.messagebox.showwarning", lambda title, message, **kw: warned.update(text=message))
         window.key_file.set("")
         window.encrypted.set("")
         window.output.set("")
@@ -159,6 +160,7 @@ class TestWindow:
 class TestEntryPoint:
     def test_version_does_not_need_a_display(self, capsys):
         from wa_crypt_tools.gui.app import main
+
         assert main(["--version"]) == 0
         assert "wa-crypt-tools" in capsys.readouterr().out
 
@@ -166,10 +168,12 @@ class TestEntryPoint:
         # This is what CI runs against each frozen binary; if it can pass here but fail
         # there, the PyInstaller spec is missing something.
         from wa_crypt_tools.gui.app import main
+
         assert main(["--selftest"]) == 0
         assert "selftest ok" in capsys.readouterr().out
 
     def test_help_does_not_need_a_display(self, capsys):
         from wa_crypt_tools.gui.app import main
+
         assert main(["--help"]) == 0
         assert "wadecrypt" in capsys.readouterr().out

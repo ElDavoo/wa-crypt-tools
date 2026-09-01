@@ -31,16 +31,19 @@ class DatabaseFactory:
         except ImportError as e:
             log.error(f"Could not import the proto classes: {e}")
             if str(e).startswith("cannot import name 'builder' from 'google.protobuf.internal'"):
-                log.error("You need to upgrade the protobuf library to at least 3.20.0.\n"
-                          "    python -m pip install --upgrade protobuf")
+                log.error(
+                    "You need to upgrade the protobuf library to at least 3.20.0.\n"
+                    "    python -m pip install --upgrade protobuf"
+                )
             elif str(e).startswith("no module named"):
-                log.error("Please download them and put them in the \"proto\" sub folder.")
+                log.error('Please download them and put them in the "proto" sub folder.')
             raise
         except AttributeError as e:
-            log.error(f"Could not import the proto classes: {e}\n    " +
-                      "Your protobuf library is probably too old.\n    "
-                      "Please upgrade to at least version 3.20.0 , by running:\n    "
-                      "python -m pip install --upgrade protobuf")
+            log.error(
+                f"Could not import the proto classes: {e}\n    " + "Your protobuf library is probably too old.\n    "
+                "Please upgrade to at least version 3.20.0 , by running:\n    "
+                "python -m pip install --upgrade protobuf"
+            )
             raise
 
         header = prefix.BackupPrefix()
@@ -61,30 +64,29 @@ class DatabaseFactory:
             for shift in range(0, 35, 7):
                 size_byte = encrypted.read(1)
                 if not size_byte:
-                    raise HeaderError("Reading database header failed: file ended while reading "
-                                      "the header size.")
+                    raise HeaderError("Reading database header failed: file ended while reading the header size.")
                 file_hash.update(size_byte)
                 byte = size_byte[0]
-                protobuf_size |= (byte & 0x7f) << shift
+                protobuf_size |= (byte & 0x7F) << shift
                 if not byte & 0x80:
                     break
             else:
                 raise HeaderError("The header size varint is too long. Please report a bug.")
 
             try:
-
                 protobuf_raw = encrypted.read(protobuf_size)
                 file_hash.update(protobuf_raw)
 
                 if header.ParseFromString(protobuf_raw) != protobuf_size:
-                    raise HeaderError(f"Protobuf message not fully read: the header claims {protobuf_size} bytes. "
-                                      "Please report a bug.")
+                    raise HeaderError(
+                        f"Protobuf message not fully read: the header claims {protobuf_size} bytes. Please report a bug."
+                    )
 
                 # Checking and printing WA version and phone number. Neither is used for
                 # anything cryptographic, so a surprise here is worth a message and no more.
                 version = findall(r"\d(?:\.\d{1,3}){3}", header.backup_metadata.app_version)
                 if len(version) != 1:
-                    log.error('WhatsApp version not found')
+                    log.error("WhatsApp version not found")
                 else:
                     log.debug(f"WhatsApp version: {version[0]}")
                 if len(header.backup_metadata.jid_suffix) != 2:
@@ -109,12 +111,12 @@ class DatabaseFactory:
                 # Anything the schema cannot name is how a format change announces itself.
                 extra = unknown_header_fields(header)
                 if extra:
-                    log.warning("This header carries {} this schema does not know: {}.\n    "
-                                "Your WhatsApp is probably newer than this library. The backup "
-                                "still reads, and re-encrypting keeps the field, but please "
-                                "report it."
-                                .format("a field" if len(extra) == 1 else
-                                        f"{len(extra)} fields", ", ".join(extra)))
+                    log.warning(
+                        "This header carries {} this schema does not know: {}.\n    "
+                        "Your WhatsApp is probably newer than this library. The backup "
+                        "still reads, and re-encrypting keeps the field, but please "
+                        "report it.".format("a field" if len(extra) == 1 else f"{len(extra)} fields", ", ".join(extra))
+                    )
 
                 props = Props(v_features=header.backup_metadata)
                 # The database is built even when the IV is the wrong length, so that --force
@@ -125,12 +127,10 @@ class DatabaseFactory:
                 db.prefix = header
                 db.feature_table = len(props.get_features()) > 0
                 if len(iv) != 16:
-                    raise IntegrityError(f"IV is not 16 bytes long but is {len(iv)} bytes long"
-                                         , data=db)
+                    raise IntegrityError(f"IV is not 16 bytes long but is {len(iv)} bytes long", data=db)
                 return db
 
             except (DecodeError, _NotCrypt1415):
-
                 # try again as a crypt12
                 log.debug("Could not parse the protobuf message as a crypt14/15. Trying as a crypt12...")
                 try:

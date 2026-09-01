@@ -64,7 +64,7 @@ def describe_backup(path: str) -> Description:
     which is the commonest mistake there is: pointing this at an already-decrypted database.
     """
     try:
-        with open(path, 'rb') as f:
+        with open(path, "rb") as f:
             return _describe(DatabaseFactory.from_file(f))
     except IntegrityError as e:
         # The header parsed but something about it is off. wainfo reports on the file rather
@@ -109,12 +109,11 @@ def suggest_output(encrypted_path: str) -> str:
     p = Path(encrypted_path)
     for suffix in BACKUP_SUFFIXES:
         if p.name.lower().endswith(suffix):
-            return str(p.with_name(p.name[:-len(suffix)]))
+            return str(p.with_name(p.name[: -len(suffix)]))
     return encrypted_path + ".decrypted"
 
 
-def problems(*, key: str, key_is_file: bool, encrypted: str, output: str,
-             overwrite: bool) -> list[str]:
+def problems(*, key: str, key_is_file: bool, encrypted: str, output: str, overwrite: bool) -> list[str]:
     """
     Everything wrong with the form, in plain sentences, before any file is opened.
 
@@ -132,18 +131,15 @@ def problems(*, key: str, key_is_file: bool, encrypted: str, output: str,
         found.append("Choose where to save the decrypted file.")
     elif encrypted.strip() and _same_file(encrypted, output):
         # Ticking Overwrite must not turn the source into the destination.
-        found.append("That would overwrite the backup you are decrypting. "
-                     "Pick a different name for the decrypted file.")
+        found.append("That would overwrite the backup you are decrypting. Pick a different name for the decrypted file.")
     elif Path(output).is_file() and not overwrite:
-        found.append(f"{Path(output).name} already exists. Tick \"Overwrite the output file\" under Advanced "
-                     "to replace it.")
+        found.append(f'{Path(output).name} already exists. Tick "Overwrite the output file" under Advanced to replace it.')
     return found
 
 
 def _key_problems(key: str, key_is_file: bool) -> list[str]:
     if not key.strip():
-        return ["Choose your key file." if key_is_file
-                else "Paste your 64-character key."]
+        return ["Choose your key file." if key_is_file else "Paste your 64-character key."]
     if key_is_file:
         if not Path(key).is_file():
             return [f"That key file does not exist: {key}"]
@@ -174,21 +170,29 @@ def friendly(error: BaseException) -> str:
     Never a class name: a dialog reading "IntegrityError" helps nobody.
     """
     if isinstance(error, IntegrityError):
-        return ("This backup did not pass its integrity check: it is damaged, or this is not "
-                "the right key for it.\n\nUnder Advanced you can tick \"Write the output even "
-                "if the checks fail\" to save the result anyway -- but nothing vouches for it "
-                "being your data.")
+        return (
+            "This backup did not pass its integrity check: it is damaged, or this is not "
+            'the right key for it.\n\nUnder Advanced you can tick "Write the output even '
+            'if the checks fail" to save the result anyway -- but nothing vouches for it '
+            "being your data."
+        )
     if isinstance(error, InvalidKeyError):
-        return ("That key could not be used.\n\nMake sure you picked the key file -- it is "
-                "called \"encrypted_backup.key\", or just \"key\" for older backups -- and "
-                "not the backup itself.")
+        return (
+            "That key could not be used.\n\nMake sure you picked the key file -- it is "
+            'called "encrypted_backup.key", or just "key" for older backups -- and '
+            "not the backup itself."
+        )
     if isinstance(error, HeaderError):
-        return ("That file does not look like a WhatsApp backup.\n\nAre the two files the "
-                "right way round? The backup is the .crypt12, .crypt14 or .crypt15 file.")
+        return (
+            "That file does not look like a WhatsApp backup.\n\nAre the two files the "
+            "right way round? The backup is the .crypt12, .crypt14 or .crypt15 file."
+        )
     if isinstance(error, DecryptionError):
-        return ("Decryption failed: the key does not match this backup.\n\nA key belongs to "
-                "one account. A key from a different phone, or a newer key after WhatsApp "
-                "changed it, will not open this file.")
+        return (
+            "Decryption failed: the key does not match this backup.\n\nA key belongs to "
+            "one account. A key from a different phone, or a newer key after WhatsApp "
+            "changed it, will not open this file."
+        )
     if isinstance(error, WaCryptError):
         return str(error)
     if isinstance(error, OSError):
@@ -211,8 +215,7 @@ class QueueLogHandler(logging.Handler):
         super().__init__(level=logging.DEBUG if verbose else logging.INFO)
         self.records = records
         # No CustomFormatter here: its ANSI colour codes would land in the pane as mojibake.
-        self.setFormatter(logging.Formatter(
-            "%(filename)s:%(lineno)d: %(message)s" if verbose else "%(message)s"))
+        self.setFormatter(logging.Formatter("%(filename)s:%(lineno)d: %(message)s" if verbose else "%(message)s"))
 
     def emit(self, record: logging.LogRecord) -> None:
         try:
@@ -244,9 +247,17 @@ def captured_logs(records: queue.Queue, verbose: bool = False):
         logger.setLevel(previous)
 
 
-def run_decrypt(*, key: str, encrypted: str, output: str, force: bool = False,
-                overwrite: bool = False, no_decompress: bool = False,
-                low_memory: bool = False, try_harder: bool = False) -> None:
+def run_decrypt(
+    *,
+    key: str,
+    encrypted: str,
+    output: str,
+    force: bool = False,
+    overwrite: bool = False,
+    no_decompress: bool = False,
+    low_memory: bool = False,
+    try_harder: bool = False,
+) -> None:
     """
     Decrypts, raising WaCryptError on failure.
 
@@ -256,12 +267,19 @@ def run_decrypt(*, key: str, encrypted: str, output: str, force: bool = False,
     if try_harder:
         _run_guess(key=key, encrypted=encrypted, output=output, overwrite=overwrite)
         return
-    with open(encrypted, 'rb') as stream:
-        wadecrypt.decrypt(SimpleNamespace(
-            keyfile=key, encrypted=stream, decrypted=output,
-            no_mem=low_memory, buffer_size=None, no_decompress=no_decompress,
-            force=force, yes=overwrite,
-        ))
+    with open(encrypted, "rb") as stream:
+        wadecrypt.decrypt(
+            SimpleNamespace(
+                keyfile=key,
+                encrypted=stream,
+                decrypted=output,
+                no_mem=low_memory,
+                buffer_size=None,
+                no_decompress=no_decompress,
+                force=force,
+                yes=overwrite,
+            )
+        )
 
 
 def _run_guess(*, key: str, encrypted: str, output: str, overwrite: bool) -> None:
@@ -276,11 +294,16 @@ def _run_guess(*, key: str, encrypted: str, output: str, overwrite: bool) -> Non
         raise WaCryptError("The output file already exists.")
     partial = Path(output).with_name(Path(output).name + ".part")
     try:
-        with open(encrypted, 'rb') as stream, open(partial, 'wb') as out:
-            waguess.guess(SimpleNamespace(
-                keyfile=key, encrypted=stream, decrypted=out,
-                iv_offset=C.DEFAULT_IV_OFFSET, data_offset=C.DEFAULT_DATA_OFFSET,
-            ))
+        with open(encrypted, "rb") as stream, open(partial, "wb") as out:
+            waguess.guess(
+                SimpleNamespace(
+                    keyfile=key,
+                    encrypted=stream,
+                    decrypted=out,
+                    iv_offset=C.DEFAULT_IV_OFFSET,
+                    data_offset=C.DEFAULT_DATA_OFFSET,
+                )
+            )
         os.replace(partial, output)
     finally:
         # os.replace already moved it on the happy path; this is the failure one.

@@ -30,20 +30,24 @@ except ModuleNotFoundError:
         # noinspection PyUnresolvedReferences
         from Crypto.Cipher import AES
 
-        if not hasattr(AES, 'MODE_GCM'):
+        if not hasattr(AES, "MODE_GCM"):
             # pycrypto
-            raise ModuleNotFoundError("You installed pycrypto and not pycryptodome(x). "
-                                      "Pycrypto is old, deprecated and not supported. \n"
-                                      "Run: python -m pip uninstall pycrypto\n"
-                                      "And: python -m pip install pycryptodomex\n"
-                                      "Or:  python -m pip install pycryptodome")
+            raise ModuleNotFoundError(
+                "You installed pycrypto and not pycryptodome(x). "
+                "Pycrypto is old, deprecated and not supported. \n"
+                "Run: python -m pip uninstall pycrypto\n"
+                "And: python -m pip install pycryptodomex\n"
+                "Or:  python -m pip install pycryptodome"
+            )
     except ModuleNotFoundError:
         # crypto (or nothing)
-        raise ModuleNotFoundError("You need pycryptodome(x) to run these scripts!\n"
-                                  "python -m pip install pycryptodome\n"
-                                  "Or: python -m pip install pycryptodome\n"
-                                  "You can also remove \"crypto\" if you have it installed\n"
-                                  "python -m pip uninstall crypto") from None
+        raise ModuleNotFoundError(
+            "You need pycryptodome(x) to run these scripts!\n"
+            "python -m pip install pycryptodome\n"
+            "Or: python -m pip install pycryptodome\n"
+            'You can also remove "crypto" if you have it installed\n'
+            "python -m pip uninstall crypto"
+        ) from None
 
 
 def oscillate(n: int, n_min: int, n_max: int):
@@ -61,7 +65,6 @@ def oscillate(n: int, n_min: int, n_max: int):
 
     # First phase (n, n-1, n+1...)
     while True:
-
         if i == n_max:
             break
         yield i
@@ -77,14 +80,12 @@ def oscillate(n: int, n_min: int, n_max: int):
     # Second phase (range of remaining numbers)
     # n != i/2 fixes a bug where we would yield min and max two times if n == (max-min)/2
     if i == n_min and n != i / 2:
-
         yield i
         i += c
         for j in range(i, n_max + 1):
             yield j
 
     if i == n_max and n != i / 2:
-
         yield n_max
         i -= c
         for j in range(i, n_min - 1, -1):
@@ -96,18 +97,16 @@ def find_data_offset(header: bytes, iv_offset: int, key: bytes, starting_data_of
     Returns the offset or -1 if the offset is not found.
     Only works with ZLIB stream, not with ZIP file."""
 
-    iv = header[iv_offset:iv_offset + 16]
+    iv = header[iv_offset : iv_offset + 16]
 
     # oscillate ensures we try the closest values to the default value first.
     for i in oscillate(n=starting_data_offset, n_min=iv_offset + len(iv), n_max=C.HEADER_SIZE - 128):
-
         cipher = AES.new(key, AES.MODE_GCM, iv)
 
         # We only decrypt the first two bytes.
-        test_bytes = cipher.decrypt(header[i:i + 2])
+        test_bytes = cipher.decrypt(header[i : i + 2])
 
         for zheader in C.ZLIB_HEADERS:
-
             if test_bytes == zheader:
                 # We found a match, but this might also happen by chance.
                 # Let's run another test by decrypting some hundreds of bytes.
@@ -119,8 +118,7 @@ def find_data_offset(header: bytes, iv_offset: int, key: bytes, starting_data_of
     return -1
 
 
-def guess_offsets(key: bytes, encrypted: io.BufferedReader, def_iv_offset: int,
-                  def_data_offset: int):
+def guess_offsets(key: bytes, encrypted: io.BufferedReader, def_iv_offset: int, def_data_offset: int):
     """Gets the IV, shifts the stream to the beginning of the encrypted data and returns the cipher.
     It does so by guessing the offset."""
 
@@ -132,22 +130,22 @@ def guess_offsets(key: bytes, encrypted: io.BufferedReader, def_iv_offset: int,
 
     db_header = encrypted.read(C.HEADER_SIZE)
     if len(db_header) < C.HEADER_SIZE:
-        raise HeaderError("The encrypted database is too small.\n    "
-                          "Did you swap the keyfile and the encrypted database file by mistake?")
+        raise HeaderError(
+            "The encrypted database is too small.\n    Did you swap the keyfile and the encrypted database file by mistake?"
+        )
 
     try:
-        if db_header[:15].decode('ascii') == 'SQLite format 3':
-            log.error("The database file is not encrypted.\n    "
-                      "Did you swap the input and the output files by mistake?")
+        if db_header[:15].decode("ascii") == "SQLite format 3":
+            log.error("The database file is not encrypted.\n    Did you swap the input and the output files by mistake?")
     except ValueError:
         pass
 
     # Finding WhatsApp's version is nice
     version = findall(b"\\d(?:\\.\\d{1,3}){3}", db_header)
     if len(version) != 1:
-        log.info('WhatsApp version not found (Crypt12?)')
+        log.info("WhatsApp version not found (Crypt12?)")
     else:
-        log.debug("WhatsApp version: {}".format(version[0].decode('ascii')))
+        log.debug("WhatsApp version: {}".format(version[0].decode("ascii")))
 
     # Determine IV offset and data offset.
     for iv_offset in oscillate(n=def_iv_offset, n_min=0, n_max=C.HEADER_SIZE - 128):
@@ -160,7 +158,7 @@ def guess_offsets(key: bytes, encrypted: io.BufferedReader, def_iv_offset: int,
     if data_offset == -1:
         return None
 
-    iv = db_header[iv_offset:iv_offset + 16]
+    iv = db_header[iv_offset : iv_offset + 16]
 
     encrypted.seek(data_offset)
 
@@ -169,22 +167,43 @@ def guess_offsets(key: bytes, encrypted: io.BufferedReader, def_iv_offset: int,
 
 def parsecmdline() -> argparse.Namespace:
     """Sets up the argument parser"""
-    parser = argparse.ArgumentParser(description='Decrypts WhatsApp backup files'
-                                                 ' encrypted with crypt12, 14 or 15')
-    parser.add_argument('keyfile', nargs='?', type=str, default="encrypted_backup.key",
-                        help='The WhatsApp encrypted_backup key file or the hex encoded key. '
-                             'Default: encrypted_backup.key')
-    parser.add_argument('encrypted', nargs='?', type=argparse.FileType('rb'), default="msgstore.db.crypt15",
-                        help='The encrypted crypt12, 14 or 15 file. Default: msgstore.db.crypt15')
-    parser.add_argument('decrypted', nargs='?', type=argparse.FileType('wb'), default="msgstore.db",
-                        help='The decrypted output file. Default: msgstore.db')
-    parser.add_argument('-ivo', '--iv-offset', type=int, default=C.DEFAULT_IV_OFFSET,
-                        help='The default offset of the IV in the encrypted file. '
-                             f'Default: {C.DEFAULT_IV_OFFSET}')
-    parser.add_argument('-do', '--data-offset', type=int, default=C.DEFAULT_DATA_OFFSET,
-                        help='The default offset of the encrypted data in the encrypted file. '
-                             f'Default: {C.DEFAULT_DATA_OFFSET}')
-    parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
+    parser = argparse.ArgumentParser(description="Decrypts WhatsApp backup files encrypted with crypt12, 14 or 15")
+    parser.add_argument(
+        "keyfile",
+        nargs="?",
+        type=str,
+        default="encrypted_backup.key",
+        help="The WhatsApp encrypted_backup key file or the hex encoded key. Default: encrypted_backup.key",
+    )
+    parser.add_argument(
+        "encrypted",
+        nargs="?",
+        type=argparse.FileType("rb"),
+        default="msgstore.db.crypt15",
+        help="The encrypted crypt12, 14 or 15 file. Default: msgstore.db.crypt15",
+    )
+    parser.add_argument(
+        "decrypted",
+        nargs="?",
+        type=argparse.FileType("wb"),
+        default="msgstore.db",
+        help="The decrypted output file. Default: msgstore.db",
+    )
+    parser.add_argument(
+        "-ivo",
+        "--iv-offset",
+        type=int,
+        default=C.DEFAULT_IV_OFFSET,
+        help=f"The default offset of the IV in the encrypted file. Default: {C.DEFAULT_IV_OFFSET}",
+    )
+    parser.add_argument(
+        "-do",
+        "--data-offset",
+        type=int,
+        default=C.DEFAULT_DATA_OFFSET,
+        help=f"The default offset of the encrypted data in the encrypted file. Default: {C.DEFAULT_DATA_OFFSET}",
+    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Prints all offsets and messages")
 
     return parser.parse_args()
 
@@ -198,7 +217,6 @@ def decrypt(cipher, encrypted, decrypted):
         raise DecryptionError("Could not create a decryption cipher")
 
     try:
-
         try:
             encrypted_data = encrypted.read()
             # Crypt12 moment: the last 4 bytes are --xx, where xx
@@ -208,9 +226,7 @@ def decrypt(cipher, encrypted, decrypted):
             try:
                 output_decrypted: bytearray = cipher.decrypt(encrypted_data)
             except ValueError as e:
-                raise DecryptionError(f"Decryption failed: {e}."
-                                      "\n    This probably means your backup is corrupted."
-                                      ) from e
+                raise DecryptionError(f"Decryption failed: {e}.\n    This probably means your backup is corrupted.") from e
 
             try:
                 output_file = z_obj.decompress(output_decrypted)
@@ -218,12 +234,14 @@ def decrypt(cipher, encrypted, decrypted):
                     log.error("The encrypted database file is truncated (damaged).")
             except zlib.error:
                 output_file = output_decrypted
-                if test_decompression(output_file[:io.DEFAULT_BUFFER_SIZE]):
+                if test_decompression(output_file[: io.DEFAULT_BUFFER_SIZE]):
                     log.info("Decrypted data is a ZIP file that I will not decompress automatically.")
                 else:
-                    log.error("I can't recognize decrypted data. Decryption not successful.\n    "
-                              "The key probably does not match with the encrypted file.\n    "
-                              "Or the backup is simply empty.")
+                    log.error(
+                        "I can't recognize decrypted data. Decryption not successful.\n    "
+                        "The key probably does not match with the encrypted file.\n    "
+                        "Or the backup is simply empty."
+                    )
 
             decrypted.write(output_file)
 
@@ -270,14 +288,16 @@ def guess(args):
 
     # The guessing loops report failure by returning None rather than raising: they run once
     # per candidate offset, and an exception per candidate would be both slow and wrong.
-    cipher = guess_offsets(key=key.get(), encrypted=args.encrypted,
-                           def_iv_offset=args.iv_offset, def_data_offset=args.data_offset)
+    cipher = guess_offsets(
+        key=key.get(), encrypted=args.encrypted, def_iv_offset=args.iv_offset, def_data_offset=args.data_offset
+    )
     if cipher is None:
-        raise DecryptionError("Could not guess the offsets: the key does not match this "
-                              "backup, or the file is not a WhatsApp database.")
+        raise DecryptionError(
+            "Could not guess the offsets: the key does not match this backup, or the file is not a WhatsApp database."
+        )
 
     decrypt(cipher, args.encrypted, args.decrypted)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

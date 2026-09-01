@@ -41,6 +41,7 @@ class TestProps:
 
     def test_a_parsed_header_is_wrapped_as_is(self):
         from wa_crypt_tools.proto import backup_expiry_pb2 as backup_expiry
+
         parsed = backup_expiry.BackupExpiry()
         parsed.app_version = "2.22.5.13"
         parsed.jid_suffix = "67"
@@ -54,6 +55,7 @@ class TestProps:
         # It never set max_feature, so get_features() -- the only thing that reads it --
         # raised AttributeError on every props built that way.
         from wa_crypt_tools.proto import backup_expiry_pb2 as backup_expiry
+
         parsed = backup_expiry.BackupExpiry()
         parsed.call_log_migration_finished = True
         parsed.receipt_user_migration_finished = True
@@ -70,7 +72,8 @@ class TestProps:
         # get_wa_version used to read a "version" field the protobuf does not have, so it
         # raised AttributeError for every caller.
         from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
-        with open("tests/res/msgstore.db.crypt15", 'rb') as f:
+
+        with open("tests/res/msgstore.db.crypt15", "rb") as f:
             assert DatabaseFactory.from_file(f).props.get_wa_version() == "2.22.5.13"
 
     def test_str_is_the_protobuf_text_format(self):

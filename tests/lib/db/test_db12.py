@@ -22,7 +22,7 @@ IV = bytes.fromhex("F4E9A6DC0B6F0D8986AF6C7180F02356")
 
 
 def read(path: str) -> bytes:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         return f.read()
 
 
@@ -43,12 +43,15 @@ class TestDatabase12FromAHeaderAndAKey:
         decrypted = zlib.decompress(db.decrypt(key(), stream.read()))
         assert sha512(decrypted).digest() == sha512(read("tests/res/msgstore.db")).digest()
 
-    @pytest.mark.parametrize("offset, message", [
-        pytest.param(0, "Cipher version mismatch", id="cipher-version"),
-        pytest.param(2, "Key version mismatch", id="key-version"),
-        pytest.param(3, "Server salt mismatch", id="server-salt"),
-        pytest.param(35, "Google ID mismatch", id="google-id"),
-    ])
+    @pytest.mark.parametrize(
+        "offset, message",
+        [
+            pytest.param(0, "Cipher version mismatch", id="cipher-version"),
+            pytest.param(2, "Key version mismatch", id="key-version"),
+            pytest.param(3, "Server salt mismatch", id="server-salt"),
+            pytest.param(35, "Google ID mismatch", id="google-id"),
+        ],
+    )
     def test_a_header_that_does_not_match_the_key_is_rejected(self, offset, message):
         data = bytearray(read("tests/res/msgstore.db.crypt12"))
         data[offset] ^= 0xFF
@@ -88,20 +91,19 @@ class TestDatabase12FromParameters:
 
     def test_supplied_parameters_are_kept(self):
         salt, googleid = bytes(range(32)), bytes(range(16))
-        db = Database12(cipher_version=b'\x00\x01', key_version=b'\x01',
-                        serversalt=salt, googleid=googleid, iv=IV)
-        assert db.key_version == b'\x01'
+        db = Database12(cipher_version=b"\x00\x01", key_version=b"\x01", serversalt=salt, googleid=googleid, iv=IV)
+        assert db.key_version == b"\x01"
         assert db.serversalt == salt
         assert db.googleid == googleid
         assert db.get_iv() == IV
 
     def test_an_unsupported_cipher_version_is_rejected(self):
         with pytest.raises(InvalidKeyError, match="cipher version"):
-            Database12(cipher_version=b'\x00\x02')
+            Database12(cipher_version=b"\x00\x02")
 
     def test_an_unsupported_key_version_is_rejected(self):
         with pytest.raises(InvalidKeyError, match="key version"):
-            Database12(key_version=b'\x09')
+            Database12(key_version=b"\x09")
 
 
 class TestDatabase12Decryption:
@@ -116,23 +118,25 @@ class TestDatabase12Decryption:
 
     def test_a_footer_without_a_phone_number_is_only_complained_about(self, caplog):
         import logging
+
         # The last four bytes are "--67" in a real backup. They are not used for anything
         # cryptographic, so a backup missing them still has to decrypt.
         original = read("tests/res/msgstore.db.crypt12")
-        data = original[:-4] + b'ABCD'
+        data = original[:-4] + b"ABCD"
         stream = io.BytesIO(data)
         db = Database12(key=key(), encrypted=stream)
         with caplog.at_level(logging.ERROR, logger="wa_crypt_tools.lib.db.db12"):
             decrypted = db.decrypt(key(), stream.read())
         assert "phone number end is not 2 characters long" in caplog.text
-        assert zlib.decompress(decrypted)[:15] == b'SQLite format 3'
+        assert zlib.decompress(decrypted)[:15] == b"SQLite format 3"
 
 
 class TestDatabase12Encryption:
     def test_a_jid_that_is_not_two_characters_is_complained_about(self, caplog):
         import logging
+
         db = Database12(key=key(), iv=IV)
         with caplog.at_level(logging.ERROR, logger="wa_crypt_tools.lib.db.db12"):
-            out = db.encrypt(key(), Props(jid="1234", features=None), zlib.compress(b'x' * 64, level=1))
+            out = db.encrypt(key(), Props(jid="1234", features=None), zlib.compress(b"x" * 64, level=1))
         assert "phone number end is not 2 characters long" in caplog.text
-        assert out.endswith(b'--1234')
+        assert out.endswith(b"--1234")

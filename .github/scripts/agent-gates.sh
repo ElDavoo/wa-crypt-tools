@@ -45,6 +45,7 @@ gate() {
 # different definitions of "lint passes". That drift is exactly what the old copy of flake8's
 # `--select=E9,F63,F7,F82` invited.
 gate ruff ruff check .
+gate "ruff format" ruff format --check .
 
 # pytest must run from the repo root: tests/test_*.py open fixtures by relative path
 # (tests/res/...), and tests/tools-invocation/ shells out to the installed console scripts

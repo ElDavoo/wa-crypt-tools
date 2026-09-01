@@ -23,20 +23,24 @@ except ModuleNotFoundError:
         # noinspection PyUnresolvedReferences
         from Crypto.Cipher import AES
 
-        if not hasattr(AES, 'MODE_GCM'):
+        if not hasattr(AES, "MODE_GCM"):
             # pycrypto
-            raise ModuleNotFoundError("You installed pycrypto and not pycryptodome(x). "
-                                      "Pycrypto is old, deprecated and not supported. \n"
-                                      "Run: python -m pip uninstall pycrypto\n"
-                                      "And: python -m pip install pycryptodomex\n"
-                                      "Or:  python -m pip install pycryptodome")
+            raise ModuleNotFoundError(
+                "You installed pycrypto and not pycryptodome(x). "
+                "Pycrypto is old, deprecated and not supported. \n"
+                "Run: python -m pip uninstall pycrypto\n"
+                "And: python -m pip install pycryptodomex\n"
+                "Or:  python -m pip install pycryptodome"
+            )
     except ModuleNotFoundError:
         # crypto (or nothing)
-        raise ModuleNotFoundError("You need pycryptodome(x) to run these scripts!\n"
-                                  "python -m pip install pycryptodome\n"
-                                  "Or: python -m pip install pycryptodome\n"
-                                  "You can also remove \"crypto\" if you have it installed\n"
-                                  "python -m pip uninstall crypto") from None
+        raise ModuleNotFoundError(
+            "You need pycryptodome(x) to run these scripts!\n"
+            "python -m pip install pycryptodome\n"
+            "Or: python -m pip install pycryptodome\n"
+            'You can also remove "crypto" if you have it installed\n'
+            "python -m pip uninstall crypto"
+        ) from None
 # noinspection PyPackageRequirements
 # This is from javaobj-py3
 
@@ -51,10 +55,10 @@ from pathlib import Path
 from re import findall
 from time import sleep
 
-__author__ = 'ElDavo'
-__copyright__ = 'Copyright (C) 2023'
-__license__ = 'GPLv3'
-__status__ = 'Production'
+__author__ = "ElDavo"
+__copyright__ = "Copyright (C) 2023"
+__license__ = "GPLv3"
+__status__ = "Production"
 
 import logging
 
@@ -63,32 +67,53 @@ log = logging.getLogger(__name__)
 
 def parsecmdline() -> argparse.Namespace:
     """Sets up the argument parser"""
-    parser = argparse.ArgumentParser(description='Decrypts WhatsApp backup files'
-                                                 ' encrypted with crypt12, 14 or 15')
-    parser.add_argument('keyfile', nargs='?', type=str, default="encrypted_backup.key",
-                        help='The WhatsApp encrypted_backup key file or the hex encoded key. '
-                             'Default: encrypted_backup.key')
-    parser.add_argument('encrypted', nargs='?', type=argparse.FileType('rb'), default="msgstore.db.crypt15",
-                        help='The encrypted crypt12, 14 or 15 file. Default: msgstore.db.crypt15')
+    parser = argparse.ArgumentParser(description="Decrypts WhatsApp backup files encrypted with crypt12, 14 or 15")
+    parser.add_argument(
+        "keyfile",
+        nargs="?",
+        type=str,
+        default="encrypted_backup.key",
+        help="The WhatsApp encrypted_backup key file or the hex encoded key. Default: encrypted_backup.key",
+    )
+    parser.add_argument(
+        "encrypted",
+        nargs="?",
+        type=argparse.FileType("rb"),
+        default="msgstore.db.crypt15",
+        help="The encrypted crypt12, 14 or 15 file. Default: msgstore.db.crypt15",
+    )
     # Deliberately not argparse.FileType('wb'): that opens the file while the arguments are
     # still being parsed, so a run that fails for any reason -- an unreadable key, a file
     # that is not a backup -- would already have truncated whatever was at that path.
-    parser.add_argument('decrypted', nargs='?', type=str, default="msgstore.db",
-                        help='The decrypted output file. Default: msgstore.db')
-    parser.add_argument('-nm', '--no-mem', action='store_true',
-                        help='Does not load files in RAM, stresses the disk more. '
-                             'Default: load files into RAM')
-    parser.add_argument('-bs', '--buffer-size', type=int, help='How many bytes of data to process at a time. '
-                                                               f'Implies -nm. Default: {io.DEFAULT_BUFFER_SIZE}')
-    parser.add_argument('-nd', '--no-decompress', action='store_true',
-                        help='Does not decompress the decrypted data. '
-                             'Default: decompresses the decrypted data')
-    parser.add_argument('-v', '--verbose', action='store_true', help='Prints all offsets and messages')
-    parser.add_argument('-f', '--force', action='store_true',
-                        help='Write the output even if an integrity check fails. '
-                             'Default: stop on the first failed check')
-    parser.add_argument('-y', '--yes', action='store_true',
-                        help='Overwrite the output file if it exists.')
+    parser.add_argument(
+        "decrypted", nargs="?", type=str, default="msgstore.db", help="The decrypted output file. Default: msgstore.db"
+    )
+    parser.add_argument(
+        "-nm",
+        "--no-mem",
+        action="store_true",
+        help="Does not load files in RAM, stresses the disk more. Default: load files into RAM",
+    )
+    parser.add_argument(
+        "-bs",
+        "--buffer-size",
+        type=int,
+        help=f"How many bytes of data to process at a time. Implies -nm. Default: {io.DEFAULT_BUFFER_SIZE}",
+    )
+    parser.add_argument(
+        "-nd",
+        "--no-decompress",
+        action="store_true",
+        help="Does not decompress the decrypted data. Default: decompresses the decrypted data",
+    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Prints all offsets and messages")
+    parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="Write the output even if an integrity check fails. Default: stop on the first failed check",
+    )
+    parser.add_argument("-y", "--yes", action="store_true", help="Overwrite the output file if it exists.")
 
     return parser.parse_args()
 
@@ -109,7 +134,6 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
         raise DecryptionError("Could not create a decryption cipher")
 
     try:
-
         if buffer_size < 17:
             log.info(f"Invalid buffer size, will use default of {io.DEFAULT_BUFFER_SIZE}")
             buffer_size = io.DEFAULT_BUFFER_SIZE
@@ -151,8 +175,8 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
                     chunk = chunk[:-36]
                 # 3. The checksum is split between the last two chunks
                 else:
-                    checksum = chunk[-(36 - len(next_chunk)):] + next_chunk
-                    chunk = chunk[:-(36 - len(next_chunk))]
+                    checksum = chunk[-(36 - len(next_chunk)) :] + next_chunk
+                    chunk = chunk[: -(36 - len(next_chunk))]
 
             file_hash.update(chunk)
 
@@ -167,8 +191,10 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
                     if test_decompression(decrypted_chunk):
                         log.info("Decrypted data is a ZIP file that I will not decompress automatically.")
                     else:
-                        log.error("I can't recognize decrypted data. Decryption not successful.\n    "
-                                  "The key probably does not match with the encrypted file.")
+                        log.error(
+                            "I can't recognize decrypted data. Decryption not successful.\n    "
+                            "The key probably does not match with the encrypted file."
+                        )
                     is_zip = False
                     decrypted.write(decrypted_chunk)
             else:
@@ -214,15 +240,14 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
                     else:
                         cipher.verify(checksum[:16])
                 except ValueError as e:
-                    integrity_problems.append(f"Authentication tag mismatch: {e}."
-                                              "\n    This probably means your backup is corrupted."
-                                              )
+                    integrity_problems.append(
+                        f"Authentication tag mismatch: {e}.\n    This probably means your backup is corrupted."
+                    )
                 break
 
             # If there is no more data, we should already have seen a checksum.
             if not next_chunk:
-                integrity_problems.append("The encrypted database file is truncated "
-                                          "(no checksum found).")
+                integrity_problems.append("The encrypted database file is truncated (no checksum found).")
                 break
 
             # Move the sliding window forward.
@@ -291,9 +316,8 @@ def decrypt(args):
     if args.buffer_size is not None or args.no_mem:
         buffer_size = args.buffer_size if args.buffer_size is not None else io.DEFAULT_BUFFER_SIZE
         try:
-            with open(args.decrypted, 'wb') as f:
-                chunked_decrypt(db.file_hash, cipher, args.encrypted, f, buffer_size,
-                                args.no_decompress)
+            with open(args.decrypted, "wb") as f:
+                chunked_decrypt(db.file_hash, cipher, args.encrypted, f, buffer_size, args.no_decompress)
         except IntegrityError as e:
             # The output was already streamed to disk, so there is nothing to write here:
             # --force only decides whether a partial file is an error or not.
@@ -315,13 +339,15 @@ def decrypt(args):
                 log.error("The encrypted database file is truncated (damaged).")
     except zlib.error:
         output_file = output_decrypted
-        if test_decompression(output_file[:io.DEFAULT_BUFFER_SIZE]):
+        if test_decompression(output_file[: io.DEFAULT_BUFFER_SIZE]):
             log.info("Decrypted data is a ZIP file that I will not decompress automatically.")
         else:
-            log.error("I can't recognize decrypted data. Decryption not successful.\n    "
-                      "The key probably does not match with the encrypted file.\n    "
-                      "Or the backup is simply empty. (check with --force)")
-    with open(args.decrypted, 'wb') as f:
+            log.error(
+                "I can't recognize decrypted data. Decryption not successful.\n    "
+                "The key probably does not match with the encrypted file.\n    "
+                "Or the backup is simply empty. (check with --force)"
+            )
+    with open(args.decrypted, "wb") as f:
         f.write(output_file)
 
 
