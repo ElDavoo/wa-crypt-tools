@@ -46,6 +46,7 @@ import io
 from pathlib import Path
 from re import findall
 from sys import maxsize
+import sys
 from time import sleep
 from datetime import date
 
@@ -60,6 +61,51 @@ __status__ = 'Production'
 import logging
 
 log = logging.getLogger(__name__)
+
+
+def format_progress(done: int, total: int, width: int = 30) -> str:
+    """Return the compact progress indicator used by streaming decryption."""
+    if total <= 0:
+        return "Decrypting [" + "." * width + "]"
+    percent = min(100, int(done * 100 / total))
+    filled = min(width, int(done * width / total))
+    return "Decrypting [{}{}] {:3d}%".format(
+        "=" * filled, "." * (width - filled), percent
+    )
+
+
+class ProgressBar:
+    """Render a single-line progress bar for interactive commands."""
+
+    def __init__(self, file):
+        self.stream = sys.stderr
+        self.start = 0
+        self.total = 0
+        self.finished = False
+        self.visible = self.stream.isatty()
+        if not self.visible:
+            return
+        try:
+            self.start = file.tell()
+            file.seek(0, io.SEEK_END)
+            self.total = file.tell() - self.start
+            file.seek(self.start)
+        except (OSError, AttributeError):
+            self.visible = False
+
+    def update(self, file, finished: bool = False):
+        if not self.visible:
+            return
+        done = self.total if finished else max(0, file.tell() - self.start)
+        self.stream.write("\r" + format_progress(done, self.total))
+        self.stream.flush()
+        if finished:
+            self.stream.write("\n")
+            self.finished = True
+
+    def close(self):
+        if self.visible and not self.finished:
+            self.stream.write("\n")
 
 
 def parsecmdline() -> argparse.Namespace:
@@ -101,6 +147,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
     """
 
     z_obj = zlib.decompressobj()
+    progress = ProgressBar(encrypted)
 
     # Problems that leave the written output suspect but complete. They are raised together
     # once the file has been flushed and closed -- the bytes are already on disk by the time
@@ -220,6 +267,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
                         integrity_problems.append("Authentication tag mismatch: {}."
                                                   "\n    This probably means your backup is corrupted."
                                                   .format(e))
+                    progress.update(encrypted, finished=True)
                     break
 
                 # If there is no more data, we should already have seen a checksum.
@@ -230,6 +278,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
 
                 # Move the sliding window forward.
                 chunk = next_chunk
+                progress.update(encrypted)
 
         if is_zip and not no_decompress and not z_obj.eof:
             integrity_problems.append("The encrypted database file is truncated (damaged).")
@@ -240,6 +289,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
         raise DecryptionError("I/O error: {}".format(e)) from e
 
     finally:
+        progress.close()
         decrypted.close()
         encrypted.close()
 
