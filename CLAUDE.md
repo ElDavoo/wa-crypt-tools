@@ -331,14 +331,15 @@ not encode a workaround for it.
   TOTAL is the package's own number (~94%): `lib/` sits around 97%, the `wa*.py` entry points
   between 81% and 97%, and `gui/` at 97% for `core.py` and 91% for `app.py` -- the latter only
   reaches that where a display exists, so a headless run reports it far lower.
-- `fail_under` in `.coveragerc` makes that number load-bearing, and it lives there rather than
-  as `--cov-fail-under` on CI's pytest call so a local `python -m pytest --cov` fails the same
-  way CI does. It is set below the current number on purpose -- at the current number, any
-  refactor that moves a few lines goes red -- and low enough that a **headless** run still
-  clears it, because `tests/gui/test_app.py` skips without a display and takes `app.py`'s
-  coverage down with it. CI's Ubuntu leg runs under xvfb and so sees the higher number; a
-  developer running `pytest --cov` on a machine with no display sees the lower one, and the
-  floor has to be under that, not under CI's.
+- `fail_under = 80` in `.coveragerc` makes that number load-bearing, and it lives there rather
+  than as `--cov-fail-under` on CI's pytest call so a local `python -m pytest --cov` fails the
+  same way CI does. **80, not 90**, because the suite reports two very different numbers: ~94%
+  where a display exists (CI's Ubuntu leg under xvfb, and Windows, where Tk needs none) and
+  ~83% headless, where `tests/gui/test_app.py` skips and `gui/app.py` falls from 91% to 22%.
+  The floor has to clear the lower one, or `pytest --cov` over SSH fails for a reason that has
+  nothing to do with the change being tested. It still catches what it is for -- the
+  subprocess-coverage breakage below takes every `wa*.py` to 0% and the total to ~57%. Raising
+  it means making `app.py`'s widget code reachable without a display first.
 - mypy is wired up but advisory (`continue-on-error` in the lint job), and the config in
   `[tool.mypy]` only sets `ignore_missing_imports` (javaobj and pycryptodomex ship no types)
   and excludes the generated protobuf. Blocking on it needs an annotation pass or a baseline
