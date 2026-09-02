@@ -79,7 +79,7 @@ class Window(ttk.Frame):
         self.key_mode.trace_add("write", lambda *_: self._sync_key_mode())
         self.encrypted.trace_add("write", lambda *_: self._schedule_describe())
         self._sync_key_mode()
-        self._pump_job = self.after(POLL_MS, self._pump)
+        self._pump_job: str | None = self.after(POLL_MS, self._pump)
         # Otherwise Tk fires the pending pump after the widget's commands are gone and Tcl
         # complains to stderr about an invalid command name.
         self.bind("<Destroy>", self._stop_pump)
@@ -126,9 +126,14 @@ class Window(ttk.Frame):
         ttk.Entry(line, textvariable=self.encrypted).grid(row=0, column=0, sticky="ew")
         ttk.Button(line, text="Browse…", command=self._pick_backup).grid(row=0, column=1, padx=(6, 0))
 
-        self.info = ttk.Label(box, foreground="grey40", justify="left", text="Choose a file and this will say what it is.")
-        self.info.grid(row=1, column=0, sticky="w", pady=(8, 0))
-        self._wrapping.append(self.info)
+        # Not `self.info`: ttk.Frame inherits an `info()` method from Misc, and assigning a
+        # widget over it is a shadowing that happens to be harmless only because nothing here
+        # calls it.
+        self.info_label = ttk.Label(
+            box, foreground="grey40", justify="left", text="Choose a file and this will say what it is."
+        )
+        self.info_label.grid(row=1, column=0, sticky="w", pady=(8, 0))
+        self._wrapping.append(self.info_label)
         return row + 1
 
     def _build_output(self, row: int) -> int:
@@ -263,7 +268,7 @@ class Window(ttk.Frame):
         self._show_detail(path, found.detail)
 
     def _say_info(self, text: str, colour: str) -> None:
-        self.info.configure(text=text, foreground=colour)
+        self.info_label.configure(text=text, foreground=colour)
 
     def _show_detail(self, path: str, text: str) -> None:
         """
@@ -398,9 +403,10 @@ class Window(ttk.Frame):
         messagebox.showerror("Could not decrypt", core.friendly(error), parent=self)
 
 
-def build(master: tk.Misc | None = None) -> Window:
+def build(master: tk.Tk | tk.Toplevel | None = None) -> Window:
     """Creates the window. Separate from main() so the tests can build one and drive it."""
-    root = master if master is not None else tk.Tk()
+    # A toplevel, not any old widget: title() and minsize() below are tk.Wm's, not Misc's.
+    root: tk.Tk | tk.Toplevel = master if master is not None else tk.Tk()
     root.title("WhatsApp Crypt Tools")
     root.minsize(640, 700)
     # The default X11 theme is a Motif throwback; clam is the closest thing Tk has to a

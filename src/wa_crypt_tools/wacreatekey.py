@@ -56,12 +56,12 @@ def main():
     logging.getLogger("wa_crypt_tools.lib").addHandler(ch)
     logging.getLogger("wa_crypt_tools.lib").setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
-    hex_key = None
+    hex_key: bytes | None = None
     if args.hex is None:
         log.warning("Key not specified, a random key will be generated.")
     else:
         try:
-            hex_key: bytes = bytes.fromhex(args.hex)
+            hex_key = bytes.fromhex(args.hex)
         except ValueError:
             log.critical("Key is not in hexadecimal format")
             sys.exit(1)
@@ -69,6 +69,7 @@ def main():
     if args.output is None:
         args.output = "key" if args.crypt14 else "encrypted_backup.key"
 
+    key: Key14 | Key15
     if args.crypt14:
         if args.cipher_version is None:
             args.cipher_version = 1
@@ -79,7 +80,7 @@ def main():
         if args.googleid is None:
             log.warning("Google id not specified, a random one will be generated.")
         try:
-            key: Key14 = Key14(
+            key = Key14(
                 cipher_version=args.cipher_version.to_bytes(2, "big"),
                 key_version=args.key_version.to_bytes(1, "big"),
                 serversalt=bytes.fromhex(args.server_salt) if args.server_salt is not None else None,
@@ -100,7 +101,7 @@ def main():
         if args.googleid is not None:
             log.warning("Google id specified, but it is not used for crypt15 keys, ignoring.")
         try:
-            key: Key15 = Key15(keyarray=hex_key)
+            key = Key15(keyarray=hex_key)
         except ValueError as e:
             log.critical("Error while creating the key: %s", e)
             sys.exit(1)
@@ -116,5 +117,7 @@ def main():
     log.info('Key file "%s" created.', args.output)
 
 
-if __name__ == "__main__":
+# Excluded from coverage like gui/app.py's: the tests reach main() through the console
+# script, and this branch only fires on `python -m wa_crypt_tools.wacreatekey`.
+if __name__ == "__main__":  # pragma: no cover
     main()

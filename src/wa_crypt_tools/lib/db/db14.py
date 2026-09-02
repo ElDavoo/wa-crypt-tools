@@ -34,21 +34,21 @@ class Database14(Database[Key14]):
         from wa_crypt_tools.proto import C14_cipher_pb2 as C14_cipher
         from wa_crypt_tools.proto import key_type_pb2 as key_type
 
-        cipher = C14_cipher.C14_cipher()
+        key_data = C14_cipher.C14_cipher()
         if self.prefix is not None:
             # Start from the key data the reference carried, for the same reason the header
             # below starts from the reference's own: this message has a field nothing else
             # can supply. key_version is the header's, in ASCII, and the key file's raw byte
             # is a different encoding of it -- so overwriting it with a constant silently
             # rewrote the header of any backup that did not happen to say '2'.
-            cipher.CopyFrom(self.prefix.wa_provided_key_data)
+            key_data.CopyFrom(self.prefix.wa_provided_key_data)
         else:
-            cipher.key_version = C.DEFAULT_C14_KEY_VERSION
+            key_data.key_version = C.DEFAULT_C14_KEY_VERSION
         # TODO which ones take priority? Key or self values?
-        cipher.backup_cipher_header = key.get_cipher_version()
-        cipher.server_salt = key.get_serversalt()
-        cipher.google_id_salt = key.get_googleid()
-        cipher.encryption_iv = self.iv
+        key_data.backup_cipher_header = key.get_cipher_version()
+        key_data.server_salt = key.get_serversalt()
+        key_data.google_id_salt = key.get_googleid()
+        key_data.encryption_iv = self.iv
         from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
 
         header = prefix.BackupPrefix()
@@ -59,7 +59,7 @@ class Database14(Database[Key14]):
             # re-encryption that works and one that reproduces the original byte for byte.
             header.CopyFrom(self.prefix)
         header.key_type_deprecated = key_type.Key_Type.WA_PROVIDED
-        header.wa_provided_key_data.CopyFrom(cipher)
+        header.wa_provided_key_data.CopyFrom(key_data)
 
         header.backup_metadata.CopyFrom(props.get_proto())
         serialized_prefix = header.SerializeToString()

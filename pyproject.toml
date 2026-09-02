@@ -66,6 +66,10 @@ test = [
     "ruff >= 0.16.5, < 0.17",
     # Advisory only -- CI reports mypy but does not fail on it. See the workflow for why.
     "mypy >= 1.18.0",
+    # The stubs for the protobuf runtime. Without them google.protobuf is Any under
+    # ignore_missing_imports and the generated .pyi next to each _pb2.py -- which is what
+    # makes the header messages checkable at all -- says nothing mypy can use.
+    "types-protobuf >= 7.35.0",
     "coveralls >= 3.3.0"
 ]
 
@@ -126,7 +130,12 @@ python_version = "3.10"
 # Third-party packages that ship no type information: javaobj and pycryptodomex. Without this
 # every import of them is an error, which buries the findings that are about this code.
 ignore_missing_imports = true
-# Generated protobuf classes, and the stubs protoc does not write for them.
+# Without this mypy skips the body of every function that has no annotations at all -- which
+# here was most of each wa*.py, main() and encrypt()/decrypt() included. Ten real findings were
+# hiding behind it, and turning it on is what keeps a clean run meaning something.
+check_untyped_defs = true
+# Generated protobuf classes: the .py protoc writes builds its classes at import time and has
+# nothing to check, and the .pyi mypy-protobuf writes beside it is a stub, not source.
 exclude = "^src/wa_crypt_tools/proto/"
 
 [[tool.mypy.overrides]]

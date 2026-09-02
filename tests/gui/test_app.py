@@ -10,6 +10,7 @@ worker's result gets back into the pane it belongs in.
 from __future__ import annotations
 
 import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -75,7 +76,7 @@ class TestWindow:
     def test_choosing_a_backup_describes_it_and_names_the_output(self, window):
         window.encrypted.set(BACKUP)
         window._describe()
-        assert "Crypt15 backup" in window.info.cget("text")
+        assert "Crypt15 backup" in window.info_label.cget("text")
         assert window.output.get() == "tests/res/msgstore.db"
         # The full header lands in the pane, where it is out of the way.
         assert "IV:" in log_text(window)
@@ -83,7 +84,7 @@ class TestWindow:
     def test_a_file_that_is_not_a_backup_says_so_without_a_traceback(self, window):
         window.encrypted.set(PLAIN)
         window._describe()
-        text = window.info.cget("text")
+        text = window.info_label.cget("text")
         assert "Error" not in text and "Traceback" not in text
         assert text
 
@@ -159,7 +160,146 @@ class TestWindow:
         assert window.output.get() == "somewhere/else.db"
 
 
+class TestBrowseButtons:
+    """
+    The three Browse buttons, driven without a file dialog.
+
+    They are one line each and all three have the same shape -- put what the dialog returned
+    into the field, and leave the field alone if the user cancelled -- except that choosing
+    an output is also what stops the output field following the backup.
+    """
+
+    def test_choosing_a_key_fills_the_field(self, window, monkeypatch):
+        monkeypatch.setattr("tkinter.filedialog.askopenfilename", lambda **kw: KEY15)
+        window._pick_key()
+        assert window.key_file.get() == KEY15
+
+    def test_choosing_a_backup_fills_the_field(self, window, monkeypatch):
+        monkeypatch.setattr("tkinter.filedialog.askopenfilename", lambda **kw: BACKUP)
+        window._pick_backup()
+        assert window.encrypted.get() == BACKUP
+
+    def test_choosing_an_output_takes_the_field_over(self, window, monkeypatch):
+        window.encrypted.set(BACKUP)
+        window._describe()
+        assert window._suggested == window.output.get()
+        monkeypatch.setattr("tkinter.filedialog.asksaveasfilename", lambda **kw: "somewhere/chosen.db")
+        window._pick_output()
+        assert window.output.get() == "somewhere/chosen.db"
+        # Cleared, so the next backup does not overwrite what the user just picked.
+        assert window._suggested == ""
+
+    @pytest.mark.parametrize("picker", ["_pick_key", "_pick_backup", "_pick_output"])
+    def test_cancelling_leaves_everything_alone(self, window, monkeypatch, picker):
+        # An empty string is what the dialog returns when it is dismissed.
+        monkeypatch.setattr("tkinter.filedialog.askopenfilename", lambda **kw: "")
+        monkeypatch.setattr("tkinter.filedialog.asksaveasfilename", lambda **kw: "")
+        window.key_file.set(KEY15)
+        window.encrypted.set(BACKUP)
+        window.output.set("mine.db")
+        getattr(window, picker)()
+        assert (window.key_file.get(), window.encrypted.get(), window.output.get()) == (KEY15, BACKUP, "mine.db")
+
+
+class TestDescribing:
+    def test_an_empty_field_asks_for_a_file(self, window):
+        window.encrypted.set("")
+        window._describe()
+        assert "Choose a file" in window.info_label.cget("text")
+
+    def test_a_path_with_nothing_at_it_says_so(self, window):
+        window.encrypted.set("tests/res/there-is-no-such-file")
+        window._describe()
+        assert window.info_label.cget("text") == "There is no file at that path."
+
+    def test_a_suspect_header_is_described_with_its_warning(self, window, monkeypatch):
+        # The factory hands back what it managed to parse along with the reason it does not
+        # trust it; both belong next to the field, the warning under the headline.
+        from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
+        from wa_crypt_tools.lib.errors import IntegrityError
+
+        with open(BACKUP, "rb") as f:
+            salvaged = DatabaseFactory.from_file(f)
+
+        def suspect(_stream):
+            raise IntegrityError("IV is not 16 bytes long", data=salvaged)
+
+        monkeypatch.setattr(DatabaseFactory, "from_file", staticmethod(suspect))
+        window.encrypted.set(BACKUP)
+        window._describe()
+        text = window.info_label.cget("text")
+        assert "Crypt15 backup" in text
+        assert "⚠ IV is not 16 bytes long" in text
+
+    def test_a_second_keystroke_replaces_the_pending_describe(self, window):
+        # Each keystroke arms a timer; the one before it has to be cancelled or a path being
+        # typed would be described once per character.
+        window.encrypted.set("tests/res/msgstore")
+        first = window._describe_job
+        window.encrypted.set(BACKUP)
+        assert window._describe_job is not None
+        assert window._describe_job != first
+
+
+class TestWindowChrome:
+    def test_the_labels_rewrap_when_the_window_is_resized(self, window):
+        window._rewrap(SimpleNamespace(width=800))
+        assert window._wrap_width == 740
+        assert all(int(label.cget("wraplength")) == 740 for label in window._wrapping)
+
+    def test_a_configure_event_that_changes_nothing_is_ignored(self, window):
+        # Re-wrapping changes a label's requested size, which can put another <Configure> on
+        # the queue: reacting to a width that has not changed is how that becomes a loop.
+        window._rewrap(SimpleNamespace(width=800))
+        window._wrapping[0].configure(wraplength=1)
+        window._rewrap(SimpleNamespace(width=800))
+        assert int(window._wrapping[0].cget("wraplength")) == 1
+
+    def test_a_second_start_while_one_is_running_is_ignored(self, window, tmp_path):
+        # A worker that says it is alive rather than a real one: whether a decryption has
+        # finished by the time the second click arrives is exactly the timing this must not
+        # depend on.
+        class StillRunning:
+            def is_alive(self):
+                return True
+
+        window.key_file.set(KEY15)
+        window.encrypted.set(BACKUP)
+        window.output.set(str(tmp_path / "msgstore.db"))
+        window.worker = StillRunning()
+        window.start()
+        assert isinstance(window.worker, StillRunning)
+        assert not (tmp_path / "msgstore.db").exists()
+
+
 class TestEntryPoint:
+    def test_the_package_re_exports_main_lazily(self):
+        # pyproject's entry point is wa_crypt_tools.gui:main, and gui/__init__.py resolves
+        # that name through a PEP 562 __getattr__ rather than importing app.py eagerly --
+        # which is what keeps tests/gui/test_core.py collectable without _tkinter.
+        import wa_crypt_tools.gui as package
+        from wa_crypt_tools.gui.app import main
+
+        assert package.main is main
+
+    def test_the_window_is_built_and_handed_to_the_event_loop(self, monkeypatch):
+        # main() with no arguments does exactly two things, and mainloop() never returns in
+        # a real run, so this is the only place they can be checked.
+        from wa_crypt_tools.gui import app
+
+        looped = []
+
+        class FakeWindow:
+            def winfo_toplevel(self):
+                return self
+
+            def mainloop(self):
+                looped.append(True)
+
+        monkeypatch.setattr(app, "build", FakeWindow)
+        assert app.main([]) == 0
+        assert looped == [True]
+
     def test_version_does_not_need_a_display(self, capsys):
         from wa_crypt_tools.gui.app import main
 

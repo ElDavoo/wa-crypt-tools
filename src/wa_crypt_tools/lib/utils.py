@@ -6,7 +6,9 @@ import json
 import logging
 import math
 import zlib
+from collections.abc import Sequence
 from hashlib import sha256
+from typing import TYPE_CHECKING, Any, cast
 
 from Cryptodome.Cipher import AES
 from javaobj import JavaByteArray
@@ -14,6 +16,11 @@ from javaobj.v2.beans import ClassDescType, JavaArray, JavaClassDesc
 
 from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.lib.errors import HeaderError, IntegrityError, InvalidKeyError
+
+if TYPE_CHECKING:
+    # Only for annotations: lib/key/key15.py imports this module, so a real import here would
+    # be a cycle.
+    from wa_crypt_tools.lib.key.key15 import Key15
 
 # FIXME a "utils" file shouldn't have its own logger
 log = logging.getLogger(__name__)
@@ -58,7 +65,7 @@ def create_jba(out: bytes) -> JavaByteArray:
     # `super_class` -- that is what mypy checks against -- but the thing that serialises it is
     # javaobj.v1's JavaObjectMarshaller, and v1 reads `.superclass`. Setting the v2 name instead
     # leaves v1 with no attribute at all and every key file dump raises AttributeError.
-    cd.superclass = None
+    cd.superclass = None  # type: ignore[attr-defined]
     cd.serial_version_uid = -5984413125824719648
     cd.desc_flags = 2
 
@@ -109,37 +116,37 @@ def encryptionloop(*, first_iteration_data: bytes, privateseed: bytes = b"\x00" 
     return output
 
 
-def mcrypt1_metadata_decrypt(*, key, encoded: str):
+def mcrypt1_metadata_decrypt(*, key: Key15, encoded: str) -> Any:
     """
     Decrypts the metadata of a mcrypt1 file.
     :param key: The key used to decrypt the metadata
     :param encoded: The metadata downloaded from Google Drive in base64
     :return: The decrypted JSON
     """
-    # Base64 decoding
-    encoded = base64.b64decode(encoded)
+    # Base64 decoding, under its own name: `encoded` is the str this was handed, and rebinding
+    # it to the bytes it decodes to is what most of mypy's findings in this function were.
+    raw = base64.b64decode(encoded)
 
     # PKCS5Padding is not natively supported
-    def unpad(s):
+    def unpad(s: bytes) -> bytes:
         return s[: -ord(s[len(s) - 1 :])]
 
-    iv_size = encoded[0]
+    iv_size = raw[0]
     if iv_size != 16:
         raise HeaderError("IV Size is not 16")
 
-    iv = encoded[1:17]
-    mac_size = encoded[17]
+    iv = raw[1:17]
+    mac_size = raw[17]
     if mac_size != 32:
         raise HeaderError("MAC Size is not 32")
 
-    mac = encoded[18:50]
-    encrypted_metadata = encoded[50:]
+    mac = raw[18:50]
+    encrypted_metadata = raw[50:]
     # Authentication part
     hmac_auth = hmac.new(key.get_metadata_authentication(), digestmod="sha256")
     hmac_auth.update(iv)
     hmac_auth.update(encrypted_metadata)
-    hmac_auth = hmac_auth.digest()
-    if hmac_auth != mac:
+    if hmac_auth.digest() != mac:
         raise IntegrityError("MAC does not match")
     # Decryption part
     cipher = AES.new(key.get_metadata_encryption(), AES.MODE_CBC, iv)
@@ -149,7 +156,7 @@ def mcrypt1_metadata_decrypt(*, key, encoded: str):
     return json.loads(decrypted_metadata.decode("utf-8"))
 
 
-def get_mcrypt1_name(*, key, name: str, md5: bytes) -> bytes:
+def get_mcrypt1_name(*, key: Key15, name: str, md5: bytes | str) -> bytes:
     hmac_n = hmac.new(key.get_root(), digestmod="sha256")
     # Calculate SHA256 of the name
     digest = sha256()
@@ -199,7 +206,11 @@ def unknown_header_fields(header) -> list[str]:
             unknown = UnknownFieldSet(message)
         except (NotImplementedError, TypeError):  # pragma: no cover - implementation-dependent
             return
-        found.extend(f"{message.DESCRIPTOR.name} field {field.field_number}" for field in unknown)
+        # Through a Sequence: UnknownFieldSet really does have only __len__ and __getitem__,
+        # which is what its stub says, so a plain `for field in unknown` runs on the old
+        # iteration protocol and cannot be type-checked as written.
+        fields = cast("Sequence[Any]", unknown)
+        found.extend(f"{message.DESCRIPTOR.name} field {field.field_number}" for field in fields)
         for descriptor, value in message.ListFields():
             # is_repeated rather than the old label constant: protobuf 7 dropped label with
             # the move to editions.

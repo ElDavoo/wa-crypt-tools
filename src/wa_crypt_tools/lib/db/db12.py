@@ -69,7 +69,7 @@ class Database12(Database[Key14]):
         self.cipher_version = encrypted.read(2)
         if key:
             if self.cipher_version != key.get_cipher_version():
-                raise IntegrityError(f"Cipher version mismatch: {self.cipher_version} != {key.get_cipher_version()}")
+                raise IntegrityError(f"Cipher version mismatch: {self.cipher_version!r} != {key.get_cipher_version()!r}")
         elif self.cipher_version != C.SUPPORTED_CIPHER_VERSION:
             # A crypt12 header has no magic of its own, so this is the only thing telling a
             # real one apart from any other file that happens to be long enough. Without it
@@ -81,15 +81,15 @@ class Database12(Database[Key14]):
 
         self.key_version = encrypted.read(1)
         if key and self.key_version != key.get_key_version():
-            raise IntegrityError(f"Key version mismatch: {self.key_version} != {key.get_key_version()}")
+            raise IntegrityError(f"Key version mismatch: {self.key_version!r} != {key.get_key_version()!r}")
 
         self.serversalt = encrypted.read(32)
         if key and self.serversalt != key.get_serversalt():
-            raise IntegrityError(f"Server salt mismatch: {self.serversalt} != {key.get_serversalt()}")
+            raise IntegrityError(f"Server salt mismatch: {self.serversalt!r} != {key.get_serversalt()!r}")
 
         self.googleid = encrypted.read(16)
         if key and self.googleid != key.get_googleid():
-            raise IntegrityError(f"Google ID mismatch: {self.googleid} != {key.get_googleid()}")
+            raise IntegrityError(f"Google ID mismatch: {self.googleid!r} != {key.get_googleid()!r}")
 
         self.iv = encrypted.read(16)
 
@@ -120,12 +120,15 @@ class Database12(Database[Key14]):
         self.googleid = googleid or urandom(16)
         self.iv = iv or urandom(16)
 
-    def __str__(self):
-        return f"""cipher_version: {self.cipher_version}
-                    key_version: {self.key_version}
-                    serversalt: {self.serversalt}
-                    googleid: {self.googleid}
-                    iv: {self.iv}"""
+    def __str__(self) -> str:
+        # !r on every field: these are bytes and are meant to read as b'...', which is what an
+        # unadorned f-string does with them anyway -- spelling it out is what stops mypy
+        # assuming a forgotten .decode().
+        return f"""cipher_version: {self.cipher_version!r}
+                    key_version: {self.key_version!r}
+                    serversalt: {self.serversalt!r}
+                    googleid: {self.googleid!r}
+                    iv: {self.iv!r}"""
 
     def decrypt(self, key: Key14, encrypted: bytes) -> bytes:
         """Decrypts the database using the provided key"""

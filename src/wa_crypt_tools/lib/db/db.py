@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import abc
 import logging
-from typing import Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from wa_crypt_tools.lib.key.key import Key
 from wa_crypt_tools.lib.props import Props
+
+if TYPE_CHECKING:
+    # For the `prefix` annotation only. The runtime imports of the generated modules are lazy
+    # everywhere else for the frozen build's sake, and this keeps that true.
+    from wa_crypt_tools.proto.backup_prefix_pb2 import BackupPrefix
 
 log = logging.getLogger(__name__)
 
@@ -31,15 +36,15 @@ class Database(abc.ABC, Generic[K]):
     # The header protobuf this database was parsed from, when it was parsed from one.
     # DatabaseFactory sets it; encrypt() rebuilds the header on top of it so that anything
     # WhatsApp put there which this schema does not model survives a re-encryption.
-    prefix = None
+    prefix: BackupPrefix | None = None
     # Whether the source's header carried any migration-finished feature flag. Informational
     # only -- it does not affect encrypt(), which always sizes the header with a protobuf
     # varint and never writes a byte of its own for this. None when this database was not
     # parsed from a file.
-    feature_table = None
+    feature_table: bool | None = None
 
     @abc.abstractmethod
-    def __str__(self):
+    def __str__(self) -> str:
         pass
 
     @abc.abstractmethod

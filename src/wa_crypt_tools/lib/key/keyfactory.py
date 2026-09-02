@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 class KeyFactory:
     @staticmethod
-    def new(file: Path):
+    def new(file: Path) -> Key14 | Key15:
         """Tries to load the key from a file, a screenshot of it, or a hex string."""
         if looks_like_image(file):
             # Sniffed before anything else so a PNG never reaches javaobj, which would
@@ -31,7 +31,7 @@ class KeyFactory:
             return KeyFactory.from_hex(str(file))
 
     @staticmethod
-    def from_file(file: Path):
+    def from_file(file: Path) -> Key14 | Key15:
         log.debug("Reading keyfile...")
 
         # Try to open the keyfile.
