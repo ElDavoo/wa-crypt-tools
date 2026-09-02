@@ -92,6 +92,8 @@ select = [
     "PIE",         # flake8-pie
     "RET",         # flake8-return
     "BLE",         # flake8-blind-except
+    "G",           # flake8-logging-format -- lazy %s args, not f-strings, in log calls
+    "PTH",         # flake8-use-pathlib -- os.path and open() where a Path method reads better
     "RUF",         # ruff's own
     "PLE", "PLW",  # pylint errors and warnings
     "PLR1722",     # exit() -- which only exists when `site` ran -- instead of sys.exit()
@@ -105,7 +107,12 @@ select = [
 "src/wa_crypt_tools/__init__.py" = ["E402"]
 # Tests open fixtures and hand the handle to a factory that reads the header off it, then read
 # the rest themselves -- a `with` block around that would close the file mid-assertion.
-"tests/*" = ["SIM115"]
+# PTH is scoped to the library and utils on purpose. What it is for is keeping path handling in
+# the shipped code consistent -- `Path(x).is_file()` next to `open(x)` was the actual mess -- and
+# there it is now uniform. In tests, `open("tests/res/...")` and `exists(...)` against a literal
+# fixture path are the clearest way to say what they say, and rewriting 89 of them would be
+# churn through the assertions with nothing gained.
+"tests/*" = ["SIM115", "PTH"]
 
 [tool.mypy]
 python_version = "3.10"

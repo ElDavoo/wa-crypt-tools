@@ -146,7 +146,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
 
     try:
         if buffer_size < 17:
-            log.info(f"Invalid buffer size, will use default of {io.DEFAULT_BUFFER_SIZE}")
+            log.info("Invalid buffer size, will use default of %d", io.DEFAULT_BUFFER_SIZE)
             buffer_size = io.DEFAULT_BUFFER_SIZE
 
         # Does the thing above but only with DEFAULT_BUFFER_SIZE bytes at a time.
@@ -220,7 +220,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
                 if len(jid) == 1:
                     # Confirmed to be crypt12
                     checksum = checksum[:-4]
-                    log.debug(f"Your phone number ends with {jid[0]}")
+                    log.debug("Your phone number ends with %s", jid[0])
                 else:
                     # Shift everything forward by 4 bytes
                     chunk = checksum[:4]
@@ -243,7 +243,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
                 if file_hash.digest() != checksum[16:]:
                     is_multifile_backup = True
                 else:
-                    log.debug(f"Checksum OK ({file_hash.hexdigest()})!")
+                    log.debug("Checksum OK (%s)!", file_hash.hexdigest())
                 try:
                     if is_multifile_backup:
                         decrypted.write(cipher.decrypt(checksum[:16]))
@@ -288,7 +288,7 @@ def main():
         decrypt(args)
     except IntegrityError as e:
         # Only reached when --force was not given: the forced path handles these itself.
-        log.critical(f"{e}\n    Use --force to write the output anyway.")
+        log.critical("%s\n    Use --force to write the output anyway.", e)
         sys.exit(1)
     except WaCryptError as e:
         log.critical(str(e))
@@ -440,7 +440,7 @@ def decrypt(args):
     if args.buffer_size is not None or args.no_mem:
         buffer_size = args.buffer_size if args.buffer_size is not None else io.DEFAULT_BUFFER_SIZE
         try:
-            with open(args.decrypted, "wb") as f:
+            with Path(args.decrypted).open("wb") as f:
                 chunked_decrypt(db.file_hash, cipher, args.encrypted, f, buffer_size, args.no_decompress)
         except IntegrityError as e:
             # The output was already streamed to disk, so there is nothing to write here:
@@ -471,15 +471,14 @@ def decrypt(args):
                 "The key probably does not match with the encrypted file.\n    "
                 "Or the backup is simply empty. (check with --force)"
             )
-    with open(args.decrypted, "wb") as f:
-        f.write(output_file)
+    Path(args.decrypted).write_bytes(output_file)
 
 
 def forced(args, error: IntegrityError):
     """Re-raises unless --force was given, in which case it hands back the salvaged result."""
     if not args.force:
         raise error
-    log.error(f"{error}\n    Continuing anyway because --force was given.")
+    log.error("%s\n    Continuing anyway because --force was given.", error)
     return error.data
 
 

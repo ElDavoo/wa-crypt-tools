@@ -151,15 +151,15 @@ def guess_offsets(key: bytes, encrypted: io.BufferedReader, def_iv_offset: int, 
     if len(version) != 1:
         log.info("WhatsApp version not found (Crypt12?)")
     else:
-        log.debug("WhatsApp version: {}".format(version[0].decode("ascii")))
+        log.debug("WhatsApp version: %s", version[0].decode("ascii"))
 
     # Determine IV offset and data offset.
     for iv_offset in oscillate(n=def_iv_offset, n_min=0, n_max=C.HEADER_SIZE - 128):
         data_offset = find_data_offset(db_header, iv_offset, key, def_data_offset)
         if data_offset != -1:
-            log.info(f"Offsets guessed (IV: {iv_offset}, data: {data_offset}).")
+            log.info("Offsets guessed (IV: %d, data: %d).", iv_offset, data_offset)
             if iv_offset != def_iv_offset or data_offset != def_data_offset:
-                log.info(f"Next time, use -ivo {iv_offset} -do {data_offset} for guess-free decryption")
+                log.info("Next time, use -ivo %d -do %d for guess-free decryption", iv_offset, data_offset)
             break
     if data_offset == -1:
         return None

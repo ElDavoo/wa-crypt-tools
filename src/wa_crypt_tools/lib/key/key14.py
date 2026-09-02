@@ -186,5 +186,4 @@ class Key14(Key):
         return JavaObjectMarshaller().dump(create_jba(out))
 
     def file_dump(self, file: Path):
-        with open(file, "wb") as f:
-            f.write(self.dump())
+        Path(file).write_bytes(self.dump())

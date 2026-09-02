@@ -6,7 +6,6 @@ This script decrypts WhatsApp's DB files encrypted with Crypt12, Crypt14 or Cryp
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
@@ -21,7 +20,7 @@ __status__ = "Production"
 
 import logging
 
-lo = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
 def parsecmdline() -> argparse.Namespace:
@@ -48,23 +47,23 @@ def main():
     args = parsecmdline()
 
     # set wa_crypt_tools l to debug
-    lo.setLevel(logging.DEBUG if args.verbose else logging.INFO)
+    log.setLevel(logging.DEBUG if args.verbose else logging.INFO)
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG if args.verbose else logging.INFO)
     ch.setFormatter(CustomFormatter())
-    lo.addHandler(ch)
+    log.addHandler(ch)
     # also add to "wa_crypt_tools.lib" logger
     logging.getLogger("wa_crypt_tools.lib").addHandler(ch)
     logging.getLogger("wa_crypt_tools.lib").setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
     hex_key = None
     if args.hex is None:
-        lo.warning("Key not specified, a random key will be generated.")
+        log.warning("Key not specified, a random key will be generated.")
     else:
         try:
             hex_key: bytes = bytes.fromhex(args.hex)
         except ValueError:
-            lo.critical("Key is not in hexadecimal format")
+            log.critical("Key is not in hexadecimal format")
             sys.exit(1)
 
     if args.output is None:
@@ -76,9 +75,9 @@ def main():
         if args.key_version is None:
             args.key_version = 3
         if args.server_salt is None:
-            lo.warning("Server salt not specified, a random one will be generated.")
+            log.warning("Server salt not specified, a random one will be generated.")
         if args.googleid is None:
-            lo.warning("Google id not specified, a random one will be generated.")
+            log.warning("Google id not specified, a random one will be generated.")
         try:
             key: Key14 = Key14(
                 cipher_version=args.cipher_version.to_bytes(2, "big"),
@@ -89,33 +88,32 @@ def main():
                 key=hex_key,
             )
         except ValueError as e:
-            lo.critical(f"Something was not right: {e}")
+            log.critical("Something was not right: %s", e)
             sys.exit(1)
     else:
         if args.cipher_version is not None:
-            lo.warning("Cipher version specified, but it is not used for crypt15 keys, ignoring.")
+            log.warning("Cipher version specified, but it is not used for crypt15 keys, ignoring.")
         if args.key_version is not None:
-            lo.warning("Key version specified, but it is not used for crypt15 keys, ignoring.")
+            log.warning("Key version specified, but it is not used for crypt15 keys, ignoring.")
         if args.server_salt is not None:
-            lo.warning("Server salt specified, but it is not used for crypt15 keys, ignoring.")
+            log.warning("Server salt specified, but it is not used for crypt15 keys, ignoring.")
         if args.googleid is not None:
-            lo.warning("Google id specified, but it is not used for crypt15 keys, ignoring.")
+            log.warning("Google id specified, but it is not used for crypt15 keys, ignoring.")
         try:
             key: Key15 = Key15(keyarray=hex_key)
         except ValueError as e:
-            lo.critical(f"Error while creating the key: {e}")
+            log.critical("Error while creating the key: %s", e)
             sys.exit(1)
     # Check if the output file exists
     output_file = Path(args.output)
-    print(os.getcwd())
     if output_file.is_file() and not args.yes:
-        lo.fatal("The output file already exists.")
+        log.fatal("The output file already exists.")
         sys.exit(1)
 
     # Write the key file
     key.file_dump(output_file)
 
-    lo.info(f'Key file "{args.output}" created.')
+    log.info('Key file "%s" created.', args.output)
 
 
 if __name__ == "__main__":

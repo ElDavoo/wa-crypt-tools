@@ -213,20 +213,20 @@ def header_info(header):
     if header.e2ee_key_data.encryption_iv:
         string += "Crypt15 info:\n"
         string += "Header information in your crypt15 file:\n"
-        string += str(f"IV: {header.e2ee_key_data.encryption_iv.hex()}\n")
+        string += f"IV: {header.e2ee_key_data.encryption_iv.hex()}\n"
     if header.wa_provided_key_data.encryption_iv:
         cipher = header.wa_provided_key_data
         string += "Header information in your crypt14 file:\n"
-        string += str(f"Cipher version: {cipher.backup_cipher_header.hex()}\n")
-        string += str(f"Key version: {cipher.key_version.hex()}\n")
-        string += str(f"Server salt: {cipher.server_salt.hex()}\n")
-        string += str(f"Google ID: {cipher.google_id_salt.hex()}\n")
-        string += str(f"IV: {cipher.encryption_iv.hex()}\n")
-    string += str(f"Key type: {header.key_type_deprecated}\n")
-    string += str(f"WhatsApp version: {header.backup_metadata.app_version}\n")
+        string += f"Cipher version: {cipher.backup_cipher_header.hex()}\n"
+        string += f"Key version: {cipher.key_version.hex()}\n"
+        string += f"Server salt: {cipher.server_salt.hex()}\n"
+        string += f"Google ID: {cipher.google_id_salt.hex()}\n"
+        string += f"IV: {cipher.encryption_iv.hex()}\n"
+    string += f"Key type: {header.key_type_deprecated}\n"
+    string += f"WhatsApp version: {header.backup_metadata.app_version}\n"
     # string += str("Device model: {}".format(header.backup_metadata.device_model))
-    string += str(f"The last two numbers of the user's Jid: {header.backup_metadata.jid_suffix}\n")
-    string += str(f"Backup version: {header.backup_metadata.backup_version}\n")
+    string += f"The last two numbers of the user's Jid: {header.backup_metadata.jid_suffix}\n"
+    string += f"Backup version: {header.backup_metadata.backup_version}\n"
     # string += str("Size of the backup file: {}".format(header.backup_metadata.backup_export_file_size))
     # The migration flags, by field number: the numbers are what this project has always called
     # features, and the schema is what says which fields are flags rather than metadata.
@@ -236,8 +236,8 @@ def header_info(header):
         if f.type == f.TYPE_BOOL and getattr(header.backup_metadata, f.name)
     ]
     if len(features) > 0:
-        string += str(f"Features: {features}\n")
-        string += str(f"Max feature number: {max(features)}\n")
+        string += f"Features: {features}\n"
+        string += f"Max feature number: {max(features)}\n"
     else:
         string += "No feature table found (not a msgstore DB or very old)\n"
 

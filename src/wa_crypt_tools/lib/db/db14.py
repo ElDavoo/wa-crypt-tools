@@ -102,7 +102,7 @@ class Database14(Database):
             # We are probably in a multifile backup, which does not have a checksum.
             is_multifile_backup = True
         else:
-            log.debug(f"Checksum OK ({self.file_hash.hexdigest()}). Decrypting...")
+            log.debug("Checksum OK (%s). Decrypting...", self.file_hash.hexdigest())
 
         cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)
         try:

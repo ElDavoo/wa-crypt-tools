@@ -35,7 +35,7 @@ class KeyFactory:
         # Try to open the keyfile.
         # The stream must be closed explicitly: javaobj keeps references to it,
         # and a lingering open handle prevents deleting the file on Windows.
-        with open(file, "rb") as key_file_stream:
+        with Path(file).open("rb") as key_file_stream:
             try:
                 # Deserialize the byte object written in the file
                 jarr: javaobj.beans.JavaArray = javaobj.load(key_file_stream).data

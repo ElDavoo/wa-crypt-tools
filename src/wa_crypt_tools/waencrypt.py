@@ -120,7 +120,7 @@ def main():
     try:
         encrypt(args)
     except IntegrityError as e:
-        log.critical(f"{e}\n    Use --force to carry on anyway.")
+        log.critical("%s\n    Use --force to carry on anyway.", e)
         sys.exit(1)
     except WaCryptError as e:
         log.critical(str(e))
@@ -140,11 +140,12 @@ def compression_level_of(key, reference, stream):
     if level is None:
         # A multi-file reference is a ZIP, and --no-compress leaves anything at all there.
         log.warning(
-            f"Cannot tell the compression level of the reference: it starts {head.hex()}, "
-            f"which is not a zlib header. Using {C.DEFAULT_COMPRESSION_LEVEL}."
+            "Cannot tell the compression level of the reference: it starts %s, which is not a zlib header. Using %d.",
+            head.hex(),
+            C.DEFAULT_COMPRESSION_LEVEL,
         )
     else:
-        log.debug(f"Reference was compressed at level {level}")
+        log.debug("Reference was compressed at level %d", level)
     return level
 
 
@@ -178,7 +179,7 @@ def encrypt(args):
         except IntegrityError as e:
             if not args.force:
                 raise
-            log.error(f"{e}\n    Continuing anyway because --force was given.")
+            log.error("%s\n    Continuing anyway because --force was given.", e)
             reference = e.data
         iv: bytes = reference.get_iv()
         props = reference.props
@@ -204,8 +205,7 @@ def encrypt(args):
     else:
         compressed = zlib.compress(data, args.compression_level)
         encrypted = db.encrypt(key, props, compressed)
-    with open(args.encrypted, "wb") as f:
-        f.write(encrypted)
+    Path(args.encrypted).write_bytes(encrypted)
     log.info("Done!")
     args.decrypted.close()
 

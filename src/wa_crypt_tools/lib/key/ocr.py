@@ -133,7 +133,7 @@ def looks_like_image(file) -> bool:
     to choose a path and leave the reporting of a missing file to whoever opens it next.
     """
     try:
-        with open(file, "rb") as f:
+        with Path(file).open("rb") as f:
             head = f.read(12)
     except OSError:
         return False

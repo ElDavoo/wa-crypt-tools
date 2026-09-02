@@ -15,7 +15,6 @@ about it.
 from __future__ import annotations
 
 import logging
-import os
 import queue
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -65,7 +64,7 @@ def describe_backup(path: str) -> Description:
     which is the commonest mistake there is: pointing this at an already-decrypted database.
     """
     try:
-        with open(path, "rb") as f:
+        with Path(path).open("rb") as f:
             return _describe(DatabaseFactory.from_file(f))
     except IntegrityError as e:
         # The header parsed but something about it is off. wainfo reports on the file rather
@@ -280,7 +279,7 @@ def run_decrypt(
     if try_harder:
         _run_guess(key=key, encrypted=encrypted, output=output, overwrite=overwrite)
         return
-    with open(encrypted, "rb") as stream:
+    with Path(encrypted).open("rb") as stream:
         wadecrypt.decrypt(
             SimpleNamespace(
                 keyfile=key,
@@ -307,7 +306,7 @@ def _run_guess(*, key: str, encrypted: str, output: str, overwrite: bool) -> Non
         raise WaCryptError("The output file already exists.")
     partial = Path(output).with_name(Path(output).name + ".part")
     try:
-        with open(encrypted, "rb") as stream, open(partial, "wb") as out:
+        with Path(encrypted).open("rb") as stream, partial.open("wb") as out:
             waguess.guess(
                 SimpleNamespace(
                     keyfile=key,
@@ -317,7 +316,7 @@ def _run_guess(*, key: str, encrypted: str, output: str, overwrite: bool) -> Non
                     data_offset=C.DEFAULT_DATA_OFFSET,
                 )
             )
-        os.replace(partial, output)
+        partial.replace(output)
     finally:
-        # os.replace already moved it on the happy path; this is the failure one.
+        # The replace above already moved it on the happy path; this is the failure one.
         partial.unlink(missing_ok=True)

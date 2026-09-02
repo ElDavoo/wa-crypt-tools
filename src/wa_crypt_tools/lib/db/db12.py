@@ -166,7 +166,7 @@ class Database12(Database):
         if len(jid) != 1:
             log.error("The phone number end is not 2 characters long")
         else:
-            log.debug(f"Your phone number ends with {jid[0]}")
+            log.debug("Your phone number ends with %s", jid[0])
         checksum = encrypted[-20:-4]
         authentication_tag = encrypted[-36:-20]
         encrypted_data = encrypted[:-36]
@@ -180,7 +180,7 @@ class Database12(Database):
             # TODO do crypt12 multifiles actually exist?
             is_multifile_backup = True
         else:
-            log.debug(f"Checksum OK ({self.file_hash.hexdigest()}). Decrypting...")
+            log.debug("Checksum OK (%s). Decrypting...", self.file_hash.hexdigest())
 
         cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)
         try:

@@ -8,7 +8,7 @@ from __future__ import annotations
 import argparse
 import sys
 from io import BytesIO
-from os.path import getsize
+from pathlib import Path
 
 from protobuf_inspector.types import StandardParser
 
@@ -29,12 +29,12 @@ def load_file(file_name: str, byte_range=0, reverse=False) -> bytes:
     If reverse is set, it will return the last byte_range bytes of the file.
     """
     try:
-        size = getsize(file_name)
+        size = Path(file_name).stat().st_size
 
         if byte_range > size / 2:
             raise ValueError("Range provided is bigger than half of file. Use -w or lower the range.")
 
-        with open(file_name, "rb") as f:
+        with Path(file_name).open("rb") as f:
             if byte_range < 1:
                 if reverse:
                     raise ValueError("Cannot read the whole file from end")
@@ -70,7 +70,7 @@ def main():
 
         print("Now searching at the end of the file")
         # Then we try the last "range" bytes.
-        size = getsize(args.file_name)
+        size = Path(args.file_name).stat().st_size
         whole_file = load_file(args.file_name, args.range, reverse=True)
         search(whole_file, args.keep_going, size - len(whole_file))
 

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
 from wa_crypt_tools.lib.errors import IntegrityError, WaCryptError
@@ -51,7 +52,7 @@ def main():
             # check it, since wainfo has no backup to verify it against.
             print(KeyFactory.new(args.encrypted))
             return
-        with open(args.encrypted, "rb") as f:
+        with Path(args.encrypted).open("rb") as f:
             print(DatabaseFactory.from_file(f))
     except IntegrityError as e:
         # This tool only reports on a file, so show what could be read off it and say why

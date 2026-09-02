@@ -48,7 +48,7 @@ class Key15(Key):
 
         if len(keyarray) != 32:
             raise InvalidKeyError(f"Invalid key length: {len(keyarray)} bytes, expected 32")
-        log.debug(f"Root key: {keyarray.hex()}")
+        log.debug("Root key: %s", keyarray.hex())
         # Save the root key in the class
         self.__key = keyarray
 
@@ -83,8 +83,7 @@ class Key15(Key):
         return JavaObjectMarshaller().dump(create_jba(self.__key))
 
     def file_dump(self, file: Path):
-        with open(file, "wb") as f:
-            f.write(self.dump())
+        Path(file).write_bytes(self.dump())
 
     def __str__(self) -> str:
         """Returns a string representation of the key"""

@@ -21,6 +21,10 @@ root = os.path.dirname(SPECPATH)  # noqa: F821 - injected by PyInstaller
 # of error that only surfaces when a user double-clicks the binary, so they are collected
 # explicitly rather than left to inference.
 hiddenimports = collect_submodules("wa_crypt_tools.proto")
+# The gui package re-exports main() lazily so that gui.core can be imported without tkinter.
+# wagui_entry.py imports gui.app directly for that reason; this is the belt to that brace, and
+# it keeps the binary working if anything ever reaches main() through the package again.
+hiddenimports.append("wa_crypt_tools.gui.app")
 
 a = Analysis(  # noqa: F821
     [os.path.join(root, "packaging", "wagui_entry.py")],

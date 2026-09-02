@@ -29,7 +29,7 @@ class DatabaseFactory:
         try:
             from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
         except ImportError as e:
-            log.error(f"Could not import the proto classes: {e}")
+            log.error("Could not import the proto classes: %s", e)
             if str(e).startswith("cannot import name 'builder' from 'google.protobuf.internal'"):
                 log.error(
                     "You need to upgrade the protobuf library to at least 3.20.0.\n"
@@ -40,9 +40,11 @@ class DatabaseFactory:
             raise
         except AttributeError as e:
             log.error(
-                f"Could not import the proto classes: {e}\n    " + "Your protobuf library is probably too old.\n    "
+                "Could not import the proto classes: %s\n    "
+                "Your protobuf library is probably too old.\n    "
                 "Please upgrade to at least version 3.20.0 , by running:\n    "
-                "python -m pip install --upgrade protobuf"
+                "python -m pip install --upgrade protobuf",
+                e,
             )
             raise
 
@@ -88,10 +90,10 @@ class DatabaseFactory:
                 if len(version) != 1:
                     log.error("WhatsApp version not found")
                 else:
-                    log.debug(f"WhatsApp version: {version[0]}")
+                    log.debug("WhatsApp version: %s", version[0])
                 if len(header.backup_metadata.jid_suffix) != 2:
                     log.error("The phone number end is not 2 characters long")
-                log.debug(f"Your phone number ends with {header.backup_metadata.jid_suffix}")
+                log.debug("Your phone number ends with %s", header.backup_metadata.jid_suffix)
 
                 if len(header.e2ee_key_data.encryption_iv) != 0:
                     # DB Header is crypt15
@@ -112,10 +114,12 @@ class DatabaseFactory:
                 extra = unknown_header_fields(header)
                 if extra:
                     log.warning(
-                        "This header carries {} this schema does not know: {}.\n    "
+                        "This header carries %s this schema does not know: %s.\n    "
                         "Your WhatsApp is probably newer than this library. The backup "
                         "still reads, and re-encrypting keeps the field, but please "
-                        "report it.".format("a field" if len(extra) == 1 else f"{len(extra)} fields", ", ".join(extra))
+                        "report it.",
+                        "a field" if len(extra) == 1 else f"{len(extra)} fields",
+                        ", ".join(extra),
                     )
 
                 props = Props(v_features=header.backup_metadata)
