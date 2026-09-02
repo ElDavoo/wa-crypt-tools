@@ -53,6 +53,11 @@ def create_jba(out: bytes) -> JavaByteArray:
     # Create the classdesc
     cd = JavaClassDesc(ClassDescType.NORMALCLASS)
     cd.name = "[B"
+    # `superclass`, with no underscore, and mypy's [attr-defined] complaint about it is a false
+    # positive that must not be "fixed". The bean is javaobj.v2's, which spells the attribute
+    # `super_class` -- that is what mypy checks against -- but the thing that serialises it is
+    # javaobj.v1's JavaObjectMarshaller, and v1 reads `.superclass`. Setting the v2 name instead
+    # leaves v1 with no attribute at all and every key file dump raises AttributeError.
     cd.superclass = None
     cd.serial_version_uid = -5984413125824719648
     cd.desc_flags = 2

@@ -16,7 +16,7 @@ from wa_crypt_tools.lib.props import Props
 log = logging.getLogger(__name__)
 
 
-class Database12(Database):
+class Database12(Database[Key14]):
     """
     Implementation of a crypt12 database.
     """

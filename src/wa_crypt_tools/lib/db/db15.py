@@ -16,7 +16,7 @@ from wa_crypt_tools.lib.utils import encode_varint
 log = logging.getLogger(__name__)
 
 
-class Database15(Database):
+class Database15(Database[Key15]):
     def __str__(self):
         return "Database15"
         # todo

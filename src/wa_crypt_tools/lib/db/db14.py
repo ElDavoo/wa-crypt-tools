@@ -9,7 +9,6 @@ from Cryptodome.Cipher import AES
 from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.lib.db.db import Database
 from wa_crypt_tools.lib.errors import DecryptionError, IntegrityError
-from wa_crypt_tools.lib.key.key import Key
 from wa_crypt_tools.lib.key.key14 import Key14
 from wa_crypt_tools.lib.props import Props
 from wa_crypt_tools.lib.utils import encode_varint
@@ -17,7 +16,7 @@ from wa_crypt_tools.lib.utils import encode_varint
 log = logging.getLogger(__name__)
 
 
-class Database14(Database):
+class Database14(Database[Key14]):
     def __init__(self, *, iv: bytes | None = None, props: Props | None = None):
         # DatabaseFactory overwrites this with the hash of the header bytes it consumed;
         # a database built for encryption starts with an empty one.
@@ -30,7 +29,7 @@ class Database14(Database):
         else:
             self.iv = urandom(16)
 
-    def encrypt(self, key: Key, props: Props, decrypted: bytes) -> bytes:
+    def encrypt(self, key: Key14, props: Props, decrypted: bytes) -> bytes:
         """Encrypts the database using the provided key"""
         from wa_crypt_tools.proto import C14_cipher_pb2 as C14_cipher
         from wa_crypt_tools.proto import key_type_pb2 as key_type

@@ -2,16 +2,29 @@ from __future__ import annotations
 
 import abc
 import logging
+from typing import Generic, TypeVar
 
 from wa_crypt_tools.lib.key.key import Key
 from wa_crypt_tools.lib.props import Props
 
 log = logging.getLogger(__name__)
 
+# Which kind of key this database is encrypted with. crypt12 and crypt14 use a Key14, crypt15
+# a Key15, and the two are not interchangeable: Database14.encrypt reaches for
+# get_serversalt() and get_googleid(), which only exist on a Key14.
+#
+# Declared with TypeVar rather than PEP 695's `class Database[K: Key]`, which needs 3.12 and
+# would be the only thing in the tree to. It says exactly the same thing.
+K = TypeVar("K", bound=Key)
 
-class Database(abc.ABC):
+
+class Database(abc.ABC, Generic[K]):
     """
-    An abstract class that represents a database.
+    An abstract class that represents a database, parameterised by the kind of key it takes.
+
+    Subclasses name that key -- `Database15(Database[Key15])` -- and their decrypt/encrypt then
+    narrow to it without violating the base class's contract, which is what a bare `key: Key`
+    here could not express.
     """
 
     iv: bytes
@@ -30,11 +43,11 @@ class Database(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def decrypt(self, key: Key, encrypted: bytes) -> bytes:
+    def decrypt(self, key: K, encrypted: bytes) -> bytes:
         pass
 
     @abc.abstractmethod
-    def encrypt(self, key: Key, props: Props, decrypted: bytes) -> bytes:
+    def encrypt(self, key: K, props: Props, decrypted: bytes) -> bytes:
         pass
 
     @abc.abstractmethod

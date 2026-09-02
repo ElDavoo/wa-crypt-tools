@@ -312,6 +312,15 @@ this feature.
 **Databases** (`lib/db/`) — `Database` ABC (`decrypt`/`encrypt`/`get_iv`), implemented by
 `Database12`, `Database14`, `Database15`.
 
+**`Database` is generic in the kind of key it takes** -- `Database(abc.ABC, Generic[K])` with
+`K = TypeVar("K", bound=Key)`, so `Database12` and `Database14` are `Database[Key14]` and
+`Database15` is `Database[Key15]`. That is not decoration: `Database14.encrypt` calls
+`get_serversalt()` and `get_googleid()`, which exist only on a `Key14`, and while the base
+declared a bare `key: Key` the subclasses were all narrowing it -- five Liskov `override`
+errors, plus three `attr-defined` where the narrowing was simply missing and a `Key` was being
+asked for `Key14` methods. Declared with `TypeVar` rather than 3.12's `class Database[K: Key]`
+syntax, which the 3.10 floor rules out and which would say exactly the same thing.
+
 `Database12.__init__` splits the same way, into `_read_header` (off a stream, checked against a
 key if there is one), `_from_key` (what `waencrypt` needs) and `_from_parts`. **The `md5` is
 accumulated once, after them, over the five fields in header order** -- cipher version, key
@@ -565,9 +574,23 @@ not encode a workaround for it.
 - mypy is wired up but advisory (`continue-on-error` in the lint job), and the config in
   `[tool.mypy]` only sets `ignore_missing_imports` (javaobj and pycryptodomex ship no types)
   and excludes the generated protobuf. Blocking on it needs an annotation pass or a baseline
-  file first. What is left is mostly `attr-defined` on protobuf messages, Liskov `override`
-  complaints where `Database12`/`Key14` narrow a base-class parameter, and `str-bytes-safe` on
-  diagnostics that render bytes as `b'...'` intentionally.
+  file first. It is down to **28** from 36, the Liskov `override` complaints having gone with
+  `Database` becoming generic (see below). What is left, in descending order of how much work
+  it would be: 8 `attr-defined` on the generated protobuf modules, which want `mypy-protobuf`
+  to emit `.pyi` stubs; 6 in `gui/app.py` against tkinter's own hints, one cluster of which is
+  a real if benign shadowing -- `self.info` is a `ttk.Label` assigned over `ttk.Frame`'s
+  inherited `info()` method, harmless only because nothing calls it; 5 in `lib/utils.py`'s
+  `mcrypt1_metadata_decrypt`, which annotates `encoded: str` and then rebinds it to the
+  `b64decode` result; 4 `str-bytes-safe` on diagnostics that render bytes as `b'...'` on
+  purpose, all of which `!r` would silence with byte-identical output; and 2 in `logformat.py`,
+  where `format` is a class attribute and a method by turns.
+
+  **One of them is a false positive that must not be "fixed":** `lib/utils.py: create_jba` sets
+  `cd.superclass`, and mypy says `JavaClassDesc` has no such attribute and suggests
+  `super_class`. Taking the suggestion breaks every key file dump with an `AttributeError`. The
+  bean comes from `javaobj.v2.beans`, which is what mypy checks against and which does spell it
+  `super_class`, but the marshaller that consumes it is `javaobj.v1`'s, and v1 reads
+  `.superclass`. The comment at the point of use says so.
 - `tests/tools-invocation/` shells out to the console scripts, and those subprocesses are measured
   too. It takes three pieces together and breaks silently — as 0% on every `wa*.py` — if any one
   of them goes: `parallel = true` in `.coveragerc`, the root `conftest.py` exporting
