@@ -397,13 +397,20 @@ You can move the protoc program to the `wa-crypt-tools/proto` folder where the .
 Replace the protobuf classes as needed and run `protoc` to generate the python classes. 
 From the `wa-crypt-tools/proto` directory of the project, run:
 
-`./protoc --python_out=../src/wa_crypt_tools/proto --proto_path=. *.proto`
+`./protoc --python_out=../src/wa_crypt_tools/proto --mypy_out=../src/wa_crypt_tools/proto --proto_path=. *.proto`
+
+`--mypy_out` writes the `.pyi` type stubs beside the generated classes, and needs
+[mypy-protobuf](https://github.com/nipunn1313/mypy-protobuf) (`pip install mypy-protobuf`,
+which puts `protoc-gen-mypy` on your `PATH`). It is only needed to regenerate: nothing at
+runtime or in the test suite imports it. Leave it out and the classes still work, but a type
+checker sees a module with no attributes at all, because `_pb2.py` builds them at import time
+out of a serialized descriptor.
 
 After generating the protobuf python classes through `protoc`, from that same directory run:
 
 `python fix_imports.py ../src/wa_crypt_tools/proto`
 
-Now all the generated python classes should have their imports fixed.
+Now all the generated python classes, and their stubs, should have their imports fixed.
 
 Note that `protoc` and the `protobuf` runtime must be version-matched: code generated
 by `protoc` vX.Y asserts a runtime of at least the corresponding `protobuf` X.Y at

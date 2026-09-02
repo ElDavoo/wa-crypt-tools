@@ -27,25 +27,27 @@ python -m pytest --cov          # with coverage (as CI runs it)
 python -m pytest tests/test_decrypt.py::TestDecryption::test_decryption15   # single test
 ```
 
-The full suite takes around eight minutes with the `ocr` extra installed, four without:
-`tests/tools-invocation/` runs the console scripts as subprocesses, `waguess` brute-forces
-offsets over a 240 KB backup for each of the three formats -- plus once more for `tests/gui/`,
-which exercises the same search behind the window's "try harder" checkbox -- and the screenshot
-tests do about a dozen full OCR reads at roughly twenty seconds each. Without tesseract those
-skip, which is the four-minute figure.
+The full suite is 555 tests and takes around ten minutes with the `ocr` extra installed, five
+without: `tests/tools-invocation/` runs the console scripts as subprocesses, `waguess`
+brute-forces offsets over a 240 KB backup for each of the three formats -- plus once more for
+`tests/gui/`, which exercises the same search behind the window's "try harder" checkbox, and
+three more times for the searches that are meant to fail, each of which costs a full sweep
+before it can say so -- and the screenshot tests do about a dozen full OCR reads at roughly
+twenty seconds each. Without tesseract those skip, which is the five-minute figure.
 
 `tests/gui/test_app.py` builds a real Tk window, so it needs both `_tkinter` and a display; it
-skips cleanly without either. With `_tkinter` present and no display that is eleven skips, one
-per test, unless the venv was built as "Running the window on this machine" below describes;
-with no `_tkinter` at all the module skips once, at its `importorskip`. CI's Ubuntu leg runs the
-suite under `xvfb-run` so that neither happens there. `tests/gui/test_core.py` is unaffected
-either way -- see "The GUI" below for what makes that true, because it was not always.
+skips cleanly without either. With `_tkinter` present and no display that is 24 skips, one per
+test that takes the `window` fixture, unless the venv was built as "Running the window on this
+machine" below describes; with no `_tkinter` at all the module skips once, at its
+`importorskip`. CI's Ubuntu leg runs the suite under `xvfb-run` so that neither happens there.
+`tests/gui/test_core.py` is unaffected either way -- see "The GUI" below for what makes that
+true, because it was not always.
 
-A run missing both optional pieces (no tesseract, no `_tkinter`) reports 17 skips: 15 for OCR
-and 2 for Tk.
+A run missing both optional pieces (no tesseract, no `_tkinter`) reports 510 passed and 17
+skips: 15 for OCR and 2 for Tk.
 
 
-Without the venv on `PATH`, the 14 `tools-invocation` tests fail with
+Without the venv on `PATH`, all 142 `tools-invocation` tests fail with
 `FileNotFoundError: 'wacreatekey'` while everything else passes.
 
 Lint and formatting (both block; ruff replaced flake8):
@@ -96,23 +98,35 @@ automatically; locally it is one opt-in per clone:
 git config blame.ignoreRevsFile .git-blame-ignore-revs
 ```
 
-Regenerating protobuf classes (from `proto/`, needs only a `protoc` binary — see README
-"Protobuf automatic fix"):
+Regenerating protobuf classes (from `proto/`, needs a `protoc` binary and `mypy-protobuf` on
+`PATH` for the stubs — see README "Protobuf automatic fix"):
 
 ```bash
-protoc --python_out=../src/wa_crypt_tools/proto --proto_path=. *.proto
+protoc --python_out=../src/wa_crypt_tools/proto --mypy_out=../src/wa_crypt_tools/proto \
+       --proto_path=. *.proto
 python fix_imports.py ../src/wa_crypt_tools/proto
 ```
 
 `fix_imports.py` rewrites protoc's absolute imports into package-relative ones; skipping it
 breaks `from wa_crypt_tools.proto import ...`. It replaces protoletariat (`protol`), which was
 archived upstream and pinned `protobuf<6`. Only `backup_prefix.proto` imports other protos, so
-the script rewrites 5 lines in `backup_prefix_pb2.py` and leaves the other five files exactly as
-protoc wrote them.
+the script rewrites 5 lines in `backup_prefix_pb2.py` and 5 more in `backup_prefix_pb2.pyi`,
+and leaves the other ten files exactly as protoc wrote them.
+
+**The `.pyi` half is not decoration.** `_pb2.py` builds its classes at import time out of a
+serialized descriptor, so to a type checker the module has no attributes at all: `BackupPrefix`,
+`C14_cipher`, `C15_IV` and `Key_Type` were 8 of mypy's findings, and behind them the *contents*
+of every header message were unchecked too. `--mypy_out` is `mypy-protobuf`'s plugin
+(`pip install mypy-protobuf` puts `protoc-gen-mypy` on `PATH`; it is not a runtime or test
+dependency, only a regeneration one), and the stubs it writes are what turned up the three real
+mistakes that had been hiding under those findings -- two `cipher` variables holding a protobuf
+message and then an AES object in the same function, and an enum field being assigned a bare
+`int`. Regenerating without them puts all of that back.
 
 There is no protoc in this environment; on NixOS a throwaway flake with `pkgs.protobuf_29` gives
-a matching one (`nix develop --command protoc ...`). The committed files are protoc 29.6 output
-and load under the 7.36 runtime the venv has.
+a matching one (`nix develop --command protoc ...`), or `nix shell nixpkgs#protobuf_29`. The
+committed files are protoc 29.6 output and load under the 7.36 runtime the venv has; the stubs
+are mypy-protobuf 5.1.0's.
 
 `protoc` and the `protobuf` runtime must be version-matched: generated code calls
 `ValidateProtobufRuntimeVersion` with the generator's version, so protoc 29.6 needs protobuf
@@ -285,10 +299,18 @@ boxes are the key is a pure function over hand-written `image_to_data` dicts and
 OCR installed, and only the "this image reads back as this key" tests need tesseract (they call
 `requires_ocr()` from `tests/utils/utils.py`). `TestAlternativeKeys` patches `_read` out
 entirely -- what is under test is the guessing, and running OCR to reach it would add twenty
-seconds for no coverage. `tests/test_key_recovery.py` pins `key_works` on its own. The
-end-to-end recovery tests stage the failure from the only reproducible direction: making
-Tesseract misread on demand depends on its build, but a *backup* whose real key differs from
-the screenshot by a digit puts the code in exactly the same position, so `waencrypt` builds one.
+seconds for no coverage. `tests/test_key_recovery.py` pins `key_works` on its own, along with
+`corrected()`'s two ways of doing nothing: a key file is never second-guessed, and a stream
+that cannot say where it is (a pipe) is left alone rather than probed. The end-to-end recovery
+tests stage the failure from the only reproducible direction: making Tesseract misread on
+demand depends on its build, but a *backup* whose real key differs from the screenshot by a
+digit puts the code in exactly the same position, so `waencrypt` builds one.
+
+Two failures of the extra itself are worth telling apart and are tested apart: the Python
+packages missing (`pip install 'wa-crypt-tools[ocr]'`) and the tesseract *binary* missing.
+pytesseract reports the second as a `TesseractNotFoundError`, which subclasses `OSError`, so
+without its own `except` ahead of the general one a missing binary was reported as "could not
+read the image" -- blaming a screenshot that was fine.
 
 The fixtures are `key-screenshot-android-2.26.png` and `-confirm-2.26.png` (a real phone, two
 different screens, the same key) and `key-screenshot-synthetic{,-dark}.png`. The synthetic pair
@@ -339,7 +361,8 @@ field that disagrees rather than the last.
   backup's header exceeds 255 bytes and exposed the difference: a single raw size byte
   misreads it, a real multi-byte varint reads it correctly. Whether the header actually carries
   feature flags is read off `backup_metadata`'s content, not off a byte in this prefix.
-  `header.c15_iv.IV` non-empty → `Database15`; `header.c14_cipher.IV` non-empty → `Database14`.
+  `header.e2ee_key_data.encryption_iv` non-empty → `Database15`;
+  `header.wa_provided_key_data.encryption_iv` non-empty → `Database14`.
 - A `DecodeError` parsing that protobuf means it is a crypt12: the stream is `seek(0)`'d and
   handed to `Database12`, which parses the fixed-offset legacy header itself.
 
@@ -413,6 +436,23 @@ does not match this backup" -- and files below `HEADER_SIZE` are refused as too 
 are intended: `wadecrypt` and `wainfo` handle every one of those files, and broadening the
 check would cost the search its only defence against false offsets.
 
+Its tests are in two places for a reason of arithmetic: every search over a real backup costs
+about twenty seconds, whether it succeeds or fails, so `tests/tools-invocation/test_waguess.py`
+buys each end-to-end case at that price. `tests/test_waguess_internals.py` is what does not
+need one -- `oscillate`, the order the offsets are tried in; the offset bounds, which are
+checked before a byte is read; and `decrypt()`, the write-out after a successful search, driven
+with a stand-in cipher so that every one of its failure paths (no cipher, a cipher that
+refuses, out of memory, a full disk, a truncated zlib stream, a ZIP, and data that is none of
+those) is a millisecond instead of a sweep.
+
+**`oscillate` has two edges that are not what the docstring implies, and the tests pin only
+what is right.** Starting at `n_min` -- which `waguess -ivo X -do X+16` does -- yields
+`[n_min, n_min - 1, n_min + 1]` and stops, so the search covers three offsets out of its whole
+range and misses everything above; and a start at the midpoint yields both ends twice. Neither
+is reachable from the defaults, both are worth fixing, and neither was fixed here: a change to
+the search order changes what `waguess` does, which is not something to slip into a coverage
+pass.
+
 `key_type_new` (field 6) is why re-encryption had to start from the parsed header: every
 crypt15 backup from 2.26 sets it to `E2EE_ENCRYPTION_KEY`. It is written by default now --
 `C.DEFAULT_KEY_TYPE`, through `Database15(key_type=...)` -- but only when there is no `prefix` to
@@ -477,6 +517,19 @@ needs no display. `core.py` holds every decision -- `describe_backup`, `suggest_
 `tests/gui/test_core.py` therefore runs anywhere -- which took the lazy re-export in
 `gui/__init__.py` below to actually be true; `tests/gui/test_app.py` builds a real Tk
 window and skips when there is no display.
+
+Both halves are at 100% under `xvfb`, which took reaching the parts of `app.py` that a
+decryption never goes through: the three Browse buttons (with `filedialog` monkeypatched to
+return a path, and again to return the empty string a cancelled dialog gives), `_describe` on
+an empty field and on a path with no file at it, `_rewrap` on a synthetic `<Configure>` event
+and then on a second one that changes nothing, and `main()` with `build` replaced, since
+`mainloop()` never returns in a real run. The one test that could have been timing-dependent
+-- a second Decrypt click while the first is still running -- hands the window a stand-in
+worker that says it is alive rather than racing a real decryption that takes 50ms.
+
+**`self.info_label`, not `self.info`.** `ttk.Frame` inherits an `info()` method from `Misc`,
+and the label used to be assigned straight over it. Nothing calls that method, so it was
+harmless, but it is the kind of harmless that stops being so silently.
 
 It calls `wadecrypt.decrypt(args)` in-process with a `SimpleNamespace` rather than shelling
 out: a frozen binary has no `wadecrypt` on `PATH`, and that function already owns the chunked
@@ -551,54 +604,100 @@ not encode a workaround for it.
 ## Notes
 
 - Protobuf generated code lives in `src/wa_crypt_tools/proto/` and is excluded from coverage
-  along with `tests/` (`.coveragerc`). `source` is scoped to `src/wa_crypt_tools`, so the reported
-  TOTAL is the package's own number (~94%): `lib/` sits around 97%, the `wa*.py` entry points
-  between 81% and 97%, and `gui/` at 97% for `core.py` and 91% for `app.py` -- the latter only
-  reaches that where a display exists, so a headless run reports it far lower.
-- `fail_under = 80` in `.coveragerc` makes that number load-bearing, and it lives there rather
-  than as `--cov-fail-under` on CI's pytest call so a local `python -m pytest --cov` fails the
-  same way CI does. **80, not 90**, because the suite reports two very different numbers: ~94%
-  where a display exists (CI's Ubuntu leg under xvfb, and Windows, where Tk needs none) and
-  ~83% headless, where `tests/gui/test_app.py` skips and `gui/app.py` falls from 91% to 22%.
-  The floor has to clear the lower one, or `pytest --cov` over SSH fails for a reason that has
-  nothing to do with the change being tested. It still catches what it is for -- the
-  subprocess-coverage breakage below takes every `wa*.py` to 0% and the total to ~57%. Raising
-  it means making `app.py`'s widget code reachable without a display first.
-- There is a **third** number, and it is under the floor: on a Python with no `_tkinter` at all,
-  `app.py` cannot be imported, sits at 0% rather than 22%, and the total is **79%** -- so
-  `pytest --cov` fails there. That machine could not run the suite at all until `gui/__init__.py`
-  stopped importing tkinter eagerly, so the case is newly reachable rather than newly broken.
-  The floor was left at 80 deliberately: dropping it to 78 would blunt the guard for a local
-  toolchain gap that "Running the window on this machine" above already says how to close.
-  CI is unaffected -- it has `_tkinter` on every leg.
-- mypy is wired up but advisory (`continue-on-error` in the lint job), and the config in
-  `[tool.mypy]` only sets `ignore_missing_imports` (javaobj and pycryptodomex ship no types)
-  and excludes the generated protobuf. Blocking on it needs an annotation pass or a baseline
-  file first. It is down to **28** from 36, the Liskov `override` complaints having gone with
-  `Database` becoming generic (see below). What is left, in descending order of how much work
-  it would be: 8 `attr-defined` on the generated protobuf modules, which want `mypy-protobuf`
-  to emit `.pyi` stubs; 6 in `gui/app.py` against tkinter's own hints, one cluster of which is
-  a real if benign shadowing -- `self.info` is a `ttk.Label` assigned over `ttk.Frame`'s
-  inherited `info()` method, harmless only because nothing calls it; 5 in `lib/utils.py`'s
-  `mcrypt1_metadata_decrypt`, which annotates `encoded: str` and then rebinds it to the
-  `b64decode` result; 4 `str-bytes-safe` on diagnostics that render bytes as `b'...'` on
-  purpose, all of which `!r` would silence with byte-identical output; and 2 in `logformat.py`,
-  where `format` is a class attribute and a method by turns.
+  along with `tests/` (`.coveragerc`). `source` is scoped to `src/wa_crypt_tools`, so the
+  reported TOTAL is the package's own number: **98.6%** with a display and tesseract, which is
+  what CI's Ubuntu leg measures. Eighteen of the twenty-five modules are at 100%, `gui/` and
+  every `wa*.py` among them, and **30 statements** are all that is left uncovered anywhere:
+  - `db12`/`db14`/`db15`, 2 each: the `except ValueError` around `cipher.decrypt`. AES-GCM's
+    `decrypt` does not raise ValueError on a wrong key -- that is what `verify` is for -- so
+    there is no input that reaches these.
+  - `wadecrypt`, 10 and `waguess`, 3: the zlib branch for the four bytes shifted out of a
+    crypt12 trailer, the "no checksum found" break (unreachable: the branch above it always
+    sets a checksum when the read comes back empty), `key_works`'s own `except`, and the
+    first-of-April easter egg in each tool's `main()`.
+  - `lib/key/ocr.py`, 10: geometry rejections deep in the grid search, each needing an image
+    that fails in one specific way while reading cleanly in every other.
+  - `lib/key/keyfactory.py`, 1: `from_hex`'s length re-check, which `hexstring2bytes` has
+    already enforced by the time it is reached.
 
-  **One of them is a false positive that must not be "fixed":** `lib/utils.py: create_jba` sets
-  `cd.superclass`, and mypy says `JavaClassDesc` has no such attribute and suggests
-  `super_class`. Taking the suggestion breaks every key file dump with an `AttributeError`. The
-  bean comes from `javaobj.v2.beans`, which is what mypy checks against and which does spell it
-  `super_class`, but the marshaller that consumes it is `javaobj.v1`'s, and v1 reads
-  `.superclass`. The comment at the point of use says so.
+  `.coveragerc`'s one `exclude_also` entry, `@(abc\.)?abstractmethod`, is what keeps the
+  eight `pass` bodies in `db/db.py` and `key/key.py` out of that list: an abstract body is
+  never executed by anything, and the base class cannot be instantiated to make it so.
+  `exclude_also` adds to coverage's defaults rather than replacing them, so `# pragma: no
+  cover` and its built-in rule for `if TYPE_CHECKING:` blocks both keep working -- which
+  matters, because the annotation-only imports added for mypy are exactly such blocks. The
+  five `if __name__ == "__main__":` guards carry `# pragma: no cover` for the same reason
+  `gui/app.py`'s always did: the tests reach `main()` through the console script.
+- **Three numbers, and the floor has to clear the lowest.** `fail_under = 80` in `.coveragerc`
+  lives there rather than as `--cov-fail-under` on CI's pytest call so that a local
+  `python -m pytest --cov` fails the same way CI does -- which is exactly why it is 80 and not
+  95. What the same suite reports depends on what the machine has:
+
+  | environment                              | skips | `gui/app.py` | TOTAL |
+  | ---------------------------------------- | ----- | ------------ | ----- |
+  | display + tesseract (CI Ubuntu, Windows) |     0 | 100%         | 98.6% |
+  | `_tkinter`, no display, no tesseract     |    39 | 23%          | 86.0% |
+  | no `_tkinter`, no tesseract              |    17 | 0%           | 82.8% |
+
+  The bottom row is a Python built without `_tkinter`, where `app.py` cannot be imported at
+  all; it used to be **79%**, under the floor, so `pytest --cov` failed on this machine for a
+  reason that had nothing to do with the change being tested. It clears the floor now. The
+  floor still catches what it is for: the subprocess-coverage breakage below takes every
+  `wa*.py` to 0% and the total to ~57%. Raising it much above 80 means making `app.py`'s
+  widget code reachable without a display first.
+- **mypy reports nothing, and the run is worth that much only because of three settings.**
+  `ignore_missing_imports` (javaobj and pycryptodomex ship no types) is the oldest; the two
+  added with the clean-up are `check_untyped_defs = true` and `types-protobuf` in the `test`
+  extra. Without the first, mypy skips the body of every function carrying no annotations at
+  all -- which here was most of each `wa*.py`, `main()` and `encrypt()`/`decrypt()` included --
+  and ten real findings sat behind it. Without the second, `google.protobuf` falls back to
+  `Any` and the generated `.pyi` stubs beside each `_pb2.py` say nothing mypy can use. It stays
+  advisory in CI (`continue-on-error` in the lint job): a green run should be kept green, but
+  a typeshed or stub release is not a reason to stop a merge.
+
+  Getting there from 28 findings was mostly mechanical -- `!r` on four `str-bytes-safe`
+  diagnostics that mean to print `b'...'`, `LINE` for the `CustomFormatter` class attribute
+  that was shadowing its own `format` method, `raw` for the base64 result that
+  `mcrypt1_metadata_decrypt` was rebinding over its `encoded: str` parameter, `info_label` for
+  the `ttk.Label` that was being assigned over `ttk.Frame`'s inherited `info()` method -- but
+  three were real:
+  - `Database14.encrypt` and `Database15.encrypt` each held a protobuf message and then an AES
+    cipher in one variable called `cipher`. Renaming them `key_data` and `iv_message` is what
+    lets a reader see the header being built at all.
+  - `waencrypt` fed whatever `KeyFactory` returned to whichever `Database` `--type` asked for.
+    A crypt15 key with `--type 12` or `14` died on an `AttributeError` partway through building
+    the header, because those formats take their cipher version, server salt and google id off
+    the key file and a crypt15 key has none of them. `database_for()` says so instead, and its
+    `Database[Any]` return is deliberate: the format and the key kind are decided by different
+    arguments and nothing in that function can narrow them together.
+  - `Database.prefix` and `.feature_table` were bare `= None`, so every `db.prefix = header`
+    was an error the type checker could only report as one.
+
+  **One finding was a false positive and is suppressed in place, not fixed:** `lib/utils.py:
+  create_jba` sets `cd.superclass`, and mypy says `JavaClassDesc` has no such attribute and
+  suggests `super_class`. Taking the suggestion breaks every key file dump with an
+  `AttributeError`. The bean comes from `javaobj.v2.beans`, which is what mypy checks against
+  and which does spell it `super_class`, but the marshaller that consumes it is `javaobj.v1`'s,
+  and v1 reads `.superclass`. It carries a `# type: ignore[attr-defined]` and the comment above
+  it says why.
 - `tests/tools-invocation/` shells out to the console scripts, and those subprocesses are measured
   too. It takes three pieces together and breaks silently — as 0% on every `wa*.py` — if any one
   of them goes: `parallel = true` in `.coveragerc`, the root `conftest.py` exporting
   `COVERAGE_PROCESS_START` when `--cov` is on, and the `.pth` file that `coverage` (pinned
   `>= 7.16.0` in the `test` extra for it) installs into site-packages to call
-  `coverage.process_startup()`. All five tools have invocation tests; what is left uncovered is
-  mostly the pycryptodome/pycryptodomex import fallback in `wadecrypt.py` and `waguess.py`, which
-  cannot run in an environment where the suite runs at all.
+  `coverage.process_startup()`. All five tools have invocation tests, and all five `wa*.py` are
+  now at or above 93%.
+
+  The pycryptodome/pycryptodomex import fallback at the top of `wadecrypt.py` and `waguess.py`
+  used to be the largest uncovered block in the tree -- 38 statements that by definition cannot
+  run in an environment where the suite runs at all. `tests/test_crypto_backend.py` reaches it
+  by executing the module from its own file under a patched `__import__`, with a stand-in
+  `Crypto.Cipher.AES` in `sys.modules`; the real module stays in `sys.modules` untouched, so a
+  deliberately failed import here cannot leave a half-initialised module behind for the next
+  test. Writing it turned up a message that could never be shown: the "you installed pycrypto"
+  `ModuleNotFoundError` was raised **inside** a `try` whose own `except ModuleNotFoundError`
+  swallowed it and reported "you need pycryptodome(x)" instead, in both copies. The check sits
+  after that block now.
 - `waencrypt` is beta, but `--reference` reproduces a real backup byte for byte -- verified
   against 13 backups off a 2.26 device, from a 239-byte `avatar-password.bkup` to a 55 MB
   msgstore, covering SQLite, ZIP, JSON and WebP payloads. Three things have to hold at once for
@@ -606,6 +705,16 @@ not encode a workaround for it.
   protobuf has to keep the fields this schema does not model, and the header's own size prefix
   has to be written as the same protobuf varint a real device would write. `--multi-file` and
   `--noparse` are declared and never read.
+
+  Which database it builds goes through `database_for()`, which is also where the one
+  impossible pairing is refused: `--type 12` or `--type 14` with a crypt15 key file. Those two
+  headers are built out of the key file's own cipher version, server salt and google id, and a
+  crypt15 key is 32 bytes with none of them -- so the tool used to reach for them anyway and
+  die on an `AttributeError` partway through writing the header. The reverse pairing is *not*
+  refused: `--type 15` with a crypt14 key encrypts under that key's own 32 bytes and decrypts
+  back with the same file, so it is odd rather than broken. The function returns `Database[Any]`
+  because the format comes from `--type` and the kind of key from whatever the keyfile turned
+  out to hold; nothing there can narrow the two together, and a cast would only hide that.
   Its output positional -- like `wadecrypt`'s -- is deliberately a plain `str` and not an
   `argparse.FileType('wb')`: that type opens the file during parsing, so it was emptied before
   any check had run. The existence guard at the top of `encrypt()`/`decrypt()` only works while
