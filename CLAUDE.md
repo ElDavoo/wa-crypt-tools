@@ -35,9 +35,14 @@ tests do about a dozen full OCR reads at roughly twenty seconds each. Without te
 skip, which is the four-minute figure.
 
 `tests/gui/test_app.py` builds a real Tk window, so it needs both `_tkinter` and a display; it
-skips cleanly without either, which is why a plain run here reports eleven skips unless the venv
-was built as "Running the window on this machine" below describes. CI's Ubuntu leg runs the
-suite under `xvfb-run` for the same reason.
+skips cleanly without either. With `_tkinter` present and no display that is eleven skips, one
+per test, unless the venv was built as "Running the window on this machine" below describes;
+with no `_tkinter` at all the module skips once, at its `importorskip`. CI's Ubuntu leg runs the
+suite under `xvfb-run` so that neither happens there. `tests/gui/test_core.py` is unaffected
+either way -- see "The GUI" below for what makes that true, because it was not always.
+
+A run missing both optional pieces (no tesseract, no `_tkinter`) reports 17 skips: 15 for OCR
+and 2 for Tk.
 
 
 Without the venv on `PATH`, the 14 `tools-invocation` tests fail with
@@ -58,10 +63,25 @@ nobody touched; the `ruff >= 0.16.5, < 0.17` range in the `test` extra is the ot
 and the upper bound should stay. Generated protobuf classes are excluded via `extend-exclude`;
 `proto/fix_imports.py` sits at the repo root and *is* linted.
 
+`[tool.ruff.lint.isort]` sets `required-imports = ["from __future__ import annotations"]`, so
+every linted file carries it. It was in twelve files and missing from fifteen with nothing
+telling the two groups apart; requiring it is what settles that, and it is also what lets an
+annotation name something imported only for typing.
+
 Two `per-file-ignores` are deliberate and should not be "cleaned up": `E402` in
 `src/wa_crypt_tools/__init__.py`, because the `NullHandler` has to be attached before the
-submodules are imported, and `SIM115` in `tests/`, because a test hands an open handle to
-`DatabaseFactory` and then reads the rest itself -- a `with` block would close it mid-assertion.
+submodules are imported, and `SIM115` plus `PTH` in `tests/`. `SIM115` because a test hands an
+open handle to `DatabaseFactory` and then reads the rest itself -- a `with` block would close it
+mid-assertion. `PTH` because what that rule is for is keeping path handling in the *shipped*
+code consistent, which it now is; in a test, `open("tests/res/...")` against a literal fixture
+path is the clearest way to say what it says, and rewriting the 89 of them would be churn
+straight through the assertions.
+
+`G` (flake8-logging-format) is selected, so log calls take lazy `%s` arguments rather than
+f-strings -- the newer code already did and the older code did not. Note ruff only recognises a
+logger by name: `wacreatekey`'s was called `lo`, which is why that file went years without the
+rule ever having an opinion about it. It is `log` like every other module now, and a new module
+should call it that.
 Three `# noqa: BLE001` carry their reason at the point of use. The same suppression in
 `db15.py`/`dbfactory.py` was drift rather than intent, and those imports are at the top now.
 
@@ -127,6 +147,21 @@ length**: 131 bytes → `Key14` (cipher version, key version, server salt, googl
 google id, padding, then the 32-byte key), 32 bytes → `Key15` (a bare root key). `Key15` derives
 the actual cipher key from the root key via an HMAC-SHA256 loop keyed with `b'backup encryption'`
 (see `lib/utils.py: encryptionloop`, mirrored in `utils/WA_HMACSHA256_Loop.java`).
+
+`Key14.__init__` is a two-mode constructor and the modes are two methods: `_parse(keyarray)` for
+a key file's payload, `_generate(...)` for everything else, with the field-length checks on one
+`_sized()` helper. Keep them apart. The public shape -- `Key14(keyarray=...)`, `Key14(key=...,
+serversalt=...)`, and every `get_*()` -- is what the ABC, both factories, `db12`, `db14` and
+some forty tests go through, so it is not a thing to tidy. `_parse` in particular must go on
+parsing every field after a check fails: the `IntegrityError` it raises carries the whole key as
+`data=self`, which is what `--force` salvages, and it collects the problems so a bad key file
+reports all of them in one run rather than one per attempt.
+
+Neither this nor `Database12` is a `@dataclass`, and that is on purpose rather than for want of
+trying. A dataclass generates "assign the fields"; these constructors dispatch on *which*
+argument arrived -- `keyarray` means parse, `encrypted` means read a stream, nothing means
+`urandom()` -- so all of it would move to `__post_init__` unchanged, with `keyarray` and
+`encrypted` as phantom fields for good measure.
 
 **Reading a key off a screenshot** (`lib/key/ocr.py`, optional extra `[ocr]`, issue #14).
 `KeyFactory.new` sniffs the first 12 bytes and routes an image to `from_image`, so a
@@ -275,8 +310,18 @@ red -- which is why the install step is not `continue-on-error`. The same instal
 this feature.
 
 **Databases** (`lib/db/`) — `Database` ABC (`decrypt`/`encrypt`/`get_iv`), implemented by
-`Database12`, `Database14`, `Database15`. `DatabaseFactory.from_file(stream)` reads the header
-off an open binary stream and decides:
+`Database12`, `Database14`, `Database15`.
+
+`Database12.__init__` splits the same way, into `_read_header` (off a stream, checked against a
+key if there is one), `_from_key` (what `waencrypt` needs) and `_from_parts`. **The `md5` is
+accumulated once, after them, over the five fields in header order** -- cipher version, key
+version, server salt, google id, IV. That every mode produces those five in that order is what
+the four hand-rolled copies of the `file_hash.update()` calls were relying on without saying so;
+a mode that departs from it breaks re-encryption byte-exactness and nothing else will notice.
+`_read_header` checks each field the moment it reads it, so a mismatch still names the first
+field that disagrees rather than the last.
+
+`DatabaseFactory.from_file(stream)` reads the header off an open binary stream and decides:
 - The header opens with the size of a `BackupPrefix` protobuf, encoded as a protobuf varint --
   one byte under 128, more above that. What looked like a separate `0x01` byte flagging the
   msgstore feature table was never an independent thing: it is that varint's own mandatory
@@ -420,7 +465,8 @@ that reason -- before catches `stickers.backup.crypt15`, after catches the real 
 `src/wa_crypt_tools/gui/` is the `wagui` window, and it is split so that the half worth testing
 needs no display. `core.py` holds every decision -- `describe_backup`, `suggest_output`,
 `problems`, `friendly`, the queue log handler, `run_decrypt` -- and `app.py` is widget wiring.
-`tests/gui/test_core.py` therefore runs anywhere; `tests/gui/test_app.py` builds a real Tk
+`tests/gui/test_core.py` therefore runs anywhere -- which took the lazy re-export in
+`gui/__init__.py` below to actually be true; `tests/gui/test_app.py` builds a real Tk
 window and skips when there is no display.
 
 It calls `wadecrypt.decrypt(args)` in-process with a `SimpleNamespace` rather than shelling
@@ -444,13 +490,29 @@ console-less `wagui.exe`. tkinter is stdlib, so there is no `gui` extra; the Lin
 `python3-tk` gap is documented in the README instead, since no extra can install a system
 package.
 
+**`gui/__init__.py` re-exports `main()` lazily, through a PEP 562 module `__getattr__`, and it
+has to stay that way.** `app.py` imports tkinter at module level, so importing it from the
+package `__init__` dragged the display half into every import of the display-free half -- which
+is exactly what `core.py` was split out to avoid. The visible symptom was that
+`tests/gui/test_core.py`, written to need no display, could not even be *collected* on a Python
+built without `_tkinter`, and a collection error aborts the whole run rather than skipping: the
+suite reported one error and nothing else. The entry point is still `wa_crypt_tools.gui:main`,
+which resolves through `__getattr__` at runtime and so did not have to change.
+
+The cost of that is paid in `packaging/`: a lazy re-export is invisible to static analysis, so
+`wagui_entry.py` imports `wa_crypt_tools.gui.app` directly and the spec adds it to
+`hiddenimports`. Going back through the package there would build a binary missing `app.py`
+entirely -- the same failure the protobuf modules are collected by hand to avoid, and one that
+only shows up when someone double-clicks the release.
+
 `packaging/wagui.spec` builds the release binaries, and `.gitignore`'s `*.spec` (which is in
 the standard Python template *because* of PyInstaller) would hide it -- hence the
 `!packaging/wagui.spec` negation. The spec is onefile everywhere except macOS, where a windowed
 onefile and a `.app` bundle contradict each other and PyInstaller 7 will make it an error.
 `wagui --selftest` is what CI runs against each built binary: it imports the generated protobuf
 modules, which `DatabaseFactory.from_file` loads lazily and a frozen build can therefore omit
-without `--version` ever noticing.
+without `--version` ever noticing. `hiddenimports` names `wa_crypt_tools.gui.app` for the same
+reason -- see the lazy re-export above.
 
 ### Running the window on this machine
 
@@ -493,6 +555,13 @@ not encode a workaround for it.
   nothing to do with the change being tested. It still catches what it is for -- the
   subprocess-coverage breakage below takes every `wa*.py` to 0% and the total to ~57%. Raising
   it means making `app.py`'s widget code reachable without a display first.
+- There is a **third** number, and it is under the floor: on a Python with no `_tkinter` at all,
+  `app.py` cannot be imported, sits at 0% rather than 22%, and the total is **79%** -- so
+  `pytest --cov` fails there. That machine could not run the suite at all until `gui/__init__.py`
+  stopped importing tkinter eagerly, so the case is newly reachable rather than newly broken.
+  The floor was left at 80 deliberately: dropping it to 78 would blunt the guard for a local
+  toolchain gap that "Running the window on this machine" above already says how to close.
+  CI is unaffected -- it has `_tkinter` on every leg.
 - mypy is wired up but advisory (`continue-on-error` in the lint job), and the config in
   `[tool.mypy]` only sets `ignore_missing_imports` (javaobj and pycryptodomex ship no types)
   and excludes the generated protobuf. Blocking on it needs an annotation pass or a baseline
