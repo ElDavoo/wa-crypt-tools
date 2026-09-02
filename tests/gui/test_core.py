@@ -9,6 +9,7 @@ only widget wiring, which test_app.py smoke-tests.
 
 import logging
 import queue
+from pathlib import PureWindowsPath
 
 import pytest
 
@@ -130,6 +131,17 @@ class TestSuggestOutput:
 
     def test_keeps_the_directory(self):
         assert core.suggest_output("/tmp/some dir/msgstore.db.crypt15") == "/tmp/some dir/msgstore.db"
+
+    def test_the_separators_the_user_typed_are_the_ones_they_get_back(self, monkeypatch):
+        # Forward slashes are perfectly good on Windows, and the file dialog is not the only
+        # way the field gets filled. Rebuilding the path through Path() rewrote them as
+        # backslashes, so the output field disagreed with the input field directly above it.
+        #
+        # Patching Path is what makes that reachable off Windows at all: the old code passed
+        # everywhere else, and the bug reached main and sat there for two commits.
+        monkeypatch.setattr(core, "Path", PureWindowsPath)
+        assert core.suggest_output("tests/res/msgstore.db.crypt15") == "tests/res/msgstore.db"
+        assert core.suggest_output(r"C:\dir\msgstore.db.crypt15") == r"C:\dir\msgstore.db"
 
     def test_nothing_chosen_yet(self):
         assert core.suggest_output("") == ""
