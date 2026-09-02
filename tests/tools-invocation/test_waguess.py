@@ -6,6 +6,8 @@ and data offsets and testing each candidate decryption.
 to serve the search here.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from tests.utils.utils import Propen, cmp_files, rm_if_found

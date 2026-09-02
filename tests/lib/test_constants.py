@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from wa_crypt_tools.lib.constants import C
 
 

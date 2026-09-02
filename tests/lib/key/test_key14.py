@@ -5,6 +5,8 @@ The parameter path is what wacreatekey uses, and every one of its validations is
 thing standing between a typo and a key file that silently decrypts nothing.
 """
 
+from __future__ import annotations
+
 from hashlib import sha256
 
 import pytest

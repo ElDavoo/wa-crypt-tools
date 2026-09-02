@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from hashlib import sha512
 
 from wa_crypt_tools.lib.key.key14 import Key14

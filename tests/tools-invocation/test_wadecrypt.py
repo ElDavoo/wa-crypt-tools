@@ -7,6 +7,8 @@ tests pin down both halves of it -- a failed check aborts, and --force writes th
 anyway.
 """
 
+from __future__ import annotations
+
 from os.path import exists
 
 from tests.utils.utils import Propen, cmp_files, rm_if_found

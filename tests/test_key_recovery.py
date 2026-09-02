@@ -10,6 +10,8 @@ The trick is waguess's, applied to keys instead of offsets: decrypt the first tw
 compare them against the headers a compressed or zipped payload has to begin with.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory

@@ -6,6 +6,8 @@ to crypt12, 14 and 15 at once -- which is exactly why they are worth pinning dow
 rather than only through a full decryption.
 """
 
+from __future__ import annotations
+
 import base64
 import json
 import zlib

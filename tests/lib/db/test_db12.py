@@ -5,6 +5,8 @@ Its header is not a protobuf, so nothing validates it for us; the checks in __in
 validation.
 """
 
+from __future__ import annotations
+
 import io
 import zlib
 from hashlib import sha512

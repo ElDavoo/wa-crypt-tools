@@ -12,6 +12,8 @@ unnoticed in every 2.26 backup until a byte-for-byte comparison went looking, an
 that predate it cannot catch its like again.
 """
 
+from __future__ import annotations
+
 import sqlite3
 import zipfile
 import zlib

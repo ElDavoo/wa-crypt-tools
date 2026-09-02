@@ -7,6 +7,8 @@ has a separate copy of the crypt12 footer handling, the multifile handling and t
 handling -- none of which the in-RAM path exercises.
 """
 
+from __future__ import annotations
+
 import zlib
 
 import pytest

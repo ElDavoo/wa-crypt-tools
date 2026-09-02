@@ -3,6 +3,8 @@ Database14 and Database15 share everything but the header they write, so they ar
 together: the IV check, the multifile-backup branch of decrypt, and get_iv.
 """
 
+from __future__ import annotations
+
 import io
 import zlib
 from hashlib import sha512
@@ -95,7 +97,7 @@ class TestCrypt14KeyVersionIsCarriedThrough:
     """
 
     @staticmethod
-    def written_header(db: Database14, key) -> "object":
+    def written_header(db: Database14, key) -> object:
         """The header Database14.encrypt actually wrote, parsed back out."""
         from wa_crypt_tools.lib.props import Props
 
@@ -130,7 +132,7 @@ class TestPasskeyMetadataIsCarriedThrough:
     """
 
     @staticmethod
-    def written_header(db: Database15, key) -> "object":
+    def written_header(db: Database15, key) -> object:
         """The header Database15.encrypt actually wrote, parsed back out."""
         from wa_crypt_tools.lib.props import Props
 

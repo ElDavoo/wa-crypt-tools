@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from hashlib import sha512
 from pathlib import Path
 from subprocess import PIPE, STDOUT, Popen

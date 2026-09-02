@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import ClassVar
 
 
@@ -8,13 +10,17 @@ class C:
     # what every level uses -- the check byte leaves exactly four possible headers, one per
     # band of compression levels. WhatsApp compressed at level 1 historically and at level 9
     # now, so a list holding only 78 01 stopped recognising current backups entirely.
-    ZLIB_HEADERS: ClassVar[list[bytes]] = [
+    # Tuples, not lists: these are only ever iterated, membership-tested or indexed, and a
+    # class attribute that can be appended to from anywhere is a footgun with no upside.
+    # DEFAULT_FEATURE_LIST below stays a list -- it is argparse's `default` for an
+    # `nargs="*"` option, which hands back a list, and get_features() returns one to compare to.
+    ZLIB_HEADERS: ClassVar[tuple[bytes, ...]] = (
         b"x\x01",  # levels 0-1
         b"x\x5e",  # levels 2-5
         b"x\x9c",  # level 6, zlib's default
         b"x\xda",  # levels 7-9, what WhatsApp uses now
         b"PK",
-    ]
+    )
     # A zlib header names a band of levels, not one level, so reproducing a stream from its
     # header alone means picking a representative: the top of each band, which is exact for
     # the only two levels WhatsApp has ever used, 1 and 9.
@@ -90,4 +96,4 @@ class C:
 
     # Constants for crypt12/14 key and db
     SUPPORTED_CIPHER_VERSION = b"\x00\x01"
-    SUPPORTED_KEY_VERSIONS: ClassVar[list[bytes]] = [b"\x01", b"\x02", b"\x03"]
+    SUPPORTED_KEY_VERSIONS: ClassVar[tuple[bytes, ...]] = (b"\x01", b"\x02", b"\x03")

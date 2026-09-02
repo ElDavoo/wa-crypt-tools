@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import hmac
 import json
@@ -192,8 +194,7 @@ def unknown_header_fields(header) -> list[str]:
             unknown = UnknownFieldSet(message)
         except (NotImplementedError, TypeError):  # pragma: no cover - implementation-dependent
             return
-        for field in unknown:
-            found.append(f"{message.DESCRIPTOR.name} field {field.field_number}")
+        found.extend(f"{message.DESCRIPTOR.name} field {field.field_number}" for field in unknown)
         for descriptor, value in message.ListFields():
             # is_repeated rather than the old label constant: protobuf 7 dropped label with
             # the move to editions.

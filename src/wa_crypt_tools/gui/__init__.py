@@ -7,6 +7,8 @@
 # it is meant to. The entry point in pyproject.toml is `wa_crypt_tools.gui:main`, so the name
 # still has to be reachable from the package; PEP 562 lets it be reachable without being eager.
 
+from __future__ import annotations
+
 
 def __getattr__(name: str):
     if name == "main":

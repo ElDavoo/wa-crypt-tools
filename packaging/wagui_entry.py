@@ -10,6 +10,8 @@ PyInstaller's analyser, so going through it would leave app.py out of the bundle
 failure the spec collects the protobuf modules by hand to avoid.
 """
 
+from __future__ import annotations
+
 import sys
 
 from wa_crypt_tools.gui.app import main

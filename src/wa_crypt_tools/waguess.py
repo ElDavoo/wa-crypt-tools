@@ -1,6 +1,8 @@
 # AES import party!
 # pycryptodome and PyCryptodomex's implementations of AES are the same,
 # so we try to import one of these twos.
+from __future__ import annotations
+
 import argparse
 import io
 import logging

@@ -2,6 +2,8 @@
 Key15: the crypt15 root key, and the three keys derived from it.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from wa_crypt_tools.lib.errors import InvalidKeyError

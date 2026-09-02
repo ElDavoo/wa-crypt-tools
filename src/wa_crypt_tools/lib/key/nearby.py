@@ -20,6 +20,8 @@ columns instead of across the rows -- which no amount of substituting one digit 
 will ever reach.
 """
 
+from __future__ import annotations
+
 from collections.abc import Iterable, Iterator
 from itertools import combinations
 

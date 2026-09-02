@@ -14,6 +14,8 @@ It never returns `spam` or `keep`. Deciding that a body which *says something* s
 useful is a judgement, and this file is deliberately only the part that is not one.
 """
 
+from __future__ import annotations
+
 import os
 import re
 import sys

@@ -6,6 +6,8 @@ zlib-ng (CPython 3.14+ on Windows) compresses differently, so only the plaintext
 across platforms. The one byte-for-byte check is guarded on that.
 """
 
+from __future__ import annotations
+
 import os.path
 import zlib
 from hashlib import md5

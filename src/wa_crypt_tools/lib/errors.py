@@ -10,6 +10,8 @@ what the tools' --force flag does. Everything else means there is nothing usable
 with.
 """
 
+from __future__ import annotations
+
 
 class WaCryptError(ValueError):
     """Base class of every error this library raises deliberately."""

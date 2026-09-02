@@ -18,6 +18,8 @@ The screenshots under tests/res/ are:
                                      (see utils/make_key_screenshot.py)
 """
 
+from __future__ import annotations
+
 import re
 from collections import Counter
 

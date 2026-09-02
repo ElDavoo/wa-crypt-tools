@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from hashlib import md5
 from os import urandom
@@ -29,10 +31,9 @@ class Database12(Database):
         googleid: bytes | None = None,
         iv: bytes | None = None,
     ):
-        """Checks if the file is a Crypt12 file.
-        Returns the cipher if it is, None otherwise."""
-
         """
+        Builds a crypt12 header, from a file, from a key, or from the parts.
+
         The crypt12 file format is similar to the crypt14 file format.
         It is a "raw" header, which means it's not a protobuf message,
         nor a serialized java object.
@@ -45,110 +46,79 @@ class Database12(Database):
         ( so we finally understood why the IV is at offset 51 ... )
         """
         self.file_hash = md5()
-        if encrypted and key:
-            self.cipher_version = encrypted.read(2)
+        if encrypted:
+            self._read_header(encrypted, key)
+        elif key:
+            self._from_key(key, iv)
+        else:
+            self._from_parts(cipher_version, key_version, serversalt, googleid, iv)
+        # Hashed once here, in header order, rather than field by field as each is worked out.
+        # Every branch above produces the same five fields in the same order, so the digest
+        # does not depend on which one ran -- which is what the four copies of these updates
+        # were quietly relying on.
+        for field in (self.cipher_version, self.key_version, self.serversalt, self.googleid, self.iv):
+            self.file_hash.update(field)
+
+    def _read_header(self, encrypted, key: Key14 | None):
+        """
+        Reads the header off the stream, checking it against `key` if there is one.
+
+        Each field is checked as soon as it is read, so a mismatch names the first field that
+        disagrees and leaves the stream where it went wrong.
+        """
+        self.cipher_version = encrypted.read(2)
+        if key:
             if self.cipher_version != key.get_cipher_version():
                 raise IntegrityError(f"Cipher version mismatch: {self.cipher_version} != {key.get_cipher_version()}")
-            self.file_hash.update(self.cipher_version)
-
-            self.key_version = encrypted.read(1)
-            if self.key_version != key.get_key_version():
-                raise IntegrityError(f"Key version mismatch: {self.key_version} != {key.get_key_version()}")
-            self.file_hash.update(self.key_version)
-
-            self.serversalt = encrypted.read(32)
-            if self.serversalt != key.get_serversalt():
-                raise IntegrityError(f"Server salt mismatch: {self.serversalt} != {key.get_serversalt()}")
-            self.file_hash.update(self.serversalt)
-
-            self.googleid = encrypted.read(16)
-            if self.googleid != key.get_googleid():
-                raise IntegrityError(f"Google ID mismatch: {self.googleid} != {key.get_googleid()}")
-            self.file_hash.update(self.googleid)
-
-            self.iv = encrypted.read(16)
-            self.file_hash.update(self.iv)
-        elif encrypted:
-            self.cipher_version = encrypted.read(2)
+        elif self.cipher_version != C.SUPPORTED_CIPHER_VERSION:
             # A crypt12 header has no magic of its own, so this is the only thing telling a
             # real one apart from any other file that happens to be long enough. Without it
             # DatabaseFactory's crypt12 fallback accepts arbitrary input and reports garbage.
-            if self.cipher_version != C.SUPPORTED_CIPHER_VERSION:
-                raise IntegrityError(
-                    f"Unsupported cipher version: {self.cipher_version.hex()}.\n    "
-                    "This does not look like a crypt12, 14 or 15 database."
-                )
-            self.file_hash.update(self.cipher_version)
+            raise IntegrityError(
+                f"Unsupported cipher version: {self.cipher_version.hex()}.\n    "
+                "This does not look like a crypt12, 14 or 15 database."
+            )
 
-            self.key_version = encrypted.read(1)
-            # if test_bytes != key.get_key_version():
-            #    quit_12()
-            self.file_hash.update(self.key_version)
+        self.key_version = encrypted.read(1)
+        if key and self.key_version != key.get_key_version():
+            raise IntegrityError(f"Key version mismatch: {self.key_version} != {key.get_key_version()}")
 
-            self.serversalt = encrypted.read(32)
-            # if test_bytes != key.get_serversalt():
-            #    quit_12()
-            self.file_hash.update(self.serversalt)
+        self.serversalt = encrypted.read(32)
+        if key and self.serversalt != key.get_serversalt():
+            raise IntegrityError(f"Server salt mismatch: {self.serversalt} != {key.get_serversalt()}")
 
-            self.googleid = encrypted.read(16)
-            # if test_bytes != key.get_googleid():
-            #    quit_12()
-            self.file_hash.update(self.googleid)
+        self.googleid = encrypted.read(16)
+        if key and self.googleid != key.get_googleid():
+            raise IntegrityError(f"Google ID mismatch: {self.googleid} != {key.get_googleid()}")
 
-            self.iv = encrypted.read(16)
-            self.file_hash.update(self.iv)
-        elif key:
-            self.cipher_version = key.get_cipher_version()
-            self.file_hash.update(self.cipher_version)
-            self.key_version = key.get_key_version()
-            self.file_hash.update(self.key_version)
-            self.serversalt = key.get_serversalt()
-            self.file_hash.update(self.serversalt)
-            self.googleid = key.get_googleid()
-            self.file_hash.update(self.googleid)
-            if iv:
-                self.iv = iv
-            else:
-                self.iv = urandom(16)
-            self.file_hash.update(self.iv)
-        else:
-            if cipher_version:
-                if cipher_version == C.SUPPORTED_CIPHER_VERSION:
-                    self.cipher_version = cipher_version
-                    self.file_hash.update(self.cipher_version)
-                else:
-                    raise InvalidKeyError(f"Unsupported cipher version provided: {cipher_version.hex()}")
-            else:
-                self.cipher_version = C.SUPPORTED_CIPHER_VERSION
-                self.file_hash.update(self.cipher_version)
+        self.iv = encrypted.read(16)
 
-            if key_version:
-                if key_version in C.SUPPORTED_KEY_VERSIONS:
-                    self.key_version = key_version
-                    self.file_hash.update(self.key_version)
-                else:
-                    raise InvalidKeyError(f"Unsupported key version provided: {key_version.hex()}")
-            else:
-                self.key_version = C.SUPPORTED_KEY_VERSIONS[-1]
-                self.file_hash.update(self.key_version)
+    def _from_key(self, key: Key14, iv: bytes | None):
+        """Every field but the IV comes off the key; that is what waencrypt needs."""
+        self.cipher_version = key.get_cipher_version()
+        self.key_version = key.get_key_version()
+        self.serversalt = key.get_serversalt()
+        self.googleid = key.get_googleid()
+        self.iv = iv if iv else urandom(16)
 
-            if serversalt:
-                self.serversalt = serversalt
-            else:
-                self.serversalt = urandom(32)
-            self.file_hash.update(self.serversalt)
-
-            if googleid:
-                self.googleid = googleid
-            else:
-                self.googleid = urandom(16)
-            self.file_hash.update(self.googleid)
-
-            if iv:
-                self.iv = iv
-            else:
-                self.iv = urandom(16)
-            self.file_hash.update(self.iv)
+    def _from_parts(
+        self,
+        cipher_version: bytes | None,
+        key_version: bytes | None,
+        serversalt: bytes | None,
+        googleid: bytes | None,
+        iv: bytes | None,
+    ):
+        """A header out of thin air: whatever was supplied, and a random or default rest."""
+        if cipher_version and cipher_version != C.SUPPORTED_CIPHER_VERSION:
+            raise InvalidKeyError(f"Unsupported cipher version provided: {cipher_version.hex()}")
+        if key_version and key_version not in C.SUPPORTED_KEY_VERSIONS:
+            raise InvalidKeyError(f"Unsupported key version provided: {key_version.hex()}")
+        self.cipher_version = cipher_version or C.SUPPORTED_CIPHER_VERSION
+        self.key_version = key_version or C.SUPPORTED_KEY_VERSIONS[-1]
+        self.serversalt = serversalt or urandom(32)
+        self.googleid = googleid or urandom(16)
+        self.iv = iv or urandom(16)
 
     def __str__(self):
         return f"""cipher_version: {self.cipher_version}

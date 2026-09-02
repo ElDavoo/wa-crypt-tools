@@ -7,6 +7,8 @@ here is the wiring itself: that the widgets come up, that the fields feed core, 
 worker's result gets back into the pane it belongs in.
 """
 
+from __future__ import annotations
+
 import time
 
 import pytest

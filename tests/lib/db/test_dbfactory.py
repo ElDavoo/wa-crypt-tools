@@ -2,6 +2,8 @@
 DatabaseFactory.from_file: the one place in the library that branches on the backup version.
 """
 
+from __future__ import annotations
+
 import io
 
 import pytest

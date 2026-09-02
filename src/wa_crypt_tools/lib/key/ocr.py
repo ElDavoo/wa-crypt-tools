@@ -50,6 +50,8 @@ And `single_threaded()` pins OMP_THREAD_LIMIT for the duration, because Tesserac
 against OpenMP is several times slower on this workload when left to use every core.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import re

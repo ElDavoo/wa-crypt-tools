@@ -5,6 +5,8 @@ Library modules only ever call log.error(...); whether the user sees anything at
 decided here.
 """
 
+from __future__ import annotations
+
 import logging
 
 from wa_crypt_tools.lib.logformat import CustomFormatter, setup_logging

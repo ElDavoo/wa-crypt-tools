@@ -11,6 +11,8 @@ decryption driven by it has to produce exactly tests/res/msgstore.db -- which ma
 end-to-end test of the feature and not just of the reader.
 """
 
+from __future__ import annotations
+
 from os.path import exists
 
 import pytest

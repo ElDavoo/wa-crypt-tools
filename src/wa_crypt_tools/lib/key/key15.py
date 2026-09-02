@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from os import urandom
 from pathlib import Path

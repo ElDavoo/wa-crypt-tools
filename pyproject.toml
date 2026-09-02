@@ -101,6 +101,13 @@ select = [
     "TRY201",      # `raise e` inside `except ... as e` instead of a bare `raise`
 ]
 
+# `from __future__ import annotations` was in twelve files and missing from fifteen, with
+# nothing distinguishing the two groups. Required everywhere rather than removed everywhere: it
+# is what lets an annotation name something imported only for typing, it keeps annotations from
+# being evaluated at import, and it is the semantics Python is moving to anyway.
+[tool.ruff.lint.isort]
+required-imports = ["from __future__ import annotations"]
+
 [tool.ruff.lint.per-file-ignores]
 # The NullHandler has to be attached before the submodules are imported, or importing this
 # library as a library warns on any log record it emits. That puts the re-exports below it.

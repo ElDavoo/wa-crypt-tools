@@ -7,6 +7,8 @@ none of them ran it at all, and `wainfo <any crypt14>` died with
 "AttributeError: 'Database14' object has no attribute 'cipher_version'".
 """
 
+from __future__ import annotations
+
 import pytest
 
 from tests.utils.utils import Propen, rm_if_found

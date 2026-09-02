@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import io
 import zlib
 from hashlib import sha512

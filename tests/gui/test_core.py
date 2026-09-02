@@ -7,6 +7,8 @@ name before doing any work, and which sentence a failure deserves. gui/app.py is
 only widget wiring, which test_app.py smoke-tests.
 """
 
+from __future__ import annotations
+
 import logging
 import queue
 from pathlib import PureWindowsPath

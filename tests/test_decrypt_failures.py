@@ -6,6 +6,8 @@ authentication tag did not match still had its plaintext returned to the caller,
 unusable key file surfaced later as an AttributeError on None.
 """
 
+from __future__ import annotations
+
 import io
 import zlib
 

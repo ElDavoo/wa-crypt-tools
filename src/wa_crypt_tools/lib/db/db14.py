@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from hashlib import md5
 from os import urandom

@@ -5,6 +5,8 @@ The version is guessed from the length of the deserialized payload, so the lengt
 whole contract.
 """
 
+from __future__ import annotations
+
 import pytest
 from javaobj import JavaObjectMarshaller
 

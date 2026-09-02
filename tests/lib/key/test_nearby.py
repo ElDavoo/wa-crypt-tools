@@ -13,6 +13,8 @@ that no amount of substituting single digits will reach -- two digits swapped ro
 4x4 grid copied down the columns.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from wa_crypt_tools.lib.key import nearby

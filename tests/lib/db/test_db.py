@@ -5,6 +5,8 @@ Version-specific behaviour lives in the three subclasses; what the base class gu
 that all three of them answer the same four calls.
 """
 
+from __future__ import annotations
+
 import inspect
 
 import pytest

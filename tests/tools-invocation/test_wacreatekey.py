@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from hashlib import sha512
 from os.path import exists
 
