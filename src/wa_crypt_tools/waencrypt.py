@@ -5,18 +5,25 @@ import logging
 import sys
 import zlib
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from Cryptodome.Cipher import AES
 
 from wa_crypt_tools.lib.constants import C
+from wa_crypt_tools.lib.db.db import Database
 from wa_crypt_tools.lib.db.db12 import Database12
 from wa_crypt_tools.lib.db.db14 import Database14
 from wa_crypt_tools.lib.db.db15 import Database15
 from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
 from wa_crypt_tools.lib.errors import IntegrityError, WaCryptError
+from wa_crypt_tools.lib.key.key14 import Key14
+from wa_crypt_tools.lib.key.key15 import Key15
 from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 from wa_crypt_tools.lib.logformat import setup_logging
 from wa_crypt_tools.lib.props import Props
+
+if TYPE_CHECKING:
+    from wa_crypt_tools.proto.backup_prefix_pb2 import BackupPrefix
 
 log = logging.getLogger(__name__)
 
@@ -151,6 +158,25 @@ def compression_level_of(key, reference, stream):
     return level
 
 
+def database_for(kind: int, key: Key14 | Key15, iv: bytes | None) -> Database[Any]:
+    """
+    The database for --type `kind`, or a fatal error if the key cannot build that format.
+
+    Database[Any] because the two halves cannot be narrowed together: the format comes from
+    --type and the kind of key from whatever the keyfile turned out to hold. The one pairing
+    that cannot work is checked here instead.
+    """
+    if kind == 15:
+        return Database15(iv=iv)
+    if not isinstance(key, Key14):
+        # A crypt12 or crypt14 header is built out of the key file's own cipher version,
+        # server salt and google id, and a crypt15 key has none of them. Without this the
+        # tool reached for them anyway and died on an AttributeError halfway through.
+        log.fatal("A crypt%d backup needs a crypt14 key file, and this key is a crypt15 one.", kind)
+        sys.exit(1)
+    return Database14(iv=iv) if kind == 14 else Database12(key=key, iv=iv)
+
+
 def encrypt(args):
     # Before anything else, and before the output is opened: refusing after the fact would
     # mean the file had already been emptied.
@@ -160,10 +186,10 @@ def encrypt(args):
     # Read the key file
     key = KeyFactory.new(args.keyfile)
     # If specified, use the IV from the command line
-    iv = None
-    props = None
-    prefix = None
-    feature_table = None
+    iv: bytes | None = None
+    props: Props | None = None
+    prefix: BackupPrefix | None = None
+    feature_table: bool | None = None
     if not args.reference:
         if args.iv:
             iv = bytes.fromhex(args.iv)
@@ -183,7 +209,7 @@ def encrypt(args):
                 raise
             log.error("%s\n    Continuing anyway because --force was given.", e)
             reference = e.data
-        iv: bytes = reference.get_iv()
+        iv = reference.get_iv()
         props = reference.props
         # The reference's own header, carried through to the output: it may hold fields this
         # schema does not model, and reproducing the reference means keeping them.
@@ -194,12 +220,7 @@ def encrypt(args):
     if args.compression_level is None:
         args.compression_level = C.DEFAULT_COMPRESSION_LEVEL
     data = args.decrypted.read()
-    if args.type == 15:
-        db = Database15(iv=iv)
-    elif args.type == 14:
-        db = Database14(iv=iv)
-    else:
-        db = Database12(key=key, iv=iv)
+    db = database_for(args.type, key, iv)
     db.prefix = prefix
     db.feature_table = feature_table
     if args.no_compress:
@@ -212,5 +233,7 @@ def encrypt(args):
     args.decrypted.close()
 
 
-if __name__ == "__main__":
+# Excluded from coverage like gui/app.py's: the tests reach main() through the console
+# script, and this branch only fires on `python -m wa_crypt_tools.waencrypt`.
+if __name__ == "__main__":  # pragma: no cover
     main()

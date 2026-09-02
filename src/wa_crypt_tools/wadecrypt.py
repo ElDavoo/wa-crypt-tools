@@ -33,16 +33,6 @@ except ModuleNotFoundError:
         # noinspection PyUnresolvedReferences
         # The rebind is the whole point of the fallback, so mypy's no-redef does not apply.
         from Crypto.Cipher import AES  # type: ignore[no-redef]
-
-        if not hasattr(AES, "MODE_GCM"):
-            # pycrypto
-            raise ModuleNotFoundError(
-                "You installed pycrypto and not pycryptodome(x). "
-                "Pycrypto is old, deprecated and not supported. \n"
-                "Run: python -m pip uninstall pycrypto\n"
-                "And: python -m pip install pycryptodomex\n"
-                "Or:  python -m pip install pycryptodome"
-            )
     except ModuleNotFoundError:
         # crypto (or nothing)
         raise ModuleNotFoundError(
@@ -51,6 +41,19 @@ except ModuleNotFoundError:
             "Or: python -m pip install pycryptodome\n"
             'You can also remove "crypto" if you have it installed\n'
             "python -m pip uninstall crypto"
+        ) from None
+
+    # Outside the try above, not inside it: raised in there, this ModuleNotFoundError was
+    # caught by that block's own `except ModuleNotFoundError` and replaced with the "you need
+    # pycryptodome(x)" message -- so the one case it exists to name could never be named.
+    if not hasattr(AES, "MODE_GCM"):
+        # pycrypto: `import Crypto` succeeds, and nothing else about it does.
+        raise ModuleNotFoundError(
+            "You installed pycrypto and not pycryptodome(x). "
+            "Pycrypto is old, deprecated and not supported. \n"
+            "Run: python -m pip uninstall pycrypto\n"
+            "And: python -m pip install pycryptodomex\n"
+            "Or:  python -m pip install pycryptodome"
         ) from None
 # noinspection PyPackageRequirements
 # This is from javaobj-py3
@@ -482,5 +485,7 @@ def forced(args, error: IntegrityError):
     return error.data
 
 
-if __name__ == "__main__":
+# Excluded from coverage like gui/app.py's: the tests reach main() through the console
+# script, and this branch only fires on `python -m wa_crypt_tools.wadecrypt`.
+if __name__ == "__main__":  # pragma: no cover
     main()
