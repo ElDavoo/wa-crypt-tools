@@ -6,6 +6,9 @@ resolves if the output directory happens to be on sys.path. Inside a package it
 must be ``from . import foo_pb2 as foo__pb2``. This rewrites those lines and
 leaves the rest of the generated file exactly as protoc wrote it.
 
+The ``.pyi`` stubs mypy-protobuf writes alongside them have the same problem and
+take the same fix, so both suffixes are rewritten.
+
 Usage (after running protoc):
 
     python proto/fix_imports.py ../src/wa_crypt_tools/proto
@@ -35,7 +38,7 @@ def main(argv: list[str]) -> int:
         return 2
 
     out = Path(argv[1])
-    generated = sorted(out.glob("*_pb2.py"))
+    generated = sorted(out.glob("*_pb2.py")) + sorted(out.glob("*_pb2.pyi"))
     if not generated:
         print(f"no *_pb2.py files found in {out}", file=sys.stderr)
         return 1
