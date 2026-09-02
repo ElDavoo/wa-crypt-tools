@@ -16,7 +16,7 @@ import pytest
 
 from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
 from wa_crypt_tools.lib.key.keyfactory import KeyFactory
-from wa_crypt_tools.wadecrypt import PROBE_BYTES, key_works
+from wa_crypt_tools.wadecrypt import PROBE_BYTES, corrected, key_works
 
 #: The root key of tests/res/encrypted_backup.key, which every crypt15 fixture is under.
 ROOT = "6730a595a1484d0c39c101dc0ac82ec5e401bb6f0e1b8ee2dc104a6b3687f017"
@@ -62,6 +62,43 @@ class TestKeyWorks:
         # succeed on the next candidate.
         iv, probe = probe_of("tests/res/msgstore.db.crypt15")
         assert not key_works(b"\x00" * 16, iv, probe)
+
+
+class TestProbingTheBackup:
+    """
+    `corrected` reads a little ciphertext to check the key against, and puts the stream back.
+
+    It runs on a stream the caller is about to decrypt from, so getting that wrong would
+    break a decryption that was going to work. When the stream cannot be rewound it does
+    nothing at all, which is what it did before any of this existed.
+    """
+
+    def test_a_stream_that_cannot_be_rewound_leaves_the_key_alone(self):
+        key = KeyFactory.from_file("tests/res/encrypted_backup.key")
+        with open("tests/res/msgstore.db.crypt15", "rb") as f:
+            db = DatabaseFactory.from_file(f)
+            # The key is given as 64 digits rather than as the file, so that this is a key
+            # the repair would otherwise have something to say about.
+            assert corrected(key, ROOT, Unrewindable(f), db.get_iv()) is key
+
+    def test_a_key_file_is_never_second_guessed(self):
+        # Its digits came out of WhatsApp's own file byte for byte; there is no misreading
+        # to repair, so the backup is not even probed.
+        key = KeyFactory.from_file("tests/res/encrypted_backup.key")
+        assert corrected(key, "tests/res/encrypted_backup.key", None, b"\x00" * 16) is key
+
+
+class Unrewindable:
+    """A stream that reads but cannot say where it is -- a pipe, in other words."""
+
+    def __init__(self, wrapped):
+        self._wrapped = wrapped
+
+    def tell(self):
+        raise OSError("underlying stream is not seekable")
+
+    def read(self, size=-1):
+        return self._wrapped.read(size)
 
 
 class TestTheKeyItIsCheckedAgainst:

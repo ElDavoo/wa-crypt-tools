@@ -66,5 +66,7 @@ def main():
         sys.exit(1)
 
 
-if __name__ == "__main__":
+# Excluded from coverage like gui/app.py's: the tests reach main() through the console
+# script, and this branch only fires on `python -m wa_crypt_tools.wainfo`.
+if __name__ == "__main__":  # pragma: no cover
     main()

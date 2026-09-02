@@ -10,6 +10,7 @@ only widget wiring, which test_app.py smoke-tests.
 from __future__ import annotations
 
 import logging
+import pathlib
 import queue
 from pathlib import PureWindowsPath
 
@@ -214,6 +215,18 @@ class TestProblems:
         assert len(problems) == 1
         assert "backup you are decrypting" in problems[0]
 
+    def test_a_path_the_system_cannot_resolve_is_not_called_the_same_file(self, tmp_path, monkeypatch):
+        # Deciding whether two paths are one file means asking the filesystem, and the
+        # filesystem can refuse -- a dead symlink loop, a mount that has gone away. The
+        # answer then is "not the same", which lets the rest of the form be checked instead
+        # of the whole dialog failing on a question that was only a safety net.
+        def refuses(_self, *_args, **_kwargs):
+            raise OSError("cannot resolve that")
+
+        monkeypatch.setattr(pathlib.Path, "resolve", refuses)
+        problems = self.good(tmp_path, output="tests/res/msgstore.db.crypt15", overwrite=True)
+        assert problems == []
+
     def test_reports_every_problem_at_once(self, tmp_path):
         # One trip to the user, not one per mistake.
         assert len(self.good(tmp_path, key="", encrypted="", output="")) == 3
@@ -238,6 +251,11 @@ class TestFriendly:
             open("tests/res/there-is-no-such-file", "rb")
         except OSError as e:
             assert "there-is-no-such-file" in core.friendly(e)
+
+    def test_an_os_error_with_no_file_to_name_falls_back_to_its_own_words(self):
+        # Not every OSError carries a filename -- a broken pipe or a full disk does not --
+        # and "None" is not a sentence to put in a dialog.
+        assert core.friendly(OSError("the disk went away")) == "the disk went away"
 
     def test_anything_else_still_says_something(self):
         assert "boom" in core.friendly(RuntimeError("boom"))
@@ -343,6 +361,16 @@ class TestRunDecrypt:
         out.write_bytes(b"precious")
         core.run_decrypt(key=KEY15, encrypted="tests/res/msgstore.db.crypt15", output=str(out), overwrite=True)
         assert cmp_files(str(out), PLAIN)
+
+    def test_try_harder_refuses_an_existing_output_before_opening_anything(self, tmp_path):
+        # The staging file is created inside the try harder path, so this check has to come
+        # first: with Overwrite unticked, an existing file is the user's and stays theirs.
+        out = tmp_path / "msgstore.db"
+        out.write_bytes(b"precious")
+        with pytest.raises(WaCryptError, match="already exists"):
+            core.run_decrypt(key=KEY15, encrypted="tests/res/msgstore.db.crypt15", output=str(out), try_harder=True)
+        assert out.read_bytes() == b"precious"
+        assert list(tmp_path.iterdir()) == [out]
 
     def test_a_failed_try_harder_leaves_no_output_behind(self, tmp_path):
         # waguess opens its output for writing before it knows whether it can decrypt, so

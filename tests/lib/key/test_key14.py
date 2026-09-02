@@ -142,3 +142,9 @@ class TestKey14Serialization:
         for field in (KEY, SALT, GOOGLEID, b"\x02", b"\x00\x01"):
             assert field.hex() in string
         assert repr(key) == string
+
+    def test_printing_a_broken_key_reports_instead_of_raising(self):
+        # See Key15's twin of this: printing a key must never be the thing that raises.
+        key = Key14(key=KEY, serversalt=SALT, googleid=GOOGLEID, key_version=b"\x02")
+        key._Key14__serversalt = "not bytes"
+        assert str(key).startswith("Exception printing key: ")

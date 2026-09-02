@@ -109,6 +109,27 @@ class TestHeaderSizeVarint:
         db = DatabaseFactory.from_file(as_stream(crypt15_header_over_255_bytes(iv=b"\x00" * 16)))
         assert len(db.prefix.passkey_encryption_metadata.client_metadata) == 512
 
+    def test_a_file_that_ends_inside_the_size_prefix_says_so(self):
+        # Every byte of a varint with its continuation bit set promises another one. A file
+        # that stops there is truncated, and reading it as a size would give a header length
+        # taken from bytes that are not in the file.
+        with pytest.raises(HeaderError, match="file ended while reading the header size"):
+            DatabaseFactory.from_file(as_stream(b"\x80"))
+
+    def test_a_size_prefix_that_never_ends_is_refused(self):
+        # Five continuation bytes is already more than any 32-bit size needs, so a sixth is
+        # not a big header: it is not a header at all.
+        with pytest.raises(HeaderError, match="header size varint is too long"):
+            DatabaseFactory.from_file(as_stream(b"\x80" * 6 + b"\x01"))
+
+    def test_a_size_prefix_longer_than_the_header_it_prefixes_says_so(self):
+        # The size and the message have to agree: a size larger than what follows means the
+        # file is truncated, and protobuf would otherwise parse the short read happily.
+        header = crypt15_header(iv=b"\x00" * 16)
+        truncated = encode_varint(len(header)) + header[1:]
+        with pytest.raises(HeaderError, match="Protobuf message not fully read"):
+            DatabaseFactory.from_file(as_stream(truncated))
+
     def test_it_survives_a_re_encryption(self):
         key = KeyFactory.new("tests/res/encrypted_backup.key")
         reference = DatabaseFactory.from_file(as_stream(crypt15_header_over_255_bytes(iv=bytes(range(16)))))

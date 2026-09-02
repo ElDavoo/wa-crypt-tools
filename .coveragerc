@@ -12,6 +12,14 @@ omit =
     */proto/*
 
 [report]
+# An abstract method's body -- the `pass` under @abstractmethod in db/db.py and key/key.py.
+# Every subclass overrides it and the base class cannot be instantiated, so those eight lines
+# were counted as untested code that no test could ever reach. `exclude_also` adds to
+# coverage's defaults rather than replacing them, so "# pragma: no cover" and the built-in
+# rule for `if TYPE_CHECKING:` blocks both keep working.
+exclude_also =
+    @(abc\.)?abstractmethod
+
 # A ratchet against a real regression, not a target to chase: at the current number every
 # refactor that moves a few lines goes red.
 #

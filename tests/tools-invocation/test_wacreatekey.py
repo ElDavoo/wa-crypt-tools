@@ -86,6 +86,24 @@ class TestWaCreateKey:
             # cleanup
             rm_if_found("encrypted_backup.key")
 
+    def test_crypt14_only_options_are_ignored_with_a_warning_for_a_crypt15_key(self):
+        # A crypt15 key is 32 bytes and nothing else, so none of these have anywhere to go.
+        # Refusing them would be unhelpful for what is plainly a copied-and-pasted command
+        # line; ignoring them silently would leave the user believing they took effect.
+        assert not exists("encrypted_backup.key")
+        try:
+            out, ret = Propen(
+                "wacreatekey -cv 1 -kv 2"
+                " -ss cd788b1b4625f50d3fccdeac94e1ff638899733b77a224ff614918363901f044"
+                " -gi 92683e735c88727eef9486911f3ac6fa"
+            )
+            assert ret == 0, out
+            for ignored in ("Cipher version", "Key version", "Server salt", "Google id"):
+                assert f"{ignored} specified, but it is not used for crypt15 keys, ignoring." in out
+            KeyFactory.from_file("encrypted_backup.key")
+        finally:
+            rm_if_found("encrypted_backup.key")
+
     def test_crypt14_key(self):
         assert not exists("key")
         try:

@@ -10,6 +10,7 @@ handling -- none of which the in-RAM path exercises.
 from __future__ import annotations
 
 import zlib
+from os.path import exists, getsize
 
 import pytest
 
@@ -90,9 +91,12 @@ class TestEveryFormatThroughTheCli:
         finally:
             rm_if_found(OUT)
 
-    def test_no_decompress_writes_the_raw_zlib_stream(self, key, backup):
+    @pytest.mark.parametrize("mode", ["", "-nm "], ids=["in-ram", "streaming"])
+    def test_no_decompress_writes_the_raw_zlib_stream(self, key, backup, mode):
+        # Both modes, because each has its own copy of the decompress-or-not handling: the
+        # streaming one has to keep the choice across every chunk and across the trailer.
         try:
-            out, ret = Propen(f"wadecrypt -nd {key} {backup} {OUT}")
+            out, ret = Propen(f"wadecrypt {mode}-nd {key} {backup} {OUT}")
             assert ret == 0, out
             with open(OUT, "rb") as f:
                 raw = f.read()
@@ -125,9 +129,58 @@ class TestTruncatedBackups:
     def test_force_writes_the_partial_output_anyway(self):
         out, ret = Propen(f"wadecrypt -nm -f {KEY15} {TRUNCATED} {OUT}")
         assert ret == 0, out
-        from os.path import exists, getsize
-
         assert exists(OUT) and getsize(OUT) > 0
+
+
+class TestBufferSizes:
+    """-bs is checked before the output file is touched, since it decides the whole read loop."""
+
+    def teardown_method(self):
+        rm_if_found(OUT)
+
+    @pytest.mark.parametrize("size", ["0", "1", "-1"])
+    def test_a_buffer_size_that_cannot_work_is_refused(self, size):
+        out, ret = Propen(["wadecrypt", "-bs", size, KEY15, "tests/res/msgstore.db.crypt15", OUT])
+        assert ret != 0
+        assert "Invalid buffer size" in out
+        assert not exists(OUT)
+
+    def test_the_wrong_key_is_reported_chunk_by_chunk_and_still_written_under_force(self):
+        # The streaming path has its own copy of the "is this even zlib" handling, one that
+        # has to keep writing after it has given up on decompressing: the first chunk decides
+        # and every later one follows it.
+        out, ret = Propen(["wadecrypt", "-bs", "4096", "-f", KEY14, "tests/res/msgstore.db.crypt15", OUT])
+        assert ret == 0, out
+        assert "I can't recognize decrypted data" in out
+        assert exists(OUT) and getsize(OUT) > 4096
+
+
+class TestAFileWithNoCiphertext:
+    """A backup whose header is all there is: nothing to decrypt, and it has to say so."""
+
+    HEADER_ONLY = "wadecrypt-header-only.crypt15"
+
+    def setup_method(self):
+        # The factory leaves the stream on the first ciphertext byte, which is exactly where
+        # this file has to stop.
+        from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
+
+        with open("tests/res/msgstore.db.crypt15", "rb") as f:
+            DatabaseFactory.from_file(f)
+            header_length = f.tell()
+            f.seek(0)
+            header = f.read(header_length)
+        with open(self.HEADER_ONLY, "wb") as f:
+            f.write(header)
+
+    def teardown_method(self):
+        rm_if_found(self.HEADER_ONLY)
+        rm_if_found(OUT)
+
+    def test_streaming_says_the_file_is_empty_or_truncated(self):
+        out, ret = Propen(f"wadecrypt -nm {KEY15} {self.HEADER_ONLY} {OUT}")
+        assert ret != 0
+        assert "empty or truncated" in out
 
 
 class TestMultiFileBackups:

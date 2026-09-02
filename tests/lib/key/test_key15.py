@@ -56,3 +56,10 @@ class TestKey15:
         key = Key15(key=ROOT)
         assert str(key) == f"Key15(key: {ROOT.hex()})"
         assert repr(key) == str(key)
+
+    def test_printing_a_broken_key_reports_instead_of_raising(self):
+        # __str__ is called from log formatting and from debuggers, so it has to survive a
+        # key that should not exist -- a second traceback from inside the first helps nobody.
+        key = Key15(key=ROOT)
+        key._Key15__key = "not bytes"
+        assert str(key).startswith("Exception printing key: ")

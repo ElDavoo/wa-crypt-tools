@@ -265,6 +265,26 @@ class TestReadingRealScreenshots:
 
 
 class TestWithoutTheExtra:
+    def test_a_missing_tesseract_binary_names_the_package_to_install(self, monkeypatch):
+        # The other half of the extra: the Python packages import fine and the program they
+        # shell out to is not there. pytesseract reports that as a TesseractNotFoundError,
+        # which subclasses OSError -- so without its own branch it came back as "could not
+        # read the image", blaming the screenshot for a missing binary.
+        pytest.importorskip("pytesseract", reason="needs the [ocr] extra")
+        import pytesseract
+
+        ocr._read.cache_clear()
+
+        def not_installed(*_args, **_kwargs):
+            raise pytesseract.TesseractNotFoundError()
+
+        monkeypatch.setattr(pytesseract, "image_to_data", not_installed)
+        try:
+            with pytest.raises(InvalidKeyError, match="tesseract program is not installed"):
+                ocr.key_from_image(ANDROID)
+        finally:
+            ocr._read.cache_clear()
+
     def test_the_error_names_the_extra_to_install(self, monkeypatch):
         # What someone who never installed it sees. Hiding the import is the only way to
         # reach this on a machine where it *is* installed -- and the read cache has to go

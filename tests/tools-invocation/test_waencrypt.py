@@ -146,11 +146,51 @@ def without_feature_table_flag(source: str, dest: str):
         f.write(header + body + md5(header + body).digest())
 
 
+def with_a_short_iv(source: str, dest: str) -> None:
+    """Rewrites a backup's header with a 12-byte IV, which DatabaseFactory refuses to trust."""
+    import io
+
+    from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
+    from wa_crypt_tools.lib.utils import encode_varint
+
+    raw = open(source, "rb").read()
+    stream = io.BufferedReader(io.BytesIO(raw))
+    db = DatabaseFactory.from_file(stream)
+    body = raw[stream.tell() : -16]
+    db.prefix.e2ee_key_data.encryption_iv = db.prefix.e2ee_key_data.encryption_iv[:12]
+    serialized = db.prefix.SerializeToString()
+    header = encode_varint(len(serialized)) + serialized
+    with open(dest, "wb") as f:
+        f.write(header + body + md5(header + body).digest())
+
+
 class TestReference:
     """--reference copies the props off a real backup, which is the documented workflow."""
 
     def teardown_method(self):
         cleanup()
+
+    def test_a_reference_whose_header_does_not_add_up_is_refused(self, tmp_path):
+        # Without --force the reference's own IntegrityError comes straight back out: this
+        # is a tool for reproducing a backup, and reproducing one whose header was not
+        # understood would produce something that is not that backup.
+        ref = str(tmp_path / "short-iv.crypt15")
+        with_a_short_iv("tests/res/msgstore.db.crypt15", ref)
+        out, ret = Propen(["waencrypt", "--reference", ref, KEY15, PLAIN, OUT])
+        assert ret != 0
+        assert "IV is not 16 bytes long but is 12" in out
+        assert not os.path.exists(OUT)
+
+    def test_force_gets_past_the_reference_and_stops_on_the_iv_itself(self, tmp_path):
+        # --force is about reading the reference, not about writing nonsense: it gets past
+        # the header that could not be trusted and then refuses the same 12-byte IV again,
+        # this time because there is no encrypting anything with it.
+        ref = str(tmp_path / "short-iv.crypt15")
+        with_a_short_iv("tests/res/msgstore.db.crypt15", ref)
+        out, ret = Propen(["waencrypt", "--force", "--reference", ref, KEY15, PLAIN, OUT])
+        assert ret != 0
+        assert "Continuing anyway because --force was given" in out
+        assert not os.path.exists(OUT)
 
     def test_a_crypt15_reference_reproduces_the_original(self):
         # The fixture is a 2.22 backup, compressed at level 1, and no -c is passed here:
@@ -247,6 +287,17 @@ class TestFailures:
         out, ret = Propen(f"waencrypt --reference tests/res/test.json {KEY15} {PLAIN} {OUT}")
         assert ret != 0
         assert "does not look like a crypt12, 14 or 15 database" in out
+
+    @pytest.mark.parametrize("type_", ["12", "14"])
+    def test_a_crypt15_key_cannot_build_an_older_format(self, type_):
+        # crypt12 and crypt14 headers are built out of the key file's own cipher version,
+        # server salt and google id, and a crypt15 key has none of them. This used to reach
+        # for them anyway and die on an AttributeError halfway through writing the header.
+        out, ret = Propen(["waencrypt", "--type", type_, KEY15, PLAIN, OUT])
+        assert ret != 0
+        assert "needs a crypt14 key file" in out
+        assert "AttributeError" not in out
+        assert not os.path.exists(OUT)
 
 
 class TestCompressionLevel:

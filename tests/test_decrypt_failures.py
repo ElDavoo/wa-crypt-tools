@@ -9,14 +9,17 @@ unusable key file surfaced later as an AttributeError on None.
 from __future__ import annotations
 
 import io
+import logging
 import zlib
+from hashlib import md5
 
 import pytest
 
 from wa_crypt_tools.lib.db.db12 import Database12
 from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
-from wa_crypt_tools.lib.errors import HeaderError, IntegrityError, InvalidKeyError
+from wa_crypt_tools.lib.errors import DecryptionError, HeaderError, IntegrityError, InvalidKeyError
 from wa_crypt_tools.lib.key.keyfactory import KeyFactory
+from wa_crypt_tools.wadecrypt import chunked_decrypt
 
 
 def as_stream(data: bytes) -> io.BufferedReader:
@@ -87,6 +90,60 @@ class TestDecryptionFailures:
     def test_a_zip_is_not_a_backup_either(self):
         with pytest.raises(IntegrityError):
             DatabaseFactory.from_file(as_stream(read("tests/res/test9.zip")))
+
+
+class TestChunkedDecryptFailures:
+    """
+    wadecrypt's streaming path, driven directly.
+
+    Its own guard clauses are unreachable from the command line -- by the time decrypt()
+    calls it the cipher has been built and the file has been opened -- but each of them is
+    the difference between a message and a traceback, so they are checked here.
+    """
+
+    def test_no_cipher_at_all(self):
+        with pytest.raises(DecryptionError, match="Could not create a decryption cipher"):
+            chunked_decrypt(md5(), None, io.BytesIO(b""), io.BytesIO())
+
+    def test_a_buffer_too_small_to_hold_the_trailer_falls_back_to_the_default(self, caplog):
+        # The trailer is 36 bytes and the loop keeps two chunks; below 17 there is no window
+        # to slide, so the value is replaced rather than honoured.
+        with caplog.at_level(logging.INFO), pytest.raises(HeaderError):
+            chunked_decrypt(md5(), _NullCipher(), io.BytesIO(b""), io.BytesIO(), buffer_size=4)
+        assert "Invalid buffer size, will use default" in caplog.text
+
+    def test_a_read_that_runs_out_of_memory_says_what_to_do_about_it(self, caplog):
+        # Reported and broken out of rather than propagated: what was decrypted before it ran
+        # out is already written, and the advice that fits is a smaller buffer. The file is
+        # then short of its trailer, which is the IntegrityError that comes back.
+        with caplog.at_level(logging.CRITICAL), pytest.raises(IntegrityError, match="truncated"):
+            chunked_decrypt(md5(), _NullCipher(), _OutOfMemory(b"first chunk"), io.BytesIO())
+        assert "Out of RAM, please use a smaller buffer size." in caplog.text
+
+    def test_a_write_that_fails_is_an_io_error(self):
+        with pytest.raises(DecryptionError, match="I/O error"):
+            chunked_decrypt(md5(), _NullCipher(), io.BytesIO(b"x" * 64), _UnwritableFile(), no_decompress=True)
+
+
+class _NullCipher:
+    """Stands in for the AES object: decryption that changes nothing."""
+
+    def decrypt(self, data):
+        return data
+
+
+class _OutOfMemory(io.BytesIO):
+    """Gives up its first chunk and then runs out of memory, the way a huge backup would."""
+
+    def read(self, size=-1):
+        if self.tell():
+            raise MemoryError
+        return super().read(size)
+
+
+class _UnwritableFile(io.BytesIO):
+    def write(self, _data):
+        raise OSError("no space left on device")
 
 
 class TestKeyFailures:

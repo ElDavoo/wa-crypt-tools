@@ -139,6 +139,15 @@ class TestWaGuessFailures:
         assert ret != 0
         assert "too small" in out
 
+    def test_a_plaintext_database_is_recognised_as_one(self):
+        # The commonest way to get the arguments the wrong way round: pointing the tool at
+        # the decrypted database. The search would otherwise grind through every offset and
+        # report a failure that says nothing about what actually happened.
+        out, ret = Propen(f"waguess {KEY15} tests/res/msgstore.db {OUT}")
+        assert ret != 0
+        assert "The database file is not encrypted" in out
+        assert "swap the input and the output files" in out
+
     def test_a_file_that_is_not_a_key_fails(self):
         out, ret = Propen("waguess tests/res/test.json tests/res/msgstore.db.crypt15 " + OUT)
         assert ret != 0
