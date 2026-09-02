@@ -106,10 +106,14 @@ def suggest_output(encrypted_path: str) -> str:
     """The name to pre-fill the output field with, so the user touches two controls, not three."""
     if not encrypted_path:
         return ""
-    p = Path(encrypted_path)
+    # Sliced off the string rather than rebuilt through Path. str(Path(...)) normalises the
+    # separators to the platform's, so on Windows "tests/res/msgstore.db.crypt15" came back as
+    # "tests\\res\\msgstore.db" -- a different-looking path than the one the user just chose,
+    # in the field right underneath it. The suffix is at the end of the whole string as well as
+    # at the end of the name, so taking it off the string leaves everything else untouched.
     for suffix in BACKUP_SUFFIXES:
-        if p.name.lower().endswith(suffix):
-            return str(p.with_name(p.name[: -len(suffix)]))
+        if Path(encrypted_path).name.lower().endswith(suffix):
+            return encrypted_path[: len(encrypted_path) - len(suffix)]
     return encrypted_path + ".decrypted"
 
 
