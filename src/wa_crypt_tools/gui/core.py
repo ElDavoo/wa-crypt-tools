@@ -30,6 +30,7 @@ from wa_crypt_tools.lib.errors import (
     HeaderError,
     IntegrityError,
     InvalidKeyError,
+    ScreenshotKeyError,
     WaCryptError,
 )
 from wa_crypt_tools.lib.utils import header_info
@@ -179,6 +180,14 @@ def friendly(error: BaseException) -> str:
             'the right key for it.\n\nUnder Advanced you can tick "Write the output even '
             'if the checks fail" to save the result anyway -- but nothing vouches for it '
             "being your data."
+        )
+    if isinstance(error, ScreenshotKeyError):
+        # Before InvalidKeyError, which it subclasses. The generic key-file advice would be
+        # actively wrong here: the file was a screenshot and it was the right one.
+        return (
+            "The key could not be read from that screenshot.\n\nType the 64 characters in "
+            "by hand instead -- switch the key box to the pasted-key mode and copy them off "
+            "the picture."
         )
     if isinstance(error, InvalidKeyError):
         return (

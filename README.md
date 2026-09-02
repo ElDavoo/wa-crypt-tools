@@ -4,7 +4,8 @@
 
 # WhatsApp Crypt Tools
 Decrypt and encrypt WhatsApp and WA Business' .crypt12, .crypt14 and .crypt15 files with ease!  
-For decryption, you NEED **the key file** or the 64-characters long key.  
+For decryption, you NEED **the key file** or the 64-characters long key
+(or [a screenshot of it](#reading-the-key-from-a-screenshot)).  
 The key file is named "key" if the backup is crypt14 or  
 "encrypted_backup.key" if the backup is crypt15 (encrypted E2E backups).  
 Those who are looking for a more complete suite for
@@ -155,6 +156,66 @@ waencrypt.py:89         : [I] Done!
 
 You can get info about a backup file with the `wainfo` tool.
 
+## Reading the key from a screenshot
+
+WhatsApp shows the 64-digit key once and never again, so most people screenshot it.
+You can give that screenshot to any of the tools **wherever the key file goes** -- there is
+no extra flag, the tools work out what they were handed:
+
+```
+$ wadecrypt Screenshot_20260901-184609_WhatsApp.png msgstore.db.crypt15 msgstore.db
+ocr.py:503      : [I] Reading the key from the screenshot, this takes a few seconds...
+key15.py:55     : [I] Crypt15 / Raw key loaded
+wadecrypt.py:301        : [I] Done
+```
+
+`wainfo -k <screenshot>` prints just the key, if you only want to read it. `wagui` takes one
+too: pick it where you would pick the key file.
+
+This is **optional** and needs two things installed:
+
+```
+python -m pip install 'wa-crypt-tools[ocr]'
+```
+
+plus the Tesseract program itself -- `sudo apt install tesseract-ocr` on Debian/Ubuntu,
+`brew install tesseract` on macOS, `winget install UB-Mannheim.TesseractOCR` on Windows.
+Without them nothing else changes; you are only told to install them if you pass an image.
+
+### When a digit is wrong
+
+`wadecrypt` checks the key against the backup before using it, and if it does not fit, it
+quietly looks for a near miss and carries on with the one that works. **Any single wrong
+digit is always found.** You are not told about any of this, because there is nothing for you
+to do -- run with `-v` if you want to see it. A candidate is only ever accepted once it has
+actually decrypted the start of the backup, so nothing here is a guess that gets used.
+
+This applies to **the 64 digits typed in directly**, not just to screenshots -- which is the
+same mistake, since the digits usually get typed off a screenshot in the first place. There
+it also tries the slips particular to copying by hand: two digits swapped round, two groups
+swapped, and the 4x4 grid read down the columns instead of across the rows. All of that takes
+about a second; a key that is simply the wrong key costs you two before the usual error.
+
+A key *file* is never second-guessed. Its digits were never transcribed by anyone, so it is
+either the right file or the wrong one.
+
+If even that fails, it says so, and says what to do about it:
+
+```
+[C] Could not read the key from the screenshot: what it says does not decrypt this backup,
+    and neither does any near miss of it.
+    Transcribe the 64 digits from the screenshot by hand and pass those instead of the image.
+```
+
+A few other things worth knowing:
+
+- Give it the **original screenshot**, not a photo of a screen and not a version something
+  has scaled down. Cropping to just the key is fine and often helps.
+- It reads the key screen: four rows of four groups, or any other layout that comes to 64
+  digits. It is not a general-purpose OCR and will not find a key written out in a sentence.
+- `wainfo -k` has no backup to check against, so it cannot repair anything -- it prints what
+  it read, and you compare it against the picture yourself.
+
 # Tool list
 For usage, run the tool with `-h` option.
 0) `wagui` - The window (see above); the only one that is not a command-line tool
@@ -193,6 +254,7 @@ Every error the library raises derives from `WaCryptError`, itself a `ValueError
 | Exception | Means |
 | --- | --- |
 | `InvalidKeyError` | the key file or hex key cannot be used |
+| `ScreenshotKeyError` | a subclass of it: OCR could not read the key off a screenshot |
 | `HeaderError` | the header is missing, truncated or unparsable |
 | `DecryptionError` | the cipher failed |
 | `IntegrityError` | a check failed, but a result was produced anyway |
@@ -269,7 +331,8 @@ On a rooted Android device, you can just copy
 (or `/data/data/com.whatsapp/files/encrypted_backup.key` if backups are crypt15).  
 If you enabled E2E backups, and you did not use a password 
 (you have a copy of the 64-digit key, for example a screenshot), 
-you can just transcribe and use it in lieu of the key file parameter.  
+you can use the 64 digits in lieu of the key file parameter -- or hand the tools the 
+screenshot itself, see [Reading the key from a screenshot](#reading-the-key-from-a-screenshot).  
 **There are other ways, but it is not in the scope of this project 
 to tell you.  
 Issues asking for this will be closed as invalid.**  

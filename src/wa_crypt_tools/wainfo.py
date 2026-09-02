@@ -46,7 +46,10 @@ def main():
 
     try:
         if args.key:
-            print(KeyFactory.from_file(args.encrypted))
+            # new() rather than from_file(): -k should accept anything the tools accept
+            # as a key, and printing what OCR read off a screenshot is how you
+            # check it, since wainfo has no backup to verify it against.
+            print(KeyFactory.new(args.encrypted))
             return
         with open(args.encrypted, "rb") as f:
             print(DatabaseFactory.from_file(f))

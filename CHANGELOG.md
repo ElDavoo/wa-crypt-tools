@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+- **A screenshot of the key can be used as the key** (issue #14). WhatsApp shows the
+  64-digit key once and never again, so most people photograph it; the screenshot now goes
+  in the same argument the key file goes in, with no new flag -- `wadecrypt shot.png
+  msgstore.db.crypt15 msgstore.db` works, and so do `wainfo -k shot.png` and `wagui`. It is
+  an optional extra: `pip install 'wa-crypt-tools[ocr]'` plus the `tesseract` binary.
+  Nothing changes and nothing new is imported for anyone who does not pass an image.
+
+  `wadecrypt` checks the key against the backup and repairs a misread digit on its own: any
+  single wrong digit is always found, and likely pairs are tried for a few seconds after
+  that. A candidate is only accepted once it has decrypted something, so the result is
+  verified rather than guessed. None of it is announced -- it succeeds silently, `-v` shows
+  the search, and only a failure interrupts, saying the reader could not manage it and to
+  transcribe the digits by hand.
+
+- **The same repair for a key given as 64 digits on the command line.** Transcribing a key by
+  hand is what the message above tells you to do, and people get a digit wrong doing it. Any
+  single wrong digit is found, along with the slips particular to copying a grid: two digits
+  swapped, two groups swapped, or the 4x4 grid read down the columns. It costs about a second
+  and says nothing; a key that is simply wrong fails as it always did, two seconds later. Key
+  *files* are never second-guessed -- nobody transcribed those.
+
 - **A graphical front end, `wagui`.** One window: pick your key (a key file, or the
   64-character key pasted in), pick the backup, press Decrypt. Choosing a backup describes it
   straight away -- format, WhatsApp version, the last two digits of the phone number -- with

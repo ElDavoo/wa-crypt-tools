@@ -38,12 +38,25 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install -e '.[test]'
+        python -m pip install -e '.[test,ocr]'
     # tests/gui/test_app.py builds a real Tk window, so it needs a display; without one it
     # skips, and the widget code would then be covered on the Windows leg alone.
-    - name: Install xvfb
+    #
+    # tesseract is for the screenshot key reader, and it is installed on every leg of the
+    # matrix on purpose: that reader is the sort of thing that works on the machine it was
+    # written on and nowhere else, and Windows rasterizes text its own way. Without the
+    # binary those tests skip rather than fail, so a runner that loses it goes quiet instead
+    # of red -- which is why neither install step is continue-on-error.
+    - name: Install xvfb and tesseract
       if: runner.os == 'Linux'
-      run: sudo apt-get update && sudo apt-get install -y xvfb
+      run: sudo apt-get update && sudo apt-get install -y xvfb tesseract-ocr
+    - name: Install tesseract
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        choco install --no-progress -y tesseract
+        # choco does not put it on PATH for the steps that follow.
+        "C:\Program Files\Tesseract-OCR" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     # The coverage floor lives in .coveragerc, so `python -m pytest --cov` enforces it locally
     # too rather than only in CI.
     - name: Test with pytest (under xvfb)

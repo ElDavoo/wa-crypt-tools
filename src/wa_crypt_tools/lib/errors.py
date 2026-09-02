@@ -19,6 +19,17 @@ class InvalidKeyError(WaCryptError):
     """The key file, hex string or key parameter cannot be used."""
 
 
+class ScreenshotKeyError(InvalidKeyError):
+    """
+    The key could not be read off a screenshot -- OCR is what failed, not the user.
+
+    A subclass rather than a plain InvalidKeyError because the advice differs completely.
+    For a key file the answer is "you picked the wrong file"; here the file was right and
+    the reader misread it, and the way out is to type the 64 digits in by hand. Callers that
+    only catch InvalidKeyError keep working.
+    """
+
+
 class HeaderError(WaCryptError):
     """The database header is missing, truncated or cannot be parsed."""
 

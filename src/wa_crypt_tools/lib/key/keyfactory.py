@@ -6,6 +6,7 @@ import javaobj.v2 as javaobj
 from wa_crypt_tools.lib.errors import InvalidKeyError
 from wa_crypt_tools.lib.key.key14 import Key14
 from wa_crypt_tools.lib.key.key15 import Key15
+from wa_crypt_tools.lib.key.ocr import key_from_image, looks_like_image
 from wa_crypt_tools.lib.utils import hexstring2bytes, javaintlist2bytes
 
 log = logging.getLogger(__name__)
@@ -14,7 +15,11 @@ log = logging.getLogger(__name__)
 class KeyFactory:
     @staticmethod
     def new(file: Path):
-        """Tries to load the key from a file, or if it fails, from a hex string."""
+        """Tries to load the key from a file, a screenshot of it, or a hex string."""
+        if looks_like_image(file):
+            # Sniffed before anything else so a PNG never reaches javaobj, which would
+            # report it as a malformed key file rather than as the screenshot it is.
+            return KeyFactory.from_image(file)
         try:
             return KeyFactory.from_file(file)
         except OSError:
@@ -61,3 +66,13 @@ class KeyFactory:
         if len(barr) != 32:
             raise InvalidKeyError("The key is invalid or of the wrong length.")
         return Key15(keyarray=barr)
+
+    @staticmethod
+    def from_image(file: Path) -> Key15:
+        """Reads the 64-digit key off a screenshot of WhatsApp's encryption key screen.
+
+        Always a Key15: that screen only exists for crypt15 backups, and WhatsApp never
+        displays a crypt14 key at all. Routing through from_hex re-checks the length and
+        the alphabet, which costs nothing and makes the OCR answer prove itself.
+        """
+        return KeyFactory.from_hex(key_from_image(file))

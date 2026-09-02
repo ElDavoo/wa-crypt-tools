@@ -8,8 +8,13 @@ Setup (editable install with test extras):
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install -e '.[test]'
+.venv/bin/python -m pip install -e '.[test,ocr]'
 ```
+
+`ocr` is the optional screenshot key reader. It also needs the `tesseract` binary on `PATH`
+(`apt install tesseract-ocr`, `brew install tesseract`; on NixOS `nix shell nixpkgs#tesseract`).
+Without either half the screenshot tests **skip** rather than fail, so a run missing it is
+quieter than CI, not redder.
 
 Tests must be run **from the repo root** — `tests/test_*.py` open resources by relative path
 (`tests/res/...`) — and with the venv's `bin` on `PATH`, because `tests/tools-invocation/`
@@ -22,10 +27,12 @@ python -m pytest --cov          # with coverage (as CI runs it)
 python -m pytest tests/test_decrypt.py::TestDecryption::test_decryption15   # single test
 ```
 
-The full suite takes around four minutes: `tests/tools-invocation/` runs the console
-scripts as subprocesses, and `waguess` brute-forces offsets over a 240 KB backup for each of the
-three formats -- plus once more for `tests/gui/`, which exercises the same search behind the
-window's "try harder" checkbox.
+The full suite takes around eight minutes with the `ocr` extra installed, four without:
+`tests/tools-invocation/` runs the console scripts as subprocesses, `waguess` brute-forces
+offsets over a 240 KB backup for each of the three formats -- plus once more for `tests/gui/`,
+which exercises the same search behind the window's "try harder" checkbox -- and the screenshot
+tests do about a dozen full OCR reads at roughly twenty seconds each. Without tesseract those
+skip, which is the four-minute figure.
 
 `tests/gui/test_app.py` builds a real Tk window, so it needs both `_tkinter` and a display; it
 skips cleanly without either, which is why a plain run here reports eleven skips unless the venv
@@ -120,6 +127,152 @@ length**: 131 bytes → `Key14` (cipher version, key version, server salt, googl
 google id, padding, then the 32-byte key), 32 bytes → `Key15` (a bare root key). `Key15` derives
 the actual cipher key from the root key via an HMAC-SHA256 loop keyed with `b'backup encryption'`
 (see `lib/utils.py: encryptionloop`, mirrored in `utils/WA_HMACSHA256_Loop.java`).
+
+**Reading a key off a screenshot** (`lib/key/ocr.py`, optional extra `[ocr]`, issue #14).
+`KeyFactory.new` sniffs the first 12 bytes and routes an image to `from_image`, so a
+screenshot goes wherever a key file goes and no tool grew a flag -- `wagui` included, since it
+hands `wadecrypt.decrypt` a keyfile path. `pytesseract` and `PIL` are imported inside the
+function; without them the user gets the pip line, not an ImportError. It is always a `Key15`:
+WhatsApp only ever displays the 64-digit screen for crypt15.
+
+The hard part is not the OCR, it is telling the key apart from the prose around it, and the
+design turns on two things being true of that screen: the key is lowercase hex and nothing
+else, and it is a *grid* of equal-length groups totalling 64 digits. So there are two passes
+with different jobs. **Pass 1** reads the whole image with no whitelist and is used only for
+*geometry* -- its text is not trusted at all (on `key-screenshot-android-2.26.png` it reads
+`353f` as `SBENT` and `bc0d` as `bcoOd`), but the boxes it returns for those groups are still
+right, and boxes are all it is asked for. **Pass 2** re-reads just those boxes under
+`tessedit_char_whitelist=0123456789abcdef`. That whitelist is safe on a crop known to hold
+nothing but hex and would be actively harmful on the whole image, where it would force the
+prose into plausible hex and manufacture rows that were never there.
+
+Four things carry the accuracy, and each was needed:
+- **Length is an oracle.** Every group is exactly 64/n digits, so a read of the wrong length
+  is known-bad and discarded rather than used. This is what catches `8c4e` -> `8c4de`.
+- **The same crop is read at six paddings and the majority wins.** Nudging a crop by a few
+  pixels changes the answer on exactly the glyphs that are marginal. On the real screenshot
+  *no single padding* gets all 16 groups right and the vote gets all 16.
+- **Rows are snapped to the grid's columns.** Once the columns are known a row does not have
+  to have been segmented correctly: `bb6f` coming back as `bbb` + `f` gives a 5-wide row and
+  a 17-group block, which divides nothing, so each word is assigned to the column it sits
+  nearest and merged. A row seeds a block on a 75% hex majority, not unanimity, and a block
+  then grows through neighbours by geometry rather than text.
+- **The grid is read at two granularities and the answers compared.** Group-at-a-time and
+  row-at-a-time fail differently, so agreement is the only check on a misread that happens to
+  come out the right length.
+
+`normalize`'s confusion map (`o`->`0`, `l`->`1`, `S`->`5` ...) only ever decides *which boxes
+are the key* -- no character of the returned key passes through it, since pass 2 re-reads
+everything under the whitelist. That is why it can be generous with letters that are not hex
+digits and must not touch ones that are: mapping `B`->`8` would turn a correctly-read `b` into
+an `8` in the comparison that picks the grid out.
+
+Two things that look like micro-optimisations and are not. All crops for one padding are
+composed into a single stacked image and read in one call, because Tesseract reloads its model
+per invocation -- one call per crop is ~740ms, which turns a key read into 71 seconds. And
+`single_threaded()` pins `OMP_THREAD_LIMIT=1` around every call: Tesseract is built against
+OpenMP and on this workload costs 3.6s at one thread, 13.1s at four, and anywhere between 2s
+and 19s left to decide for itself. A read is ~12 Tesseract calls, about 20 seconds.
+
+**A transcribed digit is repaired against the backup, and none of it is announced.** A key
+reaches this program transcribed two ways -- OCR read it off a screenshot, or a person typed
+it in off one -- and either way one wrong digit fails exactly like a completely wrong key.
+`wadecrypt.corrected()` runs after the header is parsed and before the whole decryption is
+spent: it probes 512 bytes of ciphertext with the key it has, and only if that fails walks the
+guesses. `transcribed()` decides which: a screenshot gets `ocr.alternative_keys`, 64 digits on
+the command line get `nearby.typo_keys`, and a **key file gets nothing** -- its digits came out
+of WhatsApp's own file byte for byte, so a near miss of them is not a thing that exists.
+
+The oracle is `key_works()` -- waguess's trick applied to keys instead of offsets: decrypt the
+first two bytes, compare against `C.ZLIB_HEADERS`, confirm a hit with a real
+`test_decompression`. **Nothing unverified is ever returned**, which is what makes it safe to
+guess generously; a wrong guess costs 400us and cannot produce a wrong key.
+
+It is deliberately silent. Someone who hands over a key asked for a decryption, not for a
+report on how it was arrived at, so the whole search is `log.debug` -- `-v` shows it -- and
+`key_from_image` logs the key it read at debug too, because announcing a key at info that is
+then quietly corrected would be worse than saying nothing. The one exception is a screenshot
+that could not be repaired, which raises `ScreenshotKeyError` blaming the reader and naming
+the fix: transcribe the 64 digits by hand. That is a subclass of `InvalidKeyError` rather than
+a message on it, because `wagui`'s `friendly()` dispatches on type and its generic advice --
+"make sure you picked the key file and not the backup" -- is actively wrong here: the file
+*was* a screenshot and it was the right one. A **typed** key that cannot be repaired says
+nothing at all and lets the decryption fail on its own terms; there is no reader to blame, the
+user can see what they typed, and the key may simply belong to another backup.
+
+**`lib/key/nearby.py`** holds everything generic: `near_misses(key, tiers, limit)` applies
+tiers of `{position: digit}` changes, dedupes, and filters its own output to `[0-9a-f]{64}` --
+callers hand it straight to `bytes.fromhex`, so that contract is enforced rather than trusted.
+The tiers are the caller's because what a mistake looks like depends on who made it:
+
+- **OCR** (`ocr.alternative_keys`) leads with the *losing votes* pass 2 collected -- a cell
+  that went 4-2 said what second place was, and that is evidence about this image rather than
+  a table -- then the other granularity's disagreements, then `one_digit` and `two_digits`,
+  both ordered least-confidently-read first. No transpositions: OCR reads each group where it
+  finds it and does not reorder.
+- **Typed** (`nearby.typo_keys`) has no evidence at all, so it opens with the guarantee and
+  follows with the slips specific to copying a grid by hand: `transpositions` (adjacent pairs
+  first), `grid_transposed` (the 4x4 read down the columns -- one guess, and transposing is
+  its own inverse so it covers the mistake both ways), and `group_swaps`.
+
+**Every single-digit mistake is guaranteed found**, by either path: `one_digit` is 64
+positions by 15 digits, all of them, whatever the tables expected. The tables only decide the
+order. Two digits at once are best-effort -- the full space is 64*63/2 * 15 * 15, about 450,000
+guesses and three minutes.
+
+The two budgets differ on purpose. `GUESS_LIMIT` is 20,000 (~8s) for OCR, whose mistakes
+correlate -- one bad glyph shape means several bad digits. `TYPO_LIMIT` is 4,000 (~1.6s) for a
+typed key, whose mistakes do not: the structural tiers come to about 3,000 and the rest is a
+slice of the two-digit tier. That cut is what keeps a plainly wrong key failing in two seconds
+rather than thirteen, and a wrong key is a far commoner reason for a failed decryption than
+two independent slips in 64 characters. Both are time budgets in disguise -- a candidate costs
+~400us, almost all of it `AES.new(MODE_GCM)` around a 16-byte IV (357us measured; the key
+derivation is only 50us).
+
+`LOOKALIKES` **must hold hex on both sides**. It was first written with the letters Tesseract
+emits -- `o`, `l`, `s`, `z`, `g` -- as the *answers*, which is the input alphabet
+`ocr._CONFUSIONS` maps *from*; the two-digit tier then produced strings like `e3acf17l8c4e...`
+and the caller's `bytes.fromhex` blew up. `TestLookalikes` is the tripwire, and
+`near_misses`'s own filter is the belt to its braces.
+
+`_read` is `lru_cache`d because `alternative_keys` is called *after* `key_from_image` has
+already returned a key that turned out not to work, and re-reading the screenshot would cost
+another twenty seconds for an answer already in hand. `TestWithoutTheExtra` has to
+`cache_clear()` for that reason -- an earlier test having read the fixture would otherwise mean
+the import it is trying to make fail is never reached.
+
+`tests/lib/key/test_nearby.py` needs no OCR, no backup and no tesseract: the guessing is
+string work, and whether a guess is *right* is `wadecrypt.key_works`'s job, pinned separately
+in `tests/test_key_recovery.py`.
+
+`tests/lib/key/test_ocr.py` splits along the same line the code does: everything deciding which
+boxes are the key is a pure function over hand-written `image_to_data` dicts and runs with no
+OCR installed, and only the "this image reads back as this key" tests need tesseract (they call
+`requires_ocr()` from `tests/utils/utils.py`). `TestAlternativeKeys` patches `_read` out
+entirely -- what is under test is the guessing, and running OCR to reach it would add twenty
+seconds for no coverage. `tests/test_key_recovery.py` pins `key_works` on its own. The
+end-to-end recovery tests stage the failure from the only reproducible direction: making
+Tesseract misread on demand depends on its build, but a *backup* whose real key differs from
+the screenshot by a digit puts the code in exactly the same position, so `waencrypt` builds one.
+
+The fixtures are `key-screenshot-android-2.26.png` and `-confirm-2.26.png` (a real phone, two
+different screens, the same key) and `key-screenshot-synthetic{,-dark}.png`. The synthetic pair
+spells the root key of `tests/res/encrypted_backup.key`, which is what makes
+`wadecrypt <screenshot> msgstore.db.crypt15` an end-to-end test against `tests/res/msgstore.db`.
+**They are built by `utils/make_key_screenshot.py` out of the real screenshot's own glyphs**,
+cut out with `image_to_boxes` and pasted through an alpha mask into the phone's own slot
+positions. Drawing them with a font was tried at length and does not work: Pillow's bundled
+Aileron has a `5` Tesseract reads as `b` in isolation at every size, and Liberation and DejaVu
+render all sixteen digits correctly one at a time yet still lose `a148` to `aa8` in a grid.
+Reusing the real slot positions -- not a pitch or a gap of our own choosing -- is what made
+both variants read cleanly at both granularities; a fixture tuned to a lucky spacing would
+break on the next Tesseract release.
+
+CI installs `tesseract-ocr` on every leg of the matrix, Ubuntu and Windows, and `.[test,ocr]`.
+Without the binary these tests *skip*, so a runner that quietly loses it goes green rather than
+red -- which is why the install step is not `continue-on-error`. The same install is in
+`.github/actions/project-setup/`, or the agent pipeline runs a suite that says nothing about
+this feature.
 
 **Databases** (`lib/db/`) — `Database` ABC (`decrypt`/`encrypt`/`get_iv`), implemented by
 `Database12`, `Database14`, `Database15`. `DatabaseFactory.from_file(stream)` reads the header
