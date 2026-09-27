@@ -1,0 +1,12 @@
+# Commits that changed formatting and nothing else. `git blame` walks past them, so the blame
+# for a line is the commit that wrote the line rather than the one that rewrapped it.
+#
+# GitHub reads this file automatically. Locally it has to be turned on once, per clone:
+#
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# Only add a commit here if it is genuinely a no-op -- a formatter run, a whitespace pass.
+# A commit that also changes behaviour must not be ignored, or its blame disappears.
+
+# Format the tree with ruff format, and gate on it
+485ca74fd917172e46efa0ffbb27b97a6aaa11c7

@@ -3,27 +3,31 @@ from __future__ import annotations
 import logging
 from hashlib import md5
 from os import urandom
+from typing import TYPE_CHECKING, cast
 
 from Cryptodome.Cipher import AES
 
 from wa_crypt_tools.lib.constants import C
-from wa_crypt_tools.lib.props import Props
-from wa_crypt_tools.lib.utils import encode_varint
-
-log = logging.getLogger(__name__)
-
 from wa_crypt_tools.lib.db.db import Database
 from wa_crypt_tools.lib.errors import DecryptionError, IntegrityError
 from wa_crypt_tools.lib.key.key15 import Key15
+from wa_crypt_tools.lib.props import Props
+from wa_crypt_tools.lib.utils import encode_varint
+
+if TYPE_CHECKING:
+    # For annotations only; the runtime imports stay inside encrypt(), where they are lazy so a
+    # frozen build does not have to carry the generated modules unless it encrypts something.
+    from wa_crypt_tools.proto import key_type_pb2
+
+log = logging.getLogger(__name__)
 
 
-class Database15(Database):
+class Database15(Database[Key15]):
     def __str__(self):
         return "Database15"
         # todo
 
-    def __init__(self, *, iv: bytes = None, props: Props = None,
-                 key_type: int | None = C.DEFAULT_KEY_TYPE):
+    def __init__(self, *, iv: bytes | None = None, props: Props | None = None, key_type: int | None = C.DEFAULT_KEY_TYPE):
         self.file_hash = md5()
         # just store it for now
         self.props = props
@@ -32,7 +36,7 @@ class Database15(Database):
         self.key_type = key_type
         if iv:
             if len(iv) != 16:
-                raise IntegrityError("IV is not 16 bytes long but is {} bytes long".format(len(iv)))
+                raise IntegrityError(f"IV is not 16 bytes long but is {len(iv)} bytes long")
             self.iv = iv
         else:
             self.iv = urandom(16)
@@ -51,14 +55,13 @@ class Database15(Database):
             # We are probably in a multifile backup, which does not have a checksum.
             is_multifile_backup = True
         else:
-            log.debug("Checksum OK ({}). Decrypting...".format(self.file_hash.hexdigest()))
+            log.debug("Checksum OK (%s). Decrypting...", self.file_hash.hexdigest())
 
         cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)
         try:
             output_decrypted: bytes = cipher.decrypt(encrypted_data)
         except ValueError as e:
-            raise DecryptionError("Decryption failed: {}."
-                                  "\n    This probably means your backup is corrupted.".format(e)) from e
+            raise DecryptionError(f"Decryption failed: {e}.\n    This probably means your backup is corrupted.") from e
 
         # Verify the authentication tag
         try:
@@ -73,19 +76,21 @@ class Database15(Database):
             else:
                 cipher.verify(authentication_tag)
         except ValueError as e:
-            raise IntegrityError("Authentication tag mismatch: {}."
-                                 "\n    This probably means your backup is corrupted."
-                                 .format(e), data=output_decrypted) from e
+            raise IntegrityError(
+                f"Authentication tag mismatch: {e}.\n    This probably means your backup is corrupted.", data=output_decrypted
+            ) from e
 
         return output_decrypted
 
     def encrypt(self, key: Key15, props: Props, decrypted: bytes) -> bytes:
         """Encrypts the database using the provided key"""
         from wa_crypt_tools.proto import C15_IV_pb2 as C15_IV
-        cipher = C15_IV.C15_IV()
-        cipher.encryption_iv = self.iv
+
+        iv_message = C15_IV.C15_IV()
+        iv_message.encryption_iv = self.iv
         from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
         from wa_crypt_tools.proto import key_type_pb2 as key_type
+
         header = prefix.BackupPrefix()
         if self.prefix is not None:
             # Start from the header this database was parsed from, so that whatever WhatsApp
@@ -98,20 +103,22 @@ class Database15(Database):
             # Only when there is no reference to reproduce: a reference's own value has already
             # been copied in above, and overwriting it would put the field into backups made
             # before it existed.
-            header.key_type_new = self.key_type
-        header.e2ee_key_data.CopyFrom(cipher)
+            # The stubs spell this field's type as the enum's own ValueType, and what callers
+            # (and C.DEFAULT_KEY_TYPE) have is a plain int naming one of its values.
+            header.key_type_new = cast("key_type_pb2.Key_Type.ValueType", self.key_type)
+        header.e2ee_key_data.CopyFrom(iv_message)
 
         header.backup_metadata.CopyFrom(props.get_proto())
-        prefix = header.SerializeToString()
-        out = b''
+        serialized_prefix = header.SerializeToString()
+        out = b""
         file_hash = md5()
         # The size prefix is a protobuf varint, not a raw byte capped at 255: what looked like
         # a separate msgstore "feature table" flag byte was always just that varint's own
         # mandatory continuation byte for sizes in [128, 255], never an independent flag.
-        out += encode_varint(len(prefix))
+        out += encode_varint(len(serialized_prefix))
         file_hash.update(out)
-        out += prefix
-        file_hash.update(prefix)
+        out += serialized_prefix
+        file_hash.update(serialized_prefix)
         cipher = AES.new(key.get(), AES.MODE_GCM, self.iv)
         encrypted_data, authentication_tag = cipher.encrypt_and_digest(decrypted)
         out += encrypted_data

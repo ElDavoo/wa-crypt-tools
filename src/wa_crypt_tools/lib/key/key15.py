@@ -1,24 +1,23 @@
-import hmac
-from hashlib import sha256
+from __future__ import annotations
+
+import logging
 from os import urandom
 from pathlib import Path
 
 from javaobj import JavaObjectMarshaller
 
-from wa_crypt_tools.lib.utils import create_jba, encryptionloop
-
 from wa_crypt_tools.lib.errors import InvalidKeyError
 from wa_crypt_tools.lib.key.key import Key
-import logging
+from wa_crypt_tools.lib.utils import create_jba, encryptionloop
 
 log = logging.getLogger(__name__)
 
 
 class Key15(Key):
     # This constant is only used with crypt15 keys.
-    BACKUP_ENCRYPTION = b'backup encryption'
+    BACKUP_ENCRYPTION = b"backup encryption"
 
-    def __init__(self, keyarray: bytes = None, key: bytes = None):
+    def __init__(self, keyarray: bytes | None = None, key: bytes | None = None):
         """Extracts the key from a loaded crypt15 key file."""
         # encrypted_backup.key file format and encoding explanation:
         # The E2E key file is actually a serialized byte[] object.
@@ -42,7 +41,7 @@ class Key15(Key):
                 self.__key = urandom(32)
             else:
                 if len(key) != 32:
-                    raise InvalidKeyError("Invalid key length: {}".format(key.hex()))
+                    raise InvalidKeyError(f"Invalid key length: {key.hex()}")
                 self.__key = key
             return
 
@@ -50,8 +49,8 @@ class Key15(Key):
             raise InvalidKeyError("keyarray is not a byte array!")
 
         if len(keyarray) != 32:
-            raise InvalidKeyError("Invalid key length: {} bytes, expected 32".format(len(keyarray)))
-        log.debug("Root key: {}".format(keyarray.hex()))
+            raise InvalidKeyError(f"Invalid key length: {len(keyarray)} bytes, expected 32")
+        log.debug("Root key: %s", keyarray.hex())
         # Save the root key in the class
         self.__key = keyarray
 
@@ -61,10 +60,7 @@ class Key15(Key):
         """
         Returns the key used for encryption, that is not the root key.
         """
-        return encryptionloop(
-            first_iteration_data=self.__key,
-            message=b'backup encryption',
-            output_bytes=32)
+        return encryptionloop(first_iteration_data=self.__key, message=b"backup encryption", output_bytes=32)
 
     def get_root(self) -> bytes:
         """
@@ -76,37 +72,31 @@ class Key15(Key):
         """
         Returns the key used for metadata encryption
         """
-        return encryptionloop(
-            first_iteration_data=self.__key,
-            message=b'metadata encryption',
-            output_bytes=32)
+        return encryptionloop(first_iteration_data=self.__key, message=b"metadata encryption", output_bytes=32)
 
     def get_metadata_authentication(self) -> bytes:
         """
         Returns the key used for metadata authentication
         """
-        return encryptionloop(
-            first_iteration_data=self.__key,
-            message=b'metadata authentication',
-            output_bytes=32)
+        return encryptionloop(first_iteration_data=self.__key, message=b"metadata authentication", output_bytes=32)
 
     def dump(self) -> bytes:
         """Dumps the key"""
         return JavaObjectMarshaller().dump(create_jba(self.__key))
 
     def file_dump(self, file: Path):
-        with open(file, 'wb') as f:
-            f.write(self.dump())
+        Path(file).write_bytes(self.dump())
 
     def __str__(self) -> str:
         """Returns a string representation of the key"""
         try:
             string: str = "Key15("
             if self.__key is not None:
-                string += "key: {}".format(self.__key.hex())
+                string += f"key: {self.__key.hex()}"
             return string + ")"
-        except Exception as e:
-            return "Exception printing key: {}".format(e)
+        except Exception as e:  # noqa: BLE001 -- see Key14.__str__: printing a key must
+            # never be the thing that raises.
+            return f"Exception printing key: {e}"
 
     def __repr__(self) -> str:
         # TODO

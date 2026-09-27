@@ -9,8 +9,19 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "daily"
+    groups:
+      pip:
+        patterns:
+          - "*"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       # Check for updates to GitHub Actions every weekday
       interval: "daily"
+    groups:
+      # One PR for everything; this also keeps codeql-action's init/autobuild/analyze
+      # in lockstep (split bumps fail with "Loaded a configuration file for version X,
+      # but running version Y")
+      github-actions:
+        patterns:
+          - "*"

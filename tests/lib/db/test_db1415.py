@@ -3,6 +3,8 @@ Database14 and Database15 share everything but the header they write, so they ar
 together: the IV check, the multifile-backup branch of decrypt, and get_iv.
 """
 
+from __future__ import annotations
+
 import io
 import zlib
 from hashlib import sha512
@@ -22,7 +24,7 @@ CASES = [
 
 
 def read(path: str) -> bytes:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         return f.read()
 
 
@@ -34,7 +36,7 @@ def as_stream(data: bytes) -> io.BufferedReader:
 class TestHeaderConstruction:
     def test_an_iv_of_the_wrong_length_is_rejected(self, cls, keyfile, backup):
         with pytest.raises(IntegrityError, match="15 bytes long"):
-            cls(iv=b'\x00' * 15)
+            cls(iv=b"\x00" * 15)
 
     def test_an_iv_is_generated_when_not_given(self, cls, keyfile, backup):
         assert cls().get_iv() != cls().get_iv()
@@ -82,7 +84,7 @@ class TestStr:
         # It used to print Database12's fields, none of which Database14 has, so any attempt
         # to print one died with an AttributeError.
         iv = bytes(range(16))
-        assert str(Database14(iv=iv)) == "Database14(iv: {})".format(iv.hex())
+        assert str(Database14(iv=iv)) == f"Database14(iv: {iv.hex()})"
 
 
 class TestCrypt14KeyVersionIsCarriedThrough:
@@ -95,28 +97,29 @@ class TestCrypt14KeyVersionIsCarriedThrough:
     """
 
     @staticmethod
-    def written_header(db: Database14, key) -> "object":
+    def written_header(db: Database14, key) -> object:
         """The header Database14.encrypt actually wrote, parsed back out."""
         from wa_crypt_tools.lib.props import Props
-        data = db.encrypt(key, Props(wa_version="2.22.5.13", jid="67", features=None), b'payload')
+
+        data = db.encrypt(key, Props(wa_version="2.22.5.13", jid="67", features=None), b"payload")
         return DatabaseFactory.from_file(as_stream(data)).prefix
 
     def test_a_reference_key_version_survives_re_encryption(self):
         key = KeyFactory.new("tests/res/key")
         reference = DatabaseFactory.from_file(as_stream(read("tests/res/msgstore.db.crypt14")))
-        reference.prefix.wa_provided_key_data.key_version = b'1'
+        reference.prefix.wa_provided_key_data.key_version = b"1"
 
         db = Database14(iv=bytes(range(16)))
         db.prefix = reference.prefix
         db.feature_table = reference.feature_table
 
-        assert self.written_header(db, key).wa_provided_key_data.key_version == b'1'
+        assert self.written_header(db, key).wa_provided_key_data.key_version == b"1"
 
     def test_a_backup_written_without_a_reference_still_says_2(self):
         # Nothing to copy from, so the default stands -- which is what every crypt14 fixture
         # in tests/res and every backup off a current device carries.
         header = self.written_header(Database14(iv=bytes(range(16))), KeyFactory.new("tests/res/key"))
-        assert header.wa_provided_key_data.key_version == b'2'
+        assert header.wa_provided_key_data.key_version == b"2"
 
 
 class TestPasskeyMetadataIsCarriedThrough:
@@ -129,14 +132,16 @@ class TestPasskeyMetadataIsCarriedThrough:
     """
 
     @staticmethod
-    def written_header(db: Database15, key) -> "object":
+    def written_header(db: Database15, key) -> object:
         """The header Database15.encrypt actually wrote, parsed back out."""
         from wa_crypt_tools.lib.props import Props
-        data = db.encrypt(key, Props(wa_version="2.22.5.13", jid="67", features=None), b'payload')
+
+        data = db.encrypt(key, Props(wa_version="2.22.5.13", jid="67", features=None), b"payload")
         return DatabaseFactory.from_file(as_stream(data)).prefix
 
     def test_passkey_encryption_metadata_survives_re_encryption(self):
         from wa_crypt_tools.proto import key_type_pb2 as key_type
+
         key = KeyFactory.new("tests/res/encrypted_backup.key")
         reference = DatabaseFactory.from_file(as_stream(read("tests/res/msgstore.db.crypt15")))
         reference.prefix.key_type_new = key_type.Key_Type.E2EE_PASSKEY
@@ -147,7 +152,7 @@ class TestPasskeyMetadataIsCarriedThrough:
         meta.server_cypher_key_version = "1"
         meta.server_cypher_key_account_salt = bytes(range(16))
         meta.server_cypher_key_server_salt = bytes(range(16, 32))
-        meta.client_metadata = b'client-metadata'
+        meta.client_metadata = b"client-metadata"
 
         db = Database15(iv=bytes(range(16)))
         db.prefix = reference.prefix

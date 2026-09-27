@@ -1,5 +1,55 @@
 # Changelog
 
+## Unreleased
+
+- **A screenshot of the key can be used as the key** (issue #14). WhatsApp shows the
+  64-digit key once and never again, so most people photograph it; the screenshot now goes
+  in the same argument the key file goes in, with no new flag -- `wadecrypt shot.png
+  msgstore.db.crypt15 msgstore.db` works, and so do `wainfo -k shot.png` and `wagui`. It is
+  an optional extra: `pip install 'wa-crypt-tools[ocr]'` plus the `tesseract` binary.
+  Nothing changes and nothing new is imported for anyone who does not pass an image.
+
+  `wadecrypt` checks the key against the backup and repairs a misread digit on its own: any
+  single wrong digit is always found, and likely pairs are tried for a few seconds after
+  that. A candidate is only accepted once it has decrypted something, so the result is
+  verified rather than guessed. None of it is announced -- it succeeds silently, `-v` shows
+  the search, and only a failure interrupts, saying the reader could not manage it and to
+  transcribe the digits by hand.
+
+- **The same repair for a key given as 64 digits on the command line.** Transcribing a key by
+  hand is what the message above tells you to do, and people get a digit wrong doing it. Any
+  single wrong digit is found, along with the slips particular to copying a grid: two digits
+  swapped, two groups swapped, or the 4x4 grid read down the columns. It costs about a second
+  and says nothing; a key that is simply wrong fails as it always did, two seconds later. Key
+  *files* are never second-guessed -- nobody transcribed those.
+
+- **A graphical front end, `wagui`.** One window: pick your key (a key file, or the
+  64-character key pasted in), pick the backup, press Decrypt. Choosing a backup describes it
+  straight away -- format, WhatsApp version, the last two digits of the phone number -- with
+  the full header that `wainfo` prints kept in the Messages pane below. The flags that a
+  support thread might ask for (`--force`, `--yes`, `--no-decompress`, `--no-mem`, verbose,
+  and `waguess`'s offset search) are folded away under Advanced. Encrypting, key creation and
+  offset guessing stay in the command-line tools: `waencrypt`'s reference and feature-flag
+  options are not something a non-technical user can judge, and putting them a click away
+  would invite silently corrupt output. Asked for in
+  [discussion #167](https://github.com/ElDavoo/wa-crypt-tools/discussions/167).
+- **Self-contained builds on every release.** `wagui-windows-x64.exe`,
+  `wagui-macos-arm64.zip` and `wagui-linux-x64` are attached to each GitHub release, built
+  from the committed `packaging/wagui.spec` so a local `pyinstaller packaging/wagui.spec`
+  produces the same thing. They need no Python and no installation. Each is run with
+  `--selftest` before upload, which imports the generated protobuf modules -- they are loaded
+  lazily inside `DatabaseFactory.from_file`, so they are exactly what a frozen build can
+  silently omit.
+- `wagui` is declared under `[project.gui-scripts]` rather than `[project.scripts]`, which is
+  what makes Windows build a console-less `wagui.exe`. tkinter is part of the standard
+  library, so there is no new dependency; some Linux distributions package it separately
+  (`python3-tk`), which the downloadable build does not need.
+- `wadecrypt.decrypt()` raises `WaCryptError` when the output file exists instead of calling
+  `exit(1)`. The tool prints the same message and exits with the same code -- `main()` already
+  caught `WaCryptError` -- but the function is now usable from something that is not a
+  command-line program.
+
+
 ## Version 0.2.0
 
 The library now raises instead of logging and carrying on. This is a breaking change, and

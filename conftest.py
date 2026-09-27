@@ -13,6 +13,8 @@ be set before any test spawns anything -- so it is set here rather than in CI, a
 "python -m pytest --cov" is enough.
 """
 
+from __future__ import annotations
+
 import os
 from pathlib import Path
 

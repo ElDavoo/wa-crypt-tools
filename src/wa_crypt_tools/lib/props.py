@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import contextlib
+
 from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.proto import backup_expiry_pb2 as backup_expiry
+
 
 def _highest_feature(descriptor) -> int:
     """
@@ -10,14 +13,20 @@ def _highest_feature(descriptor) -> int:
     These are the numbers this project calls features. Reading them off the schema rather than
     hardcoding 39 means the range keeps up on its own when the proto grows another flag.
     """
-    return max((f.number for f in descriptor.fields if f.type == f.TYPE_BOOL),
-               default=C.DEFAULT_MAX_FEATURE)
+    return max((f.number for f in descriptor.fields if f.type == f.TYPE_BOOL), default=C.DEFAULT_MAX_FEATURE)
 
 
 class Props:
-    def __init__(self, *, v_features=None, wa_version: str = C.DEFAULT_APP_VERSION, jid: str = C.DEFAULT_JID_SUFFIX,
-                 features: list[int] | None = C.DEFAULT_FEATURE_LIST, max_feature: int = C.DEFAULT_MAX_FEATURE,
-                 backup_version: int = C.DEFAULT_BACKUP_VERSION):
+    def __init__(
+        self,
+        *,
+        v_features=None,
+        wa_version: str = C.DEFAULT_APP_VERSION,
+        jid: str = C.DEFAULT_JID_SUFFIX,
+        features: list[int] | None = C.DEFAULT_FEATURE_LIST,
+        max_feature: int = C.DEFAULT_MAX_FEATURE,
+        backup_version: int = C.DEFAULT_BACKUP_VERSION,
+    ):
         if v_features is not None:
             self.props = v_features
             # max_feature is not part of the protobuf -- it is only how far get_features()
@@ -34,10 +43,8 @@ class Props:
             return
         self.props.backup_version = backup_version
         for f in range(5, max_feature + 1):
-            try:
+            with contextlib.suppress(AttributeError):
                 self.disable_feature(f)
-            except AttributeError:
-                pass
         for f in features:
             self.enable_feature(f)
 
@@ -45,7 +52,7 @@ class Props:
         """The schema's name for the flag with this number, or AttributeError if there is none."""
         field = self.props.DESCRIPTOR.fields_by_number.get(feature)
         if field is None or field.type != field.TYPE_BOOL:
-            raise AttributeError("No feature numbered {}".format(feature))
+            raise AttributeError(f"No feature numbered {feature}")
         return field.name
 
     def enable_feature(self, feature: int):

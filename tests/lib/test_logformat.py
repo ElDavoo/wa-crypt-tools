@@ -5,6 +5,8 @@ Library modules only ever call log.error(...); whether the user sees anything at
 decided here.
 """
 
+from __future__ import annotations
+
 import logging
 
 from wa_crypt_tools.lib.logformat import CustomFormatter, setup_logging
@@ -17,8 +19,9 @@ def record(level: int) -> logging.LogRecord:
 class TestCustomFormatter:
     def test_each_level_gets_its_own_colour(self):
         formatter = CustomFormatter()
-        coloured = {formatter.format(record(level)) for level in
-                    (logging.DEBUG, logging.WARNING, logging.ERROR, logging.CRITICAL)}
+        coloured = {
+            formatter.format(record(level)) for level in (logging.DEBUG, logging.WARNING, logging.ERROR, logging.CRITICAL)
+        }
         # DEBUG and INFO share grey, so four distinct levels give four distinct strings only
         # because the colours differ; the message is identical in all of them.
         assert len(coloured) == 4

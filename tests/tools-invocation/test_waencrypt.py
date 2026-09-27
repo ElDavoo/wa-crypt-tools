@@ -6,6 +6,8 @@ zlib-ng (CPython 3.14+ on Windows) compresses differently, so only the plaintext
 across platforms. The one byte-for-byte check is guarded on that.
 """
 
+from __future__ import annotations
+
 import os.path
 import zlib
 from hashlib import md5
@@ -20,8 +22,7 @@ PLAIN = "tests/res/msgstore.db"
 OUT = "waencrypt-test-out.crypt"
 ROUNDTRIP = "waencrypt-test-roundtrip.db"
 
-CLASSIC_ZLIB = ("zlib-ng" not in zlib.ZLIB_VERSION
-                and "zlib-ng" not in zlib.ZLIB_RUNTIME_VERSION)
+CLASSIC_ZLIB = "zlib-ng" not in zlib.ZLIB_VERSION and "zlib-ng" not in zlib.ZLIB_RUNTIME_VERSION
 
 
 def cleanup():
@@ -33,7 +34,7 @@ def roundtrip(key: str, *extra: str) -> str:
     """Encrypts the reference database, decrypts it back, and returns wadecrypt's output."""
     out, ret = Propen(["waencrypt", *extra, key, PLAIN, OUT])
     assert ret == 0, out
-    out, ret = Propen("wadecrypt {} {} {}".format(key, OUT, ROUNDTRIP))
+    out, ret = Propen(f"wadecrypt {key} {OUT} {ROUNDTRIP}")
     assert ret == 0, out
     return out
 
@@ -42,11 +43,14 @@ class TestRoundTrips:
     def teardown_method(self):
         cleanup()
 
-    @pytest.mark.parametrize("key, type_", [
-        pytest.param(KEY15, "15", id="crypt15"),
-        pytest.param(KEY14, "14", id="crypt14"),
-        pytest.param(KEY14, "12", id="crypt12"),
-    ])
+    @pytest.mark.parametrize(
+        "key, type_",
+        [
+            pytest.param(KEY15, "15", id="crypt15"),
+            pytest.param(KEY14, "14", id="crypt14"),
+            pytest.param(KEY14, "12", id="crypt12"),
+        ],
+    )
     def test_every_type_survives_a_round_trip(self, key, type_):
         roundtrip(key, "--type", type_, "--jid", "67")
         assert cmp_files(ROUNDTRIP, PLAIN)
@@ -66,9 +70,26 @@ class TestRoundTrips:
     def test_features_and_version_end_up_in_the_header(self):
         # --enable-features takes nargs='*', so it has to come before the other options:
         # placed just before the positionals it swallows the keyfile as a feature number.
-        out, ret = Propen(["waencrypt", "--enable-features", "5", "7", "13",
-                           "--type", "15", "--jid", "42", "--wa-version", "2.24.1.1",
-                           "--max-feature", "37", KEY15, PLAIN, OUT])
+        out, ret = Propen(
+            [
+                "waencrypt",
+                "--enable-features",
+                "5",
+                "7",
+                "13",
+                "--type",
+                "15",
+                "--jid",
+                "42",
+                "--wa-version",
+                "2.24.1.1",
+                "--max-feature",
+                "37",
+                KEY15,
+                PLAIN,
+                OUT,
+            ]
+        )
         assert ret == 0, out
         out, ret = Propen("wainfo " + OUT)
         assert ret == 0, out
@@ -77,7 +98,7 @@ class TestRoundTrips:
         assert "Features: [5, 7, 13]" in out
 
 
-def with_unknown_header_field(source: str, dest: str, field: bytes = b'\x30\x03'):
+def with_unknown_header_field(source: str, dest: str, field: bytes = b"\x30\x03"):
     """
     Copies a backup, adding a protobuf field the schema does not model to its header.
 
@@ -85,13 +106,13 @@ def with_unknown_header_field(source: str, dest: str, field: bytes = b'\x30\x03'
     around it -- the size byte grows, and the trailing md5 covers the header, so it has to be
     recomputed -- but the ciphertext and its authentication tag are untouched.
     """
-    raw = open(source, 'rb').read()
+    raw = open(source, "rb").read()
     size = raw[0]
     offset = 2 if raw[1] == 1 else 1
-    proto = raw[offset:offset + size] + field
-    body = raw[offset + size:-16]  # ciphertext and tag, without the md5
+    proto = raw[offset : offset + size] + field
+    body = raw[offset + size : -16]  # ciphertext and tag, without the md5
     header = bytes([len(proto)]) + raw[1:offset] + proto
-    with open(dest, 'wb') as f:
+    with open(dest, "wb") as f:
         f.write(header + body + md5(header + body).digest())
 
 
@@ -107,9 +128,11 @@ def without_feature_table_flag(source: str, dest: str):
     features.
     """
     import io
+
     from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
     from wa_crypt_tools.lib.utils import encode_varint
-    raw = open(source, 'rb').read()
+
+    raw = open(source, "rb").read()
     stream = io.BufferedReader(io.BytesIO(raw))
     db = DatabaseFactory.from_file(stream)
     header_len = stream.tell()
@@ -119,7 +142,25 @@ def without_feature_table_flag(source: str, dest: str):
             db.prefix.backup_metadata.ClearField(field.name)
     serialized = db.prefix.SerializeToString()
     header = encode_varint(len(serialized)) + serialized
-    with open(dest, 'wb') as f:
+    with open(dest, "wb") as f:
+        f.write(header + body + md5(header + body).digest())
+
+
+def with_a_short_iv(source: str, dest: str) -> None:
+    """Rewrites a backup's header with a 12-byte IV, which DatabaseFactory refuses to trust."""
+    import io
+
+    from wa_crypt_tools.lib.db.dbfactory import DatabaseFactory
+    from wa_crypt_tools.lib.utils import encode_varint
+
+    raw = open(source, "rb").read()
+    stream = io.BufferedReader(io.BytesIO(raw))
+    db = DatabaseFactory.from_file(stream)
+    body = raw[stream.tell() : -16]
+    db.prefix.e2ee_key_data.encryption_iv = db.prefix.e2ee_key_data.encryption_iv[:12]
+    serialized = db.prefix.SerializeToString()
+    header = encode_varint(len(serialized)) + serialized
+    with open(dest, "wb") as f:
         f.write(header + body + md5(header + body).digest())
 
 
@@ -129,15 +170,36 @@ class TestReference:
     def teardown_method(self):
         cleanup()
 
+    def test_a_reference_whose_header_does_not_add_up_is_refused(self, tmp_path):
+        # Without --force the reference's own IntegrityError comes straight back out: this
+        # is a tool for reproducing a backup, and reproducing one whose header was not
+        # understood would produce something that is not that backup.
+        ref = str(tmp_path / "short-iv.crypt15")
+        with_a_short_iv("tests/res/msgstore.db.crypt15", ref)
+        out, ret = Propen(["waencrypt", "--reference", ref, KEY15, PLAIN, OUT])
+        assert ret != 0
+        assert "IV is not 16 bytes long but is 12" in out
+        assert not os.path.exists(OUT)
+
+    def test_force_gets_past_the_reference_and_stops_on_the_iv_itself(self, tmp_path):
+        # --force is about reading the reference, not about writing nonsense: it gets past
+        # the header that could not be trusted and then refuses the same 12-byte IV again,
+        # this time because there is no encrypting anything with it.
+        ref = str(tmp_path / "short-iv.crypt15")
+        with_a_short_iv("tests/res/msgstore.db.crypt15", ref)
+        out, ret = Propen(["waencrypt", "--force", "--reference", ref, KEY15, PLAIN, OUT])
+        assert ret != 0
+        assert "Continuing anyway because --force was given" in out
+        assert not os.path.exists(OUT)
+
     def test_a_crypt15_reference_reproduces_the_original(self):
         # The fixture is a 2.22 backup, compressed at level 1, and no -c is passed here:
         # reproducing it byte-for-byte means the level has to come off the reference too.
-        out, ret = Propen("waencrypt --reference tests/res/msgstore.db.crypt15 {} {} {}"
-                          .format(KEY15, PLAIN, OUT))
+        out, ret = Propen(f"waencrypt --reference tests/res/msgstore.db.crypt15 {KEY15} {PLAIN} {OUT}")
         assert ret == 0, out
         if CLASSIC_ZLIB:
             assert cmp_files(OUT, "tests/res/msgstore.db.crypt15")
-        out, ret = Propen("wadecrypt {} {} {}".format(KEY15, OUT, ROUNDTRIP))
+        out, ret = Propen(f"wadecrypt {KEY15} {OUT} {ROUNDTRIP}")
         assert ret == 0, out
         assert cmp_files(ROUNDTRIP, PLAIN)
 
@@ -167,8 +229,7 @@ class TestReference:
         # This used to raise AttributeError out of Props.max_feature, because encrypt() asked
         # the props whether to write the feature table flag and props built from a reference
         # never set it. It reads the flag off the reference now and never asks.
-        out, ret = Propen("waencrypt --type 14 --reference tests/res/msgstore.db.crypt14 "
-                          "{} {} {}".format(KEY14, PLAIN, OUT))
+        out, ret = Propen(f"waencrypt --type 14 --reference tests/res/msgstore.db.crypt14 {KEY14} {PLAIN} {OUT}")
         assert ret == 0, out
 
 
@@ -185,32 +246,32 @@ class TestExistingOutput:
         cleanup()
 
     def write_something(self):
-        with open(OUT, 'wb') as f:
-            f.write(b'PRECIOUS')
+        with open(OUT, "wb") as f:
+            f.write(b"PRECIOUS")
 
     def test_an_existing_output_stops_the_run(self):
         self.write_something()
-        out, ret = Propen("waencrypt {} {} {}".format(KEY15, PLAIN, OUT))
+        out, ret = Propen(f"waencrypt {KEY15} {PLAIN} {OUT}")
         assert ret != 0
         assert "output file already exists" in out
-        with open(OUT, 'rb') as f:
-            assert f.read() == b'PRECIOUS'
+        with open(OUT, "rb") as f:
+            assert f.read() == b"PRECIOUS"
 
     def test_yes_overwrites_it(self):
         self.write_something()
-        out, ret = Propen("waencrypt --yes {} {} {}".format(KEY15, PLAIN, OUT))
+        out, ret = Propen(f"waencrypt --yes {KEY15} {PLAIN} {OUT}")
         assert ret == 0, out
-        out, ret = Propen("wadecrypt {} {} {}".format(KEY15, OUT, ROUNDTRIP))
+        out, ret = Propen(f"wadecrypt {KEY15} {OUT} {ROUNDTRIP}")
         assert ret == 0, out
         assert cmp_files(ROUNDTRIP, PLAIN)
 
     def test_a_run_that_fails_leaves_the_output_alone(self):
         # Even with --yes: the file is opened only once there is something to write to it.
         self.write_something()
-        out, ret = Propen("waencrypt --yes tests/res/test.json {} {}".format(PLAIN, OUT))
+        _out, ret = Propen(f"waencrypt --yes tests/res/test.json {PLAIN} {OUT}")
         assert ret != 0
-        with open(OUT, 'rb') as f:
-            assert f.read() == b'PRECIOUS'
+        with open(OUT, "rb") as f:
+            assert f.read() == b"PRECIOUS"
 
 
 class TestFailures:
@@ -218,15 +279,25 @@ class TestFailures:
         cleanup()
 
     def test_a_file_that_is_not_a_key_fails(self):
-        out, ret = Propen("waencrypt tests/res/test.json {} {}".format(PLAIN, OUT))
+        out, ret = Propen(f"waencrypt tests/res/test.json {PLAIN} {OUT}")
         assert ret != 0
         assert "not a valid Java object" in out
 
     def test_a_reference_that_is_not_a_backup_fails(self):
-        out, ret = Propen("waencrypt --reference tests/res/test.json {} {} {}"
-                          .format(KEY15, PLAIN, OUT))
+        out, ret = Propen(f"waencrypt --reference tests/res/test.json {KEY15} {PLAIN} {OUT}")
         assert ret != 0
         assert "does not look like a crypt12, 14 or 15 database" in out
+
+    @pytest.mark.parametrize("type_", ["12", "14"])
+    def test_a_crypt15_key_cannot_build_an_older_format(self, type_):
+        # crypt12 and crypt14 headers are built out of the key file's own cipher version,
+        # server salt and google id, and a crypt15 key has none of them. This used to reach
+        # for them anyway and die on an AttributeError halfway through writing the header.
+        out, ret = Propen(["waencrypt", "--type", type_, KEY15, PLAIN, OUT])
+        assert ret != 0
+        assert "needs a crypt14 key file" in out
+        assert "AttributeError" not in out
+        assert not os.path.exists(OUT)
 
 
 class TestCompressionLevel:

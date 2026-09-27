@@ -39,6 +39,86 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Release $TAG" --notes ""
+  # The GUI binaries a non-technical user actually downloads. They hang off the release rather
+  # than replacing it, so a PyInstaller failure on one platform costs that one asset and leaves
+  # the release and the PyPI upload alone.
+  #
+  # Built from packaging/wagui.spec, not from flags, so that a local `pyinstaller
+  # packaging/wagui.spec` produces the same thing. Each leg then runs its own binary with
+  # --selftest, which imports the generated protobuf modules: they are loaded lazily inside
+  # DatabaseFactory.from_file, so they are what a frozen build can silently omit, and --version
+  # alone would not notice.
+  binaries:
+    needs: release
+    # Uploading the assets to the release this workflow just made is all this job does.
+    permissions:
+      contents: write
+    name: Build ${{ matrix.asset }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One platform failing to build must not cancel the assets that did build.
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset: wagui-linux-x64
+          - os: windows-latest
+            asset: wagui-windows-x64.exe
+          # macos-latest is arm64. Intel Macs would need a macos-13 leg adding here.
+          - os: macos-latest
+            asset: wagui-macos-arm64.zip
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip pyinstaller
+          python -m pip install .
+      - name: Build
+        run: pyinstaller --noconfirm packaging/wagui.spec
+
+      # macOS gets a .app directory (a windowed onefile is not a thing there), so it ships
+      # zipped; the other two are already a single file.
+      - name: Package and check (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          dist/wagui.app/Contents/MacOS/wagui --selftest
+          ditto -c -k --keepParent dist/wagui.app "${{ matrix.asset }}"
+      - name: Package and check (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          dist/wagui --selftest
+          mv dist/wagui "${{ matrix.asset }}"
+      # Start-Process -Wait, not a bare call: wagui.exe is built for the GUI subsystem, so
+      # PowerShell does not wait for it and $LASTEXITCODE would be someone else's. For the
+      # same reason its output has to be redirected to be seen at all.
+      - name: Package and check (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $opts = @{ FilePath = 'dist\wagui.exe'; ArgumentList = '--selftest'; Wait = $true;
+                     PassThru = $true; NoNewWindow = $true; RedirectStandardOutput = 'selftest.txt' }
+          $p = Start-Process @opts
+          Get-Content selftest.txt
+          if ($p.ExitCode -ne 0) { exit 1 }
+          Move-Item dist\wagui.exe "${{ matrix.asset }}"
+        shell: pwsh
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          ASSET: ${{ matrix.asset }}
+        run: gh release upload "$TAG" "$ASSET" --repo "$GITHUB_REPOSITORY"
+        shell: bash
+
   pypi-publish:
     needs: release
     name: Publish release to PyPI

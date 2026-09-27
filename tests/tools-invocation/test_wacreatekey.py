@@ -1,10 +1,10 @@
-from os.path import exists
-from hashlib import sha512
+from __future__ import annotations
 
-from wa_crypt_tools.lib.key.key15 import Key15
-from wa_crypt_tools.lib.key.keyfactory import KeyFactory
+from hashlib import sha512
+from os.path import exists
 
 from tests.utils.utils import Propen, cmp_files, rm_if_found
+from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 
 
 class TestWaCreateKey:
@@ -13,8 +13,9 @@ class TestWaCreateKey:
         try:
             out, ret = Propen("wacreatekey")
             assert ret == 0
-            assert "Key file \"encrypted_backup.key\" created." in out
-            key: Key15 = KeyFactory.from_file("encrypted_backup.key")
+            assert 'Key file "encrypted_backup.key" created.' in out
+            # The call is the assertion: a key file that does not parse raises here.
+            KeyFactory.from_file("encrypted_backup.key")
         finally:
             # cleanup
             rm_if_found("encrypted_backup.key")
@@ -22,12 +23,11 @@ class TestWaCreateKey:
     def test_hex_key(self):
         assert not exists("encrypted_backup.key")
         try:
-            out,ret  = Propen("wacreatekey"
-                              " --hex 6730a595a1484d0c39c101dc0ac82ec5e401bb6f0e1b8ee2dc104a6b3687f017")
+            out, ret = Propen("wacreatekey --hex 6730a595a1484d0c39c101dc0ac82ec5e401bb6f0e1b8ee2dc104a6b3687f017")
             print(out)
 
             assert ret == 0
-            assert "Key file \"encrypted_backup.key\" created." in out
+            assert 'Key file "encrypted_backup.key" created.' in out
             assert cmp_files("encrypted_backup.key", "tests/res/encrypted_backup.key")
         finally:
             rm_if_found("encrypted_backup.key")
@@ -51,7 +51,7 @@ class TestWaCreateKey:
         try:
             out, ret = Propen("wacreatekey -o custom.key")
             assert ret == 0
-            assert "Key file \"custom.key\" created." in out
+            assert 'Key file "custom.key" created.' in out
             assert exists("custom.key")
         finally:
             rm_if_found("custom.key")
@@ -77,7 +77,7 @@ class TestWaCreateKey:
             Propen("wacreatekey")
             with open("encrypted_backup.key", "rb") as f:
                 chksum = sha512(f.read()).digest()
-            out, ret = Propen("wacreatekey -y")
+            _out, ret = Propen("wacreatekey -y")
             assert ret == 0
             with open("encrypted_backup.key", "rb") as f:
                 assert chksum != sha512(f.read()).digest()
@@ -86,17 +86,37 @@ class TestWaCreateKey:
             # cleanup
             rm_if_found("encrypted_backup.key")
 
+    def test_crypt14_only_options_are_ignored_with_a_warning_for_a_crypt15_key(self):
+        # A crypt15 key is 32 bytes and nothing else, so none of these have anywhere to go.
+        # Refusing them would be unhelpful for what is plainly a copied-and-pasted command
+        # line; ignoring them silently would leave the user believing they took effect.
+        assert not exists("encrypted_backup.key")
+        try:
+            out, ret = Propen(
+                "wacreatekey -cv 1 -kv 2"
+                " -ss cd788b1b4625f50d3fccdeac94e1ff638899733b77a224ff614918363901f044"
+                " -gi 92683e735c88727eef9486911f3ac6fa"
+            )
+            assert ret == 0, out
+            for ignored in ("Cipher version", "Key version", "Server salt", "Google id"):
+                assert f"{ignored} specified, but it is not used for crypt15 keys, ignoring." in out
+            KeyFactory.from_file("encrypted_backup.key")
+        finally:
+            rm_if_found("encrypted_backup.key")
+
     def test_crypt14_key(self):
         assert not exists("key")
         try:
-            out, ret = Propen("wacreatekey -c14"
-                      " --hex 3a146d9bbd8b6311d962c71619c0c2cce3ce694ea4a0f3f600e271380e1226c6"
-                      " -ss cd788b1b4625f50d3fccdeac94e1ff638899733b77a224ff614918363901f044"
-                      " -gi 92683e735c88727eef9486911f3ac6fa"
-                      " -kv 2"
-                      " -cv 1")
+            out, ret = Propen(
+                "wacreatekey -c14"
+                " --hex 3a146d9bbd8b6311d962c71619c0c2cce3ce694ea4a0f3f600e271380e1226c6"
+                " -ss cd788b1b4625f50d3fccdeac94e1ff638899733b77a224ff614918363901f044"
+                " -gi 92683e735c88727eef9486911f3ac6fa"
+                " -kv 2"
+                " -cv 1"
+            )
             assert ret == 0
-            assert "Key file \"key\" created." in out
+            assert 'Key file "key" created.' in out
             assert cmp_files("key", "tests/res/key")
         finally:
             rm_if_found("key")
@@ -106,18 +126,27 @@ class TestWaCreateKey:
         try:
             out, ret = Propen(arguments)
             assert ret == 0
-            key = KeyFactory.from_file("key")
+            # As above: parsing it is the check.
+            KeyFactory.from_file("key")
             return out
         finally:
             rm_if_found("key")
 
     def test_crypt14_key_not_all_parameters(self):
-        arguments=["wacreatekey", "-c14", "--hex",
-                   "3a146d9bbd8b6311d962c71619c0c2cce3ce694ea4a0f3f600e271380e1226c6",
-                    "-ss", "cd788b1b4625f50d3fccdeac94e1ff638899733b77a224ff614918363901f044",
-                    "-gi", "92683e735c88727eef9486911f3ac6fa",
-                    "-kv", "2",
-                    "-cv", "1"]
+        arguments = [
+            "wacreatekey",
+            "-c14",
+            "--hex",
+            "3a146d9bbd8b6311d962c71619c0c2cce3ce694ea4a0f3f600e271380e1226c6",
+            "-ss",
+            "cd788b1b4625f50d3fccdeac94e1ff638899733b77a224ff614918363901f044",
+            "-gi",
+            "92683e735c88727eef9486911f3ac6fa",
+            "-kv",
+            "2",
+            "-cv",
+            "1",
+        ]
         # call without key
         self.call_wacreatekey_14(arguments[:2] + arguments[4:])
         # call without server salt
@@ -143,12 +172,14 @@ class TestWaCreateKey:
     def test_crypt14_invalid_server_salt(self):
         assert not exists("key")
         try:
-            out, ret = Propen("wacreatekey -c14"
-                              " --hex 3a146d9bbd8b6311d962c71619c0c2cce3ce694ea4a0f3f600e271380e1226c6"
-                              " -ss invalid"
-                              " -gi 92683e735c88727eef9486911f3ac6fa"
-                              " -kv 2"
-                              " -cv 1")
+            out, ret = Propen(
+                "wacreatekey -c14"
+                " --hex 3a146d9bbd8b6311d962c71619c0c2cce3ce694ea4a0f3f600e271380e1226c6"
+                " -ss invalid"
+                " -gi 92683e735c88727eef9486911f3ac6fa"
+                " -kv 2"
+                " -cv 1"
+            )
             assert ret != 0
             assert "Something was not right" in out
             assert not exists("key")
@@ -158,12 +189,14 @@ class TestWaCreateKey:
     def test_crypt14_invalid_google_id(self):
         assert not exists("key")
         try:
-            out, ret = Propen("wacreatekey -c14"
-                              " --hex 3a146d9bbd8b6311d962c71619c0c2cce3ce694ea4a0f3f600e271380e1226c6"
-                              " -ss cd788b1b4625f50d3fccdeac94e1ff638899733b77a224ff614918363901f044"
-                              " -gi invalid"
-                              " -kv 2"
-                              " -cv 1")
+            out, ret = Propen(
+                "wacreatekey -c14"
+                " --hex 3a146d9bbd8b6311d962c71619c0c2cce3ce694ea4a0f3f600e271380e1226c6"
+                " -ss cd788b1b4625f50d3fccdeac94e1ff638899733b77a224ff614918363901f044"
+                " -gi invalid"
+                " -kv 2"
+                " -cv 1"
+            )
             assert ret != 0
             assert "Something was not right" in out
         finally:
@@ -173,12 +206,14 @@ class TestWaCreateKey:
     def test_crypt14_invalid_google_id_length(self):
         assert not exists("key")
         try:
-            out, ret = Propen("wacreatekey -c14"
-                          " --hex 3a146d9bbd8b6311d962c71619c0c2cce3ce694ea4a0f3f600e271380e1226c6"
-                          " -ss cd788b1b4625f50d3fccdeac94e1ff638899733b77a224ff614918363901f044"
-                          " -gi 92683e7eef9486911f3ac6fa00"
-                          " -kv 2"
-                          " -cv 1")
+            _out, ret = Propen(
+                "wacreatekey -c14"
+                " --hex 3a146d9bbd8b6311d962c71619c0c2cce3ce694ea4a0f3f600e271380e1226c6"
+                " -ss cd788b1b4625f50d3fccdeac94e1ff638899733b77a224ff614918363901f044"
+                " -gi 92683e7eef9486911f3ac6fa00"
+                " -kv 2"
+                " -cv 1"
+            )
             assert ret != 0
             # assert "Invalid google id length" in out
             assert not exists("key")
@@ -188,26 +223,30 @@ class TestWaCreateKey:
     def test_crypt14_invalid_key_version(self):
         assert not exists("key")
         try:
-            out, ret = Propen("wacreatekey -c14"
-                          " --hex 3a146d9bbd8b6311d962c71619c0c2cce3ce694ea4a0f3f600e271380e1226c6"
-                          " -ss cd788b1b4625f50d3fccdeac94e1ff638899733b77a224ff614918363901f044"
-                          " -gi 92683e735c88727eef9486911f3ac6fa"
-                          " -kv invalid"
-                          " -cv 1")
+            _out, ret = Propen(
+                "wacreatekey -c14"
+                " --hex 3a146d9bbd8b6311d962c71619c0c2cce3ce694ea4a0f3f600e271380e1226c6"
+                " -ss cd788b1b4625f50d3fccdeac94e1ff638899733b77a224ff614918363901f044"
+                " -gi 92683e735c88727eef9486911f3ac6fa"
+                " -kv invalid"
+                " -cv 1"
+            )
             assert ret != 0
-            #assert "usage:" in out
+            # assert "usage:" in out
             assert not exists("key")
         finally:
             rm_if_found("key")
 
     def test_crypt14_invalid_cipher_version(self):
         assert not exists("key")
-        out, ret = Propen("wacreatekey -c14"
-                          " --hex 3a146d9bbd8b6311d962c71619c0c2cce3ce694ea4a0f3f600e271380e1226c6"
-                          " -ss cd788b1b4625f50d3fccdeac94e1ff638899733b77a224ff614918363901f044"
-                          " -gi 92683e735c88727eef9486911f3ac6fa"
-                          " -kv 2"
-                          " -cv invalid")
+        out, ret = Propen(
+            "wacreatekey -c14"
+            " --hex 3a146d9bbd8b6311d962c71619c0c2cce3ce694ea4a0f3f600e271380e1226c6"
+            " -ss cd788b1b4625f50d3fccdeac94e1ff638899733b77a224ff614918363901f044"
+            " -gi 92683e735c88727eef9486911f3ac6fa"
+            " -kv 2"
+            " -cv invalid"
+        )
         assert ret != 0
         assert "usage:" in out
         assert not exists("key")

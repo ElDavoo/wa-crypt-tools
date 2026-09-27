@@ -4,7 +4,8 @@
 
 # WhatsApp Crypt Tools
 Decrypt and encrypt WhatsApp and WA Business' .crypt12, .crypt14 and .crypt15 files with ease!  
-For decryption, you NEED **the key file** or the 64-characters long key.  
+For decryption, you NEED **the key file** or the 64-characters long key
+(or [a screenshot of it](#reading-the-key-from-a-screenshot)).  
 The key file is named "key" if the backup is crypt14 or  
 "encrypted_backup.key" if the backup is crypt15 (encrypted E2E backups).  
 Those who are looking for a more complete suite for
@@ -39,6 +40,49 @@ python -m pip install git+https://github.com/ElDavoo/wa-crypt-tools
 for the development version.  
 
 You might have to create a virtual environment to avoid conflicts with other packages.  
+
+For an in-terminal progress bar while using `wadecrypt -nm` or `--buffer-size`, install the
+optional `progress` extra:
+
+```bash
+python -m pip install 'wa-crypt-tools[progress]'
+```
+
+Without it, decryption works as usual and no progress bar is shown.
+
+# The window: wagui
+
+If you would rather not use a terminal at all, `wagui` is a small window that decrypts a
+backup: pick your key, pick the backup, press Decrypt.
+
+![The wagui window](docs/wagui.png)
+
+**Download it and double-click it.** Every
+[release](https://github.com/ElDavoo/wa-crypt-tools/releases) carries a self-contained build
+that needs no Python and no installation:
+
+| File | For |
+| --- | --- |
+| `wagui-windows-x64.exe` | Windows |
+| `wagui-macos-arm64.zip` | macOS (Apple Silicon) |
+| `wagui-linux-x64` | Linux (`chmod +x` it first) |
+
+The macOS build is not code-signed, so the first time you open it macOS will refuse: right-click
+the app and choose *Open*, then confirm.
+
+If you already installed the package with pip, the same window is one command away:
+
+```bash
+wagui
+```
+
+On Linux, a pip install also needs your distribution's tkinter package (`python3-tk` on
+Debian/Ubuntu, `python3-tkinter` on Fedora) -- it is part of Python but packaged separately.
+The downloadable build has it built in and needs nothing.
+
+The window covers decrypting, which is what most people are here for. It also tells you what a
+file is as soon as you pick it, the way `wainfo` does. Encrypting, creating key files and
+guessing offsets stay in the command-line tools below.
 
 # Quick start
 
@@ -95,6 +139,11 @@ You need to supply the following parameters:
 1) The feature list: Only for 2019+ databases. These are really the database migration flags
    WhatsApp records in the header, and there is no way to infer them from a database file. The
    defaults are what a 2.26.34.7 msgstore carries, which is all of them.
+   Only a msgstore has them. Every other backup -- `wa.db`, `stickers.db`, the rest of
+   `WhatsApp/Backups/` -- carries no feature information at all, which is what `wainfo` means
+   by "No feature table found (not a msgstore DB or very old)". To write a header of that
+   shape, pass `--enable-features` with nothing after it: an empty list writes neither the
+   migration flags nor the backup version, and `--max-feature` then does nothing.
 2) The max feature number, which is 39 at the time of writing
 3) The version of the app that encrypted the file: defaults to 2.26.34.7.
 4) Jid: The last 2 numbers of your phone number -- this one really is yours, and defaults to 00
@@ -116,8 +165,69 @@ waencrypt.py:89         : [I] Done!
 
 You can get info about a backup file with the `wainfo` tool.
 
+## Reading the key from a screenshot
+
+WhatsApp shows the 64-digit key once and never again, so most people screenshot it.
+You can give that screenshot to any of the tools **wherever the key file goes** -- there is
+no extra flag, the tools work out what they were handed:
+
+```
+$ wadecrypt Screenshot_20260901-184609_WhatsApp.png msgstore.db.crypt15 msgstore.db
+ocr.py:503      : [I] Reading the key from the screenshot, this takes a few seconds...
+key15.py:55     : [I] Crypt15 / Raw key loaded
+wadecrypt.py:301        : [I] Done
+```
+
+`wainfo -k <screenshot>` prints just the key, if you only want to read it. `wagui` takes one
+too: pick it where you would pick the key file.
+
+This is **optional** and needs two things installed:
+
+```
+python -m pip install 'wa-crypt-tools[ocr]'
+```
+
+plus the Tesseract program itself -- `sudo apt install tesseract-ocr` on Debian/Ubuntu,
+`brew install tesseract` on macOS, `winget install UB-Mannheim.TesseractOCR` on Windows.
+Without them nothing else changes; you are only told to install them if you pass an image.
+
+### When a digit is wrong
+
+`wadecrypt` checks the key against the backup before using it, and if it does not fit, it
+quietly looks for a near miss and carries on with the one that works. **Any single wrong
+digit is always found.** You are not told about any of this, because there is nothing for you
+to do -- run with `-v` if you want to see it. A candidate is only ever accepted once it has
+actually decrypted the start of the backup, so nothing here is a guess that gets used.
+
+This applies to **the 64 digits typed in directly**, not just to screenshots -- which is the
+same mistake, since the digits usually get typed off a screenshot in the first place. There
+it also tries the slips particular to copying by hand: two digits swapped round, two groups
+swapped, and the 4x4 grid read down the columns instead of across the rows. All of that takes
+about a second; a key that is simply the wrong key costs you two before the usual error.
+
+A key *file* is never second-guessed. Its digits were never transcribed by anyone, so it is
+either the right file or the wrong one.
+
+If even that fails, it says so, and says what to do about it:
+
+```
+[C] Could not read the key from the screenshot: what it says does not decrypt this backup,
+    and neither does any near miss of it.
+    Transcribe the 64 digits from the screenshot by hand and pass those instead of the image.
+```
+
+A few other things worth knowing:
+
+- Give it the **original screenshot**, not a photo of a screen and not a version something
+  has scaled down. Cropping to just the key is fine and often helps.
+- It reads the key screen: four rows of four groups, or any other layout that comes to 64
+  digits. It is not a general-purpose OCR and will not find a key written out in a sentence.
+- `wainfo -k` has no backup to check against, so it cannot repair anything -- it prints what
+  it read, and you compare it against the picture yourself.
+
 # Tool list
 For usage, run the tool with `-h` option.
+0) `wagui` - The window (see above); the only one that is not a command-line tool
 1) `wacreatekey` - Create key files
 2) `wadecrypt` - Decrypt backups
 3) `waencrypt` - Encrypt backups
@@ -132,7 +242,7 @@ Everything the tools do is available through `import wa_crypt_tools`.
 from wa_crypt_tools import DatabaseFactory, KeyFactory, IntegrityError
 import zlib
 
-key = KeyFactory.new("encrypted_backup.key")   # a key file, or the 64-character key itself
+key = KeyFactory.new("encrypted_backup.key")  # a key file, or the 64-character key itself
 
 with open("msgstore.db.crypt15", "rb") as f:
     # Reads the header and leaves the stream at the start of the ciphertext.
@@ -153,6 +263,7 @@ Every error the library raises derives from `WaCryptError`, itself a `ValueError
 | Exception | Means |
 | --- | --- |
 | `InvalidKeyError` | the key file or hex key cannot be used |
+| `ScreenshotKeyError` | a subclass of it: OCR could not read the key off a screenshot |
 | `HeaderError` | the header is missing, truncated or unparsable |
 | `DecryptionError` | the cipher failed |
 | `IntegrityError` | a check failed, but a result was produced anyway |
@@ -229,7 +340,8 @@ On a rooted Android device, you can just copy
 (or `/data/data/com.whatsapp/files/encrypted_backup.key` if backups are crypt15).  
 If you enabled E2E backups, and you did not use a password 
 (you have a copy of the 64-digit key, for example a screenshot), 
-you can just transcribe and use it in lieu of the key file parameter.  
+you can use the 64 digits in lieu of the key file parameter -- or hand the tools the 
+screenshot itself, see [Reading the key from a screenshot](#reading-the-key-from-a-screenshot).  
 **There are other ways, but it is not in the scope of this project 
 to tell you.  
 Issues asking for this will be closed as invalid.**  
@@ -294,13 +406,20 @@ You can move the protoc program to the `wa-crypt-tools/proto` folder where the .
 Replace the protobuf classes as needed and run `protoc` to generate the python classes. 
 From the `wa-crypt-tools/proto` directory of the project, run:
 
-`./protoc --python_out=../src/wa_crypt_tools/proto --proto_path=. *.proto`
+`./protoc --python_out=../src/wa_crypt_tools/proto --mypy_out=../src/wa_crypt_tools/proto --proto_path=. *.proto`
+
+`--mypy_out` writes the `.pyi` type stubs beside the generated classes, and needs
+[mypy-protobuf](https://github.com/nipunn1313/mypy-protobuf) (`pip install mypy-protobuf`,
+which puts `protoc-gen-mypy` on your `PATH`). It is only needed to regenerate: nothing at
+runtime or in the test suite imports it. Leave it out and the classes still work, but a type
+checker sees a module with no attributes at all, because `_pb2.py` builds them at import time
+out of a serialized descriptor.
 
 After generating the protobuf python classes through `protoc`, from that same directory run:
 
 `python fix_imports.py ../src/wa_crypt_tools/proto`
 
-Now all the generated python classes should have their imports fixed.
+Now all the generated python classes, and their stubs, should have their imports fixed.
 
 Note that `protoc` and the `protobuf` runtime must be version-matched: code generated
 by `protoc` vX.Y asserts a runtime of at least the corresponding `protobuf` X.Y at

@@ -7,6 +7,8 @@ none of them ran it at all, and `wainfo <any crypt14>` died with
 "AttributeError: 'Database14' object has no attribute 'cipher_version'".
 """
 
+from __future__ import annotations
+
 import pytest
 
 from tests.utils.utils import Propen, rm_if_found
@@ -19,23 +21,28 @@ def make_short_iv_backup():
     """A crypt15 header whose IV is 8 bytes: readable, but not usable for decryption."""
     from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
     from wa_crypt_tools.proto import key_type_pb2 as key_type
+
     header = prefix.BackupPrefix()
     header.key_type_deprecated = key_type.Key_Type.E2EE_DEPRECATED
-    header.e2ee_key_data.encryption_iv = b'\x00' * 8
+    header.e2ee_key_data.encryption_iv = b"\x00" * 8
     header.backup_metadata.app_version = "2.22.5.13"
     header.backup_metadata.jid_suffix = "67"
     header.backup_metadata.call_log_migration_finished = True
     serialized = header.SerializeToString()
-    with open(BAD_IV, 'wb') as f:
-        f.write(encode_varint(len(serialized)) + serialized + b'\xff' * 64)
+    with open(BAD_IV, "wb") as f:
+        f.write(encode_varint(len(serialized)) + serialized + b"\xff" * 64)
 
 
 class TestWaInfoOnBackups:
-    @pytest.mark.parametrize("backup, expected", [
-        ("msgstore.db.crypt15", "Database15"),
-        ("msgstore.db.crypt14", "Database14(iv: ea53ceae36ecab50bc331aeb62491625)"),
-        ("msgstore.db.crypt12", "cipher_version:"),
-    ], ids=["crypt15", "crypt14", "crypt12"])
+    @pytest.mark.parametrize(
+        "backup, expected",
+        [
+            ("msgstore.db.crypt15", "Database15"),
+            ("msgstore.db.crypt14", "Database14(iv: ea53ceae36ecab50bc331aeb62491625)"),
+            ("msgstore.db.crypt12", "cipher_version:"),
+        ],
+        ids=["crypt15", "crypt14", "crypt12"],
+    )
     def test_every_format_can_be_printed(self, backup, expected):
         out, ret = Propen("wainfo tests/res/" + backup)
         assert ret == 0, out
@@ -92,5 +99,5 @@ class TestWaInfoOnKeys:
         assert "not a valid Java object" in out
 
     def test_a_backup_read_as_a_key_fails(self):
-        out, ret = Propen("wainfo -k tests/res/msgstore.db.crypt15")
+        _out, ret = Propen("wainfo -k tests/res/msgstore.db.crypt15")
         assert ret != 0

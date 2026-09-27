@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 log = logging.getLogger(__name__)
@@ -14,6 +16,7 @@ from wa_crypt_tools.lib.errors import (
     HeaderError,
     IntegrityError,
     InvalidKeyError,
+    ScreenshotKeyError,
     WaCryptError,
 )
 from wa_crypt_tools.lib.key.key import Key
@@ -23,8 +26,20 @@ from wa_crypt_tools.lib.key.keyfactory import KeyFactory
 from wa_crypt_tools.lib.props import Props
 
 __all__ = [
-    "Database", "Database12", "Database14", "Database15", "DatabaseFactory",
-    "Key", "Key14", "Key15", "KeyFactory",
+    "Database",
+    "Database12",
+    "Database14",
+    "Database15",
+    "DatabaseFactory",
+    "DecryptionError",
+    "HeaderError",
+    "IntegrityError",
+    "InvalidKeyError",
+    "Key",
+    "Key14",
+    "Key15",
+    "KeyFactory",
     "Props",
-    "WaCryptError", "InvalidKeyError", "HeaderError", "DecryptionError", "IntegrityError",
+    "ScreenshotKeyError",
+    "WaCryptError",
 ]

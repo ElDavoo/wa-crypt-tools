@@ -6,6 +6,9 @@ resolves if the output directory happens to be on sys.path. Inside a package it
 must be ``from . import foo_pb2 as foo__pb2``. This rewrites those lines and
 leaves the rest of the generated file exactly as protoc wrote it.
 
+The ``.pyi`` stubs mypy-protobuf writes alongside them have the same problem and
+take the same fix, so both suffixes are rewritten.
+
 Usage (after running protoc):
 
     python proto/fix_imports.py ../src/wa_crypt_tools/proto
@@ -22,7 +25,7 @@ def fix(source: str, siblings: set[str]) -> str:
     """Make top-level imports of `siblings` relative."""
     names = "|".join(sorted(map(re.escape, siblings)))
     return re.sub(
-        r"^import ({})( as \w+)?$".format(names),
+        rf"^import ({names})( as \w+)?$",
         lambda m: "from . import {}{}".format(m.group(1), m.group(2) or ""),
         source,
         flags=re.MULTILINE,
@@ -35,9 +38,9 @@ def main(argv: list[str]) -> int:
         return 2
 
     out = Path(argv[1])
-    generated = sorted(out.glob("*_pb2.py"))
+    generated = sorted(out.glob("*_pb2.py")) + sorted(out.glob("*_pb2.pyi"))
     if not generated:
-        print("no *_pb2.py files found in {}".format(out), file=sys.stderr)
+        print(f"no *_pb2.py files found in {out}", file=sys.stderr)
         return 1
 
     siblings = {path.stem for path in generated}
@@ -48,7 +51,7 @@ def main(argv: list[str]) -> int:
         if result != source:
             path.write_text(result)
             fixed += 1
-    print("fixed imports in {} of {} files".format(fixed, len(generated)))
+    print(f"fixed imports in {fixed} of {len(generated)} files")
     return 0
 
 

@@ -5,6 +5,8 @@ Version-specific behaviour lives in the three subclasses; what the base class gu
 that all three of them answer the same four calls.
 """
 
+from __future__ import annotations
+
 import inspect
 
 import pytest
@@ -28,10 +30,10 @@ class TestDatabase:
                 return "Database16"
 
             def decrypt(self, key, encrypted):
-                return b''
+                return b""
 
             def encrypt(self, key, props, decrypted):
-                return b''
+                return b""
 
         with pytest.raises(TypeError, match="get_iv"):
             Database16()

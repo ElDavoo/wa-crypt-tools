@@ -40,13 +40,107 @@ waencrypt = "wa_crypt_tools.waencrypt:main"
 waguess = "wa_crypt_tools.waguess:main"
 wainfo = "wa_crypt_tools.wainfo:main"
 
+# gui-scripts, not scripts: this is what makes Windows build a console-less wagui.exe, so a
+# double-click opens the window and nothing else.
+[project.gui-scripts]
+wagui = "wa_crypt_tools.gui:main"
+
 [project.optional-dependencies]
+progress = [
+    "tqdm >= 4.66.0"
+]
+# Reading a key off a screenshot (KeyFactory.new on an image). Needs the tesseract binary too:
+# Debian/Ubuntu "apt install tesseract-ocr", macOS "brew install tesseract",
+# Windows "winget install UB-Mannheim.TesseractOCR".
+ocr = [
+    "pytesseract >= 0.3.13",
+    # pytesseract depends on Pillow already, but lib/key/ocr.py imports PIL itself.
+    "Pillow >= 10.0.0"
+]
 test = [
     "pytest >= 8.0.0",
     "pytest-cov >= 4.0.0",
     # Subprocess coverage for tests/tools-invocation/ relies on the .pth file coverage
     # installs into site-packages; see conftest.py. Pinned to a version known to ship it.
     "coverage >= 7.16.0",
-    "flake8 >= 7.0.0",
+    # Rule selection lives in [tool.ruff.lint] below. The upper bound is deliberate: ruff adds
+    # rules to existing groups in minor releases, so an unbounded range lets a routine dependabot
+    # bump turn CI red on code nobody touched.
+    "ruff >= 0.16.5, < 0.17",
+    # Advisory only -- CI reports mypy but does not fail on it. See the workflow for why.
+    "mypy >= 1.18.0",
+    # The stubs for the protobuf runtime. Without them google.protobuf is Any under
+    # ignore_missing_imports and the generated .pyi next to each _pb2.py -- which is what
+    # makes the header messages checkable at all -- says nothing mypy can use.
+    "types-protobuf >= 7.35.0",
     "coveralls >= 3.3.0"
 ]
+
+[tool.ruff]
+line-length = 127
+# Generated protobuf classes. protoc writes them, `proto/fix_imports.py` rewrites five import
+# lines in one of them, and nothing here is hand-maintained -- linting them only produces
+# findings no one may act on. `proto/fix_imports.py` itself lives at the repo root and IS linted.
+extend-exclude = ["src/wa_crypt_tools/proto"]
+
+[tool.ruff.lint]
+# Selected explicitly rather than left to ruff's default set. Dependabot bumps ruff daily here,
+# and the default set grows between minor releases -- an implicit set means a dependency bump can
+# turn CI red on code nobody touched. The version range in the `test` extra is the other half of
+# that: patch releases fix bugs, minor releases add rules.
+select = [
+    "E", "W",      # pycodestyle
+    "F",           # pyflakes -- unused imports and names, the gap the old flake8 select left open
+    "I",           # isort
+    "UP",          # pyupgrade
+    "B",           # flake8-bugbear
+    "SIM",         # flake8-simplify
+    "C4",          # flake8-comprehensions
+    "PIE",         # flake8-pie
+    "RET",         # flake8-return
+    "BLE",         # flake8-blind-except
+    "G",           # flake8-logging-format -- lazy %s args, not f-strings, in log calls
+    "PTH",         # flake8-use-pathlib -- os.path and open() where a Path method reads better
+    "RUF",         # ruff's own
+    "PLE", "PLW",  # pylint errors and warnings
+    "PLR1722",     # exit() -- which only exists when `site` ran -- instead of sys.exit()
+    "PLR1730",     # if-stmt-min-max
+    "TRY201",      # `raise e` inside `except ... as e` instead of a bare `raise`
+]
+
+# `from __future__ import annotations` was in twelve files and missing from fifteen, with
+# nothing distinguishing the two groups. Required everywhere rather than removed everywhere: it
+# is what lets an annotation name something imported only for typing, it keeps annotations from
+# being evaluated at import, and it is the semantics Python is moving to anyway.
+[tool.ruff.lint.isort]
+required-imports = ["from __future__ import annotations"]
+
+[tool.ruff.lint.per-file-ignores]
+# The NullHandler has to be attached before the submodules are imported, or importing this
+# library as a library warns on any log record it emits. That puts the re-exports below it.
+"src/wa_crypt_tools/__init__.py" = ["E402"]
+# Tests open fixtures and hand the handle to a factory that reads the header off it, then read
+# the rest themselves -- a `with` block around that would close the file mid-assertion.
+# PTH is scoped to the library and utils on purpose. What it is for is keeping path handling in
+# the shipped code consistent -- `Path(x).is_file()` next to `open(x)` was the actual mess -- and
+# there it is now uniform. In tests, `open("tests/res/...")` and `exists(...)` against a literal
+# fixture path are the clearest way to say what they say, and rewriting 89 of them would be
+# churn through the assertions with nothing gained.
+"tests/*" = ["SIM115", "PTH"]
+
+[tool.mypy]
+python_version = "3.10"
+# Third-party packages that ship no type information: javaobj and pycryptodomex. Without this
+# every import of them is an error, which buries the findings that are about this code.
+ignore_missing_imports = true
+# Without this mypy skips the body of every function that has no annotations at all -- which
+# here was most of each wa*.py, main() and encrypt()/decrypt() included. Ten real findings were
+# hiding behind it, and turning it on is what keeps a clean run meaning something.
+check_untyped_defs = true
+# Generated protobuf classes: the .py protoc writes builds its classes at import time and has
+# nothing to check, and the .pyi mypy-protobuf writes beside it is a stub, not source.
+exclude = "^src/wa_crypt_tools/proto/"
+
+[[tool.mypy.overrides]]
+module = "wa_crypt_tools.proto.*"
+ignore_errors = true

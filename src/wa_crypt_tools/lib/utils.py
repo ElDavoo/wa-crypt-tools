@@ -1,18 +1,26 @@
+from __future__ import annotations
+
 import base64
 import hmac
 import json
+import logging
 import math
 import zlib
+from collections.abc import Sequence
 from hashlib import sha256
+from typing import TYPE_CHECKING, Any, cast
 
 from Cryptodome.Cipher import AES
 from javaobj import JavaByteArray
-from javaobj.v2.beans import JavaArray, JavaClassDesc, ClassDescType
-
-import logging
+from javaobj.v2.beans import ClassDescType, JavaArray, JavaClassDesc
 
 from wa_crypt_tools.lib.constants import C
 from wa_crypt_tools.lib.errors import HeaderError, IntegrityError, InvalidKeyError
+
+if TYPE_CHECKING:
+    # Only for annotations: lib/key/key15.py imports this module, so a real import here would
+    # be a cycle.
+    from wa_crypt_tools.lib.key.key15 import Key15
 
 # FIXME a "utils" file shouldn't have its own logger
 log = logging.getLogger(__name__)
@@ -39,11 +47,10 @@ def test_decompression(test_data: bytes) -> bool:
         if zlib_obj[:4] == C.ZIP_HEADER:
             return True
         # Decoding can fail if first two bytes are a bad UTF-8 char
-        if zlib_obj[:15].decode('ascii') != 'SQLite format 3':
+        if zlib_obj[:15].decode("ascii") != "SQLite format 3":
             log.error("Test decompression: Decryption and decompression ok but not a valid SQLite database")
             return False
-        else:
-            return True
+        return True
     except (zlib.error, UnicodeDecodeError):
         return False
 
@@ -53,7 +60,12 @@ def create_jba(out: bytes) -> JavaByteArray:
     # Create the classdesc
     cd = JavaClassDesc(ClassDescType.NORMALCLASS)
     cd.name = "[B"
-    cd.superclass = None
+    # `superclass`, with no underscore, and mypy's [attr-defined] complaint about it is a false
+    # positive that must not be "fixed". The bean is javaobj.v2's, which spells the attribute
+    # `super_class` -- that is what mypy checks against -- but the thing that serialises it is
+    # javaobj.v1's JavaObjectMarshaller, and v1 reads `.superclass`. Setting the v2 name instead
+    # leaves v1 with no attribute at all and every key file dump raises AttributeError.
+    cd.superclass = None  # type: ignore[attr-defined]
     cd.serial_version_uid = -5984413125824719648
     cd.desc_flags = 2
 
@@ -63,40 +75,40 @@ def create_jba(out: bytes) -> JavaByteArray:
 def hexstring2bytes(string: str) -> bytes:
     """Converts a hex string into a bytes array"""
     if len(string) != 64:
-        raise InvalidKeyError("The key file specified does not exist.\n    "
-                              "If you tried to specify the key directly, note it should be "
-                              "64 characters long and not {} characters long.".format(len(string)))
+        raise InvalidKeyError(
+            "The key file specified does not exist.\n    "
+            "If you tried to specify the key directly, note it should be "
+            f"64 characters long and not {len(string)} characters long."
+        )
 
     try:
         barr = bytes.fromhex(string)
     except ValueError as e:
-        raise InvalidKeyError("Couldn't convert the hex string.\n    "
-                              "Exception: {}".format(e)) from e
+        raise InvalidKeyError(f"Couldn't convert the hex string.\n    Exception: {e}") from e
     return barr
 
 
 def javaintlist2bytes(barr: JavaArray) -> bytes:
     """Converts a javaobj bytearray which somehow became a list of signed integers back to a Python byte array"""
-    out: bytes = b''
+    out: bytes = b""
     for i in barr:
-        out += i.to_bytes(1, byteorder='big', signed=True)
+        out += i.to_bytes(1, byteorder="big", signed=True)
     return out
 
 
-def encryptionloop(*, first_iteration_data: bytes, privateseed: bytes = b'\x00' * 32, message: bytes,
-                   output_bytes: int):
+def encryptionloop(*, first_iteration_data: bytes, privateseed: bytes = b"\x00" * 32, message: bytes, output_bytes: int):
     # The private key and the seed are used to create the HMAC key
     privatekey = hmac.new(privateseed, msg=first_iteration_data, digestmod=sha256).digest()
 
-    data = b''
-    output = b''
-    permutations = int(math.ceil(float(output_bytes) / float(32)))
+    data = b""
+    output = b""
+    permutations = math.ceil(output_bytes / 32)
     i = 1
     while i < permutations + 1:
         hasher = hmac.new(privatekey, msg=data, digestmod=sha256)
         if message is not None:
             hasher.update(message)
-        hasher.update(i.to_bytes(1, byteorder='big'))
+        hasher.update(i.to_bytes(1, byteorder="big"))
         data = hasher.digest()
         bytestowrite = min(output_bytes, len(data))
         output += data[:bytestowrite]
@@ -104,48 +116,51 @@ def encryptionloop(*, first_iteration_data: bytes, privateseed: bytes = b'\x00' 
     return output
 
 
-def mcrypt1_metadata_decrypt(*, key, encoded: str):
+def mcrypt1_metadata_decrypt(*, key: Key15, encoded: str) -> Any:
     """
     Decrypts the metadata of a mcrypt1 file.
     :param key: The key used to decrypt the metadata
     :param encoded: The metadata downloaded from Google Drive in base64
     :return: The decrypted JSON
     """
-    # Base64 decoding
-    encoded = base64.b64decode(encoded)
+    # Base64 decoding, under its own name: `encoded` is the str this was handed, and rebinding
+    # it to the bytes it decodes to is what most of mypy's findings in this function were.
+    raw = base64.b64decode(encoded)
+
     # PKCS5Padding is not natively supported
-    unpad = lambda s: s[:-ord(s[len(s) - 1:])]
-    iv_size = encoded[0]
+    def unpad(s: bytes) -> bytes:
+        return s[: -ord(s[len(s) - 1 :])]
+
+    iv_size = raw[0]
     if iv_size != 16:
         raise HeaderError("IV Size is not 16")
 
-    iv = encoded[1:17]
-    mac_size = encoded[17]
+    iv = raw[1:17]
+    mac_size = raw[17]
     if mac_size != 32:
         raise HeaderError("MAC Size is not 32")
 
-    mac = encoded[18:50]
-    encrypted_metadata = encoded[50:]
+    mac = raw[18:50]
+    encrypted_metadata = raw[50:]
     # Authentication part
-    hmac_auth = hmac.new(key.get_metadata_authentication(), digestmod='sha256')
+    hmac_auth = hmac.new(key.get_metadata_authentication(), digestmod="sha256")
     hmac_auth.update(iv)
     hmac_auth.update(encrypted_metadata)
-    hmac_auth = hmac_auth.digest()
-    if hmac_auth != mac:
+    if hmac_auth.digest() != mac:
         raise IntegrityError("MAC does not match")
     # Decryption part
     cipher = AES.new(key.get_metadata_encryption(), AES.MODE_CBC, iv)
     decrypted_metadata = cipher.decrypt(encrypted_metadata)
     decrypted_metadata = unpad(decrypted_metadata)
     # Load the JSON
-    return json.loads(decrypted_metadata.decode('utf-8'))
+    return json.loads(decrypted_metadata.decode("utf-8"))
 
 
-def get_mcrypt1_name(*, key, name: str, md5: bytes) -> bytes:
-    hmac_n = hmac.new(key.get_root(), digestmod='sha256')
+def get_mcrypt1_name(*, key: Key15, name: str, md5: bytes | str) -> bytes:
+    hmac_n = hmac.new(key.get_root(), digestmod="sha256")
     # Calculate SHA256 of the name
     digest = sha256()
-    digest.update(name.encode('utf-8'))
+    digest.update(name.encode("utf-8"))
     # Pour it into the HMAC
     hmac_n.update(digest.digest())
     # If md5 is a string, convert it to bytes
@@ -153,8 +168,7 @@ def get_mcrypt1_name(*, key, name: str, md5: bytes) -> bytes:
         md5 = bytes.fromhex(md5)
     # Now pour the MD5 into the HMAC
     hmac_n.update(md5)
-    media_hash = hmac_n.digest()
-    return media_hash
+    return hmac_n.digest()
 
 
 def encode_varint(value: int) -> bytes:
@@ -162,7 +176,7 @@ def encode_varint(value: int) -> bytes:
     prefix: one byte for any header under 128 bytes, more above that."""
     out = bytearray()
     while True:
-        byte = value & 0x7f
+        byte = value & 0x7F
         value >>= 7
         if value:
             out.append(byte | 0x80)
@@ -192,8 +206,11 @@ def unknown_header_fields(header) -> list[str]:
             unknown = UnknownFieldSet(message)
         except (NotImplementedError, TypeError):  # pragma: no cover - implementation-dependent
             return
-        for field in unknown:
-            found.append("{} field {}".format(message.DESCRIPTOR.name, field.field_number))
+        # Through a Sequence: UnknownFieldSet really does have only __len__ and __getitem__,
+        # which is what its stub says, so a plain `for field in unknown` runs on the old
+        # iteration protocol and cannot be type-checked as written.
+        fields = cast("Sequence[Any]", unknown)
+        found.extend(f"{message.DESCRIPTOR.name} field {field.field_number}" for field in fields)
         for descriptor, value in message.ListFields():
             # is_repeated rather than the old label constant: protobuf 7 dropped label with
             # the move to editions.
@@ -212,30 +229,33 @@ def header_info(header):
     string: str = ""
     if header.e2ee_key_data.encryption_iv:
         string += "Crypt15 info:\n"
-        string += str("Header information in your crypt15 file:\n")
-        string += str("IV: {}\n".format(header.e2ee_key_data.encryption_iv.hex()))
+        string += "Header information in your crypt15 file:\n"
+        string += f"IV: {header.e2ee_key_data.encryption_iv.hex()}\n"
     if header.wa_provided_key_data.encryption_iv:
         cipher = header.wa_provided_key_data
-        string += str("Header information in your crypt14 file:\n")
-        string += str("Cipher version: {}\n".format(cipher.backup_cipher_header.hex()))
-        string += str("Key version: {}\n".format(cipher.key_version.hex()))
-        string += str("Server salt: {}\n".format(cipher.server_salt.hex()))
-        string += str("Google ID: {}\n".format(cipher.google_id_salt.hex()))
-        string += str("IV: {}\n".format(cipher.encryption_iv.hex()))
-    string += str("Key type: {}\n".format(header.key_type_deprecated))
-    string += str("WhatsApp version: {}\n".format(header.backup_metadata.app_version))
-    #string += str("Device model: {}".format(header.backup_metadata.device_model))
-    string += str("The last two numbers of the user's Jid: {}\n".format(header.backup_metadata.jid_suffix))
-    string += str("Backup version: {}\n".format(header.backup_metadata.backup_version))
-    #string += str("Size of the backup file: {}".format(header.backup_metadata.backup_export_file_size))
+        string += "Header information in your crypt14 file:\n"
+        string += f"Cipher version: {cipher.backup_cipher_header.hex()}\n"
+        string += f"Key version: {cipher.key_version.hex()}\n"
+        string += f"Server salt: {cipher.server_salt.hex()}\n"
+        string += f"Google ID: {cipher.google_id_salt.hex()}\n"
+        string += f"IV: {cipher.encryption_iv.hex()}\n"
+    string += f"Key type: {header.key_type_deprecated}\n"
+    string += f"WhatsApp version: {header.backup_metadata.app_version}\n"
+    # string += str("Device model: {}".format(header.backup_metadata.device_model))
+    string += f"The last two numbers of the user's Jid: {header.backup_metadata.jid_suffix}\n"
+    string += f"Backup version: {header.backup_metadata.backup_version}\n"
+    # string += str("Size of the backup file: {}".format(header.backup_metadata.backup_export_file_size))
     # The migration flags, by field number: the numbers are what this project has always called
     # features, and the schema is what says which fields are flags rather than metadata.
-    features = [f.number for f in header.backup_metadata.DESCRIPTOR.fields
-                if f.type == f.TYPE_BOOL and getattr(header.backup_metadata, f.name)]
+    features = [
+        f.number
+        for f in header.backup_metadata.DESCRIPTOR.fields
+        if f.type == f.TYPE_BOOL and getattr(header.backup_metadata, f.name)
+    ]
     if len(features) > 0:
-        string += str("Features: {}\n".format(features))
-        string += str("Max feature number: {}\n".format(max(features)))
+        string += f"Features: {features}\n"
+        string += f"Max feature number: {max(features)}\n"
     else:
-        string += str("No feature table found (not a msgstore DB or very old)\n")
+        string += "No feature table found (not a msgstore DB or very old)\n"
 
     return string
