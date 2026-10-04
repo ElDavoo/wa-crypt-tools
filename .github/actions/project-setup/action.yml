@@ -12,7 +12,7 @@ description: >
 runs:
   using: composite
   steps:
-    # 3.10 is the floor the matrix supports. The agent runs the gates on one version only; a
+    # 3.11 is the floor the matrix supports. The agent runs the gates on one version only; a
     # break that is specific to a newer Python is CI's job to find, and the fix loop reads it
     # out of those logs.
     - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7

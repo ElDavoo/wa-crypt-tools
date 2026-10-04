@@ -11,7 +11,7 @@ authors = [
 ]
 description = "Manages WhatsApp .crypt12, .crypt14 and .crypt15 files, given the key."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "javaobj-py3 >= 0.4.4",
     "pycryptodomex >= 3.20.0",
@@ -26,11 +26,11 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Utilities",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
 ]
 
 [project.scripts]
@@ -126,7 +126,7 @@ required-imports = ["from __future__ import annotations"]
 "tests/*" = ["SIM115", "PTH"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 # Third-party packages that ship no type information: javaobj and pycryptodomex. Without this
 # every import of them is an error, which buries the findings that are about this code.
 ignore_missing_imports = true

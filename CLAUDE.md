@@ -341,7 +341,7 @@ this feature.
 declared a bare `key: Key` the subclasses were all narrowing it -- five Liskov `override`
 errors, plus three `attr-defined` where the narrowing was simply missing and a `Key` was being
 asked for `Key14` methods. Declared with `TypeVar` rather than 3.12's `class Database[K: Key]`
-syntax, which the 3.10 floor rules out and which would say exactly the same thing.
+syntax, which the 3.11 floor rules out and which would say exactly the same thing.
 
 `Database12.__init__` splits the same way, into `_read_header` (off a stream, checked against a
 key if there is one), `_from_key` (what `waencrypt` needs) and `_from_parts`. **The `md5` is
@@ -720,7 +720,7 @@ not encode a workaround for it.
   any check had run. The existence guard at the top of `encrypt()`/`decrypt()` only works while
   it stays a path, and `wadecrypt` reaches its output twice (the chunked path opens it itself),
   so both writers have to keep taking one.
-- CI (`.github/workflows/lint-test-coverage.yml`) runs the matrix Python 3.10–3.14 on Ubuntu and
+- CI (`.github/workflows/lint-test-coverage.yml`) runs the matrix Python 3.11–3.15 on Ubuntu and
   Windows. On Windows, file handles must be closed before deletion — `KeyFactory.from_file` opens
   the keyfile in a `with` block for exactly this reason.
 
