@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Python 3.11 or newer is required.** 3.10 reached end of life in October 2026; 3.15 is
+  supported and tested in CI.
+
 - **The protobuf schema moved to edition 2026**, from 2023. Nothing on the wire changes, but
   the generated classes follow the edition's naming rules now: `C14_cipher` is `C14Cipher`,
   `C15_IV` is `C15IV` and `Key_Type` is `KeyType`. The modules keep their names. Code that
