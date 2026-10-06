@@ -32,7 +32,7 @@ def crypt15_header(*, iv: bytes) -> bytes:
     from wa_crypt_tools.proto import key_type_pb2 as key_type
 
     header = prefix.BackupPrefix()
-    header.key_type_deprecated = key_type.Key_Type.E2EE_DEPRECATED
+    header.key_type_deprecated = key_type.KeyType.E2EE_DEPRECATED
     header.e2ee_key_data.encryption_iv = iv
     header.backup_metadata.app_version = "2.22.5.13"
     header.backup_metadata.jid_suffix = "67"
@@ -47,7 +47,7 @@ def crypt15_header_with_extra(*, iv: bytes, extra: bytes) -> bytes:
     from wa_crypt_tools.proto import key_type_pb2 as key_type
 
     header = prefix.BackupPrefix()
-    header.key_type_deprecated = key_type.Key_Type.E2EE_DEPRECATED
+    header.key_type_deprecated = key_type.KeyType.E2EE_DEPRECATED
     header.e2ee_key_data.encryption_iv = iv
     header.backup_metadata.app_version = "2.22.5.13"
     serialized = header.SerializeToString() + extra
@@ -62,8 +62,8 @@ def crypt15_header_with_passkey(*, iv: bytes) -> bytes:
     from wa_crypt_tools.proto import key_type_pb2 as key_type
 
     header = prefix.BackupPrefix()
-    header.key_type_deprecated = key_type.Key_Type.E2EE_DEPRECATED
-    header.key_type_new = key_type.Key_Type.E2EE_PASSKEY
+    header.key_type_deprecated = key_type.KeyType.E2EE_DEPRECATED
+    header.key_type_new = key_type.KeyType.E2EE_PASSKEY
     header.e2ee_key_data.encryption_iv = iv
     header.backup_metadata.app_version = "2.26.34.7"
     meta = header.passkey_encryption_metadata
@@ -87,8 +87,8 @@ def crypt15_header_over_255_bytes(*, iv: bytes) -> bytes:
     from wa_crypt_tools.proto import key_type_pb2 as key_type
 
     header = prefix.BackupPrefix()
-    header.key_type_deprecated = key_type.Key_Type.E2EE_DEPRECATED
-    header.key_type_new = key_type.Key_Type.E2EE_PASSKEY
+    header.key_type_deprecated = key_type.KeyType.E2EE_DEPRECATED
+    header.key_type_new = key_type.KeyType.E2EE_PASSKEY
     header.e2ee_key_data.encryption_iv = iv
     header.backup_metadata.app_version = "2.26.34.7"
     header.passkey_encryption_metadata.client_metadata = bytes(range(256)) * 2

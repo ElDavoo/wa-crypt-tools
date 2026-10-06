@@ -17,7 +17,7 @@ else:
 DESCRIPTOR: _descriptor.FileDescriptor
 
 @_typing.final
-class C15_IV(_message.Message):
+class C15IV(_message.Message):
     """In crypt15 files only the IV is stored."""
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -36,4 +36,4 @@ class C15_IV(_message.Message):
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-Global___C15_IV: _TypeAlias = C15_IV  # noqa: Y015
+Global___C15IV: _TypeAlias = C15IV  # noqa: Y015

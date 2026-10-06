@@ -23,7 +23,7 @@ def make_short_iv_backup():
     from wa_crypt_tools.proto import key_type_pb2 as key_type
 
     header = prefix.BackupPrefix()
-    header.key_type_deprecated = key_type.Key_Type.E2EE_DEPRECATED
+    header.key_type_deprecated = key_type.KeyType.E2EE_DEPRECATED
     header.e2ee_key_data.encryption_iv = b"\x00" * 8
     header.backup_metadata.app_version = "2.22.5.13"
     header.backup_metadata.jid_suffix = "67"

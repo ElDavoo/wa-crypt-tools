@@ -1,6 +1,6 @@
-edition = "2023";
+edition = "2026";
 
 // In crypt15 files only the IV is stored.
-message C15_IV {
+export message C15IV {
     bytes encryption_iv = 1; // The 16-bytes long IV
 }

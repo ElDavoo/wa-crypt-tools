@@ -102,10 +102,25 @@ Regenerating protobuf classes (from `proto/`, needs a `protoc` binary and `mypy-
 `PATH` for the stubs — see README "Protobuf automatic fix"):
 
 ```bash
-protoc --python_out=../src/wa_crypt_tools/proto --mypy_out=../src/wa_crypt_tools/proto \
-       --proto_path=. *.proto
+protoc --python_out=../src/wa_crypt_tools/proto --proto_path=. *.proto
+t=$(mktemp -d) && cp *.proto "$t" && sed -i '1s/"2026"/"2024"/' "$t"/*.proto
+protoc --mypy_out=../src/wa_crypt_tools/proto --proto_path="$t" "$t"/*.proto
 python fix_imports.py ../src/wa_crypt_tools/proto
 ```
+
+The schema is **edition 2026**, and the stubs come from a copy of it lowered to 2024 because
+`protoc-gen-mypy` refuses anything later: mypy-protobuf 5.1.0, and its master as of October
+2026, advertise `maximum_edition = EDITION_2024`. The copy differs only in that first line, and
+the two editions resolve these files to the same features (explicit presence, open enums), so
+the stubs come out the same either way -- the migration's stub diff was the renames and nothing
+else. Drop the detour once mypy-protobuf supports 2026.
+
+Edition 2026 brings two checks the 2023 schema did not have. `enforce_naming_style` is
+`STYLE2024`, which is why the types are `C14Cipher`, `C15IV` and `KeyType` -- they were
+`C14_cipher`, `C15_IV` and `Key_Type`. The *files* keep their old names, so the modules are still
+`C14_cipher_pb2` and so on. And `default_symbol_visibility` is `STRICT`: a top-level type that
+another `.proto` imports has to be declared `export`, or the import fails to resolve.
+`BackupPrefix` is imported by nothing and stays local.
 
 `fix_imports.py` rewrites protoc's absolute imports into package-relative ones; skipping it
 breaks `from wa_crypt_tools.proto import ...`. It replaces protoletariat (`protol`), which was
@@ -115,7 +130,7 @@ and leaves the other ten files exactly as protoc wrote them.
 
 **The `.pyi` half is not decoration.** `_pb2.py` builds its classes at import time out of a
 serialized descriptor, so to a type checker the module has no attributes at all: `BackupPrefix`,
-`C14_cipher`, `C15_IV` and `Key_Type` were 8 of mypy's findings, and behind them the *contents*
+`C14Cipher`, `C15IV` and `KeyType` were 8 of mypy's findings, and behind them the *contents*
 of every header message were unchecked too. `--mypy_out` is `mypy-protobuf`'s plugin
 (`pip install mypy-protobuf` puts `protoc-gen-mypy` on `PATH`; it is not a runtime or test
 dependency, only a regeneration one), and the stubs it writes are what turned up the three real
@@ -123,14 +138,14 @@ mistakes that had been hiding under those findings -- two `cipher` variables hol
 message and then an AES object in the same function, and an enum field being assigned a bare
 `int`. Regenerating without them puts all of that back.
 
-There is no protoc in this environment; on NixOS a throwaway flake with `pkgs.protobuf_29` gives
-a matching one (`nix develop --command protoc ...`), or `nix shell nixpkgs#protobuf_29`. The
-committed files are protoc 29.6 output and load under the 7.36 runtime the venv has; the stubs
-are mypy-protobuf 5.1.0's.
+There is no protoc in this environment; on NixOS `nix shell nixpkgs#protobuf` gives protoc 36.2,
+which is what the committed files are. Edition 2026 needs a protoc that knows it -- 29.x stops at
+2023 -- so the older `protobuf_29` pin no longer works. The stubs are mypy-protobuf 5.1.0's.
 
 `protoc` and the `protobuf` runtime must be version-matched: generated code calls
-`ValidateProtobufRuntimeVersion` with the generator's version, so protoc 29.6 needs protobuf
->= 5.29.6, protoc 36.0 needs >= 7.36.0. The committed files are protoc 29.6 output.
+`ValidateProtobufRuntimeVersion` with the generator's version, so protoc 36.2 needs protobuf
+>= 7.36.2, and that is why the `protobuf` floor in `pyproject.toml` is 7.36.2. Regenerating with a
+newer protoc means raising that floor to match.
 
 **The field names are WhatsApp's own**, read out of `com.whatsapp` 2.26.34.7 rather than guessed:
 `classes6.dex` holds `BackupPrefix` as a `GeneratedMessageLite` whose `*_FIELD_NUMBER` constants
@@ -139,7 +154,7 @@ and `newMessageInfo` field-name array survived obfuscation. That is where `key_t
 `key_type_new` come from, and it is why the "feature table" is really a set of
 `<migration>_migration_finished` flags. Two things the app does that this schema now mirrors:
 fields 2 and 3 are **not** a oneof -- its message schema lists them as two ordinary optional
-fields -- and fields 1 and 6 share one enum, so `Key_Type` carries all five of its values.
+fields -- and fields 1 and 6 share one enum, so `KeyType` carries all five of its values.
 Renaming a field cannot change the wire format, so none of this affects what is read or written;
 it only stops the header being half-anonymous.
 
@@ -491,7 +506,7 @@ whether `backup_metadata`'s own migration-flag fields were set -- content, not a
 prefix -- and `dbfactory.py`'s duplicate, byte-peeking "No feature table found" message is gone
 now that the peek is gone with it.
 
-**crypt14 has a fourth thing that must hold: the header's own `key_version`.** `C14_cipher`
+**crypt14 has a fourth thing that must hold: the header's own `key_version`.** `C14Cipher`
 carries a key version that nothing else can supply -- the key file stores the same number as a
 raw byte (`b'\x02'`) while the header spells it in ASCII (`b'2'`), so neither is derivable from
 the other. `Database14.encrypt` used to write a hardcoded `b'2'`, and because it built the

@@ -17,7 +17,7 @@ else:
 DESCRIPTOR: _descriptor.FileDescriptor
 
 @_typing.final
-class C14_cipher(_message.Message):
+class C14Cipher(_message.Message):
     """crypt14 cipher files."""
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -52,4 +52,4 @@ class C14_cipher(_message.Message):
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-Global___C14_cipher: _TypeAlias = C14_cipher  # noqa: Y015
+Global___C14Cipher: _TypeAlias = C14Cipher  # noqa: Y015

@@ -144,7 +144,7 @@ class TestPasskeyMetadataIsCarriedThrough:
 
         key = KeyFactory.new("tests/res/encrypted_backup.key")
         reference = DatabaseFactory.from_file(as_stream(read("tests/res/msgstore.db.crypt15")))
-        reference.prefix.key_type_new = key_type.Key_Type.E2EE_PASSKEY
+        reference.prefix.key_type_new = key_type.KeyType.E2EE_PASSKEY
         meta = reference.prefix.passkey_encryption_metadata
         meta.encapsulated_root_key = "encapsulated-root-key"
         meta.credential_id_deprecated = "credential-id"
@@ -159,5 +159,5 @@ class TestPasskeyMetadataIsCarriedThrough:
         db.feature_table = reference.feature_table
 
         written = self.written_header(db, key)
-        assert written.key_type_new == key_type.Key_Type.E2EE_PASSKEY
+        assert written.key_type_new == key_type.KeyType.E2EE_PASSKEY
         assert written.passkey_encryption_metadata == meta

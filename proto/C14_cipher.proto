@@ -1,7 +1,7 @@
-edition = "2023";
+edition = "2026";
 
 // crypt14 cipher files.
-message C14_cipher {
+export message C14Cipher {
     bytes backup_cipher_header = 1; // is usually 0001
     bytes key_version = 2; // Is usually "1"
     bytes server_salt = 3; // The 32-bytes long server salt

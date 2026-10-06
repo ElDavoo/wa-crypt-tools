@@ -34,7 +34,7 @@ class Database14(Database[Key14]):
         from wa_crypt_tools.proto import C14_cipher_pb2 as C14_cipher
         from wa_crypt_tools.proto import key_type_pb2 as key_type
 
-        key_data = C14_cipher.C14_cipher()
+        key_data = C14_cipher.C14Cipher()
         if self.prefix is not None:
             # Start from the key data the reference carried, for the same reason the header
             # below starts from the reference's own: this message has a field nothing else
@@ -58,7 +58,7 @@ class Database14(Database[Key14]):
             # field we have no name for, and losing it is the whole difference between a
             # re-encryption that works and one that reproduces the original byte for byte.
             header.CopyFrom(self.prefix)
-        header.key_type_deprecated = key_type.Key_Type.WA_PROVIDED
+        header.key_type_deprecated = key_type.KeyType.WA_PROVIDED
         header.wa_provided_key_data.CopyFrom(key_data)
 
         header.backup_metadata.CopyFrom(props.get_proto())

@@ -15,7 +15,7 @@ requires-python = ">=3.10"
 dependencies = [
     "javaobj-py3 >= 0.4.4",
     "pycryptodomex >= 3.20.0",
-    "protobuf >= 7.36.0,< 8.0.0"
+    "protobuf >= 7.36.2,< 8.0.0"
 ]
 classifiers = [
     "Environment :: Console",

@@ -397,9 +397,20 @@ You can move the protoc program to the `wa-crypt-tools/proto` folder where the .
 Replace the protobuf classes as needed and run `protoc` to generate the python classes. 
 From the `wa-crypt-tools/proto` directory of the project, run:
 
-`./protoc --python_out=../src/wa_crypt_tools/proto --mypy_out=../src/wa_crypt_tools/proto --proto_path=. *.proto`
+`./protoc --python_out=../src/wa_crypt_tools/proto --proto_path=. *.proto`
 
-`--mypy_out` writes the `.pyi` type stubs beside the generated classes, and needs
+The schema uses protobuf edition 2026, so this needs `protoc` 36.2 or later.
+
+The `.pyi` type stubs beside the generated classes come from `--mypy_out`, which does not
+accept edition 2026 yet, so run it on a copy of the schema with the first line of each file
+changed to `edition = "2024";` -- nothing else in the files differs between the two:
+
+```bash
+t=$(mktemp -d) && cp *.proto "$t" && sed -i '1s/"2026"/"2024"/' "$t"/*.proto
+./protoc --mypy_out=../src/wa_crypt_tools/proto --proto_path="$t" "$t"/*.proto
+```
+
+`--mypy_out` needs
 [mypy-protobuf](https://github.com/nipunn1313/mypy-protobuf) (`pip install mypy-protobuf`,
 which puts `protoc-gen-mypy` on your `PATH`). It is only needed to regenerate: nothing at
 runtime or in the test suite imports it. Leave it out and the classes still work, but a type
@@ -414,7 +425,7 @@ Now all the generated python classes, and their stubs, should have their imports
 
 Note that `protoc` and the `protobuf` runtime must be version-matched: code generated
 by `protoc` vX.Y asserts a runtime of at least the corresponding `protobuf` X.Y at
-import time. `protoc` 29.5 pairs with `protobuf` 5.29.5, `protoc` 36.0 with 7.36.0.
+import time. `protoc` 29.5 pairs with `protobuf` 5.29.5, `protoc` 36.2 with 7.36.2.
 
 This step previously used [protoletariat](https://github.com/cpcloud/protoletariat)
 (`protol`). That project is archived and pins `protobuf<6`, which silently downgraded
