@@ -86,7 +86,7 @@ class Database15(Database[Key15]):
         """Encrypts the database using the provided key"""
         from wa_crypt_tools.proto import C15_IV_pb2 as C15_IV
 
-        iv_message = C15_IV.C15_IV()
+        iv_message = C15_IV.C15IV()
         iv_message.encryption_iv = self.iv
         from wa_crypt_tools.proto import backup_prefix_pb2 as prefix
         from wa_crypt_tools.proto import key_type_pb2 as key_type
@@ -98,14 +98,14 @@ class Database15(Database[Key15]):
             # field we have no name for, and losing it is the whole difference between a
             # re-encryption that works and one that reproduces the original byte for byte.
             header.CopyFrom(self.prefix)
-        header.key_type_deprecated = key_type.Key_Type.E2EE_DEPRECATED
+        header.key_type_deprecated = key_type.KeyType.E2EE_DEPRECATED
         if self.prefix is None and self.key_type is not None:
             # Only when there is no reference to reproduce: a reference's own value has already
             # been copied in above, and overwriting it would put the field into backups made
             # before it existed.
             # The stubs spell this field's type as the enum's own ValueType, and what callers
             # (and C.DEFAULT_KEY_TYPE) have is a plain int naming one of its values.
-            header.key_type_new = cast("key_type_pb2.Key_Type.ValueType", self.key_type)
+            header.key_type_new = cast("key_type_pb2.KeyType.ValueType", self.key_type)
         header.e2ee_key_data.CopyFrom(iv_message)
 
         header.backup_metadata.CopyFrom(props.get_proto())

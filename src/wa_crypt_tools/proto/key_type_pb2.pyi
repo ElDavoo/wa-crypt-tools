@@ -16,38 +16,38 @@ else:
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
-class _Key_Type:
+class _KeyType:
     ValueType = _typing.NewType("ValueType", _builtins.int)
     V: _TypeAlias = ValueType  # noqa: Y015
 
-class _Key_TypeEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_Key_Type.ValueType], _builtins.type):
+class _KeyTypeEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_KeyType.ValueType], _builtins.type):
     DESCRIPTOR: _descriptor.EnumDescriptor
-    WA_PROVIDED: _Key_Type.ValueType  # 0
+    WA_PROVIDED: _KeyType.ValueType  # 0
     """WhatsApp holds the key: crypt12 and crypt14"""
-    E2EE_DEPRECATED: _Key_Type.ValueType  # 1
+    E2EE_DEPRECATED: _KeyType.ValueType  # 1
     """end-to-end, from before the kind of key was spelled out"""
-    E2EE_PASSWORD: _Key_Type.ValueType  # 2
+    E2EE_PASSWORD: _KeyType.ValueType  # 2
     """derived from a user password"""
-    E2EE_ENCRYPTION_KEY: _Key_Type.ValueType  # 3
+    E2EE_ENCRYPTION_KEY: _KeyType.ValueType  # 3
     """the 64-digit key: what crypt15 backups carry today"""
-    E2EE_PASSKEY: _Key_Type.ValueType  # 4
+    E2EE_PASSKEY: _KeyType.ValueType  # 4
     """derived from a passkey"""
 
-class Key_Type(_Key_Type, metaclass=_Key_TypeEnumTypeWrapper):
+class KeyType(_KeyType, metaclass=_KeyTypeEnumTypeWrapper):
     """Both key type fields of BackupPrefix are verified against this one enum -- the app builds a
     single Internal$EnumVerifier and puts it at both positions in the message schema.
     The value names are WhatsApp's own; the enum's own name does not survive into the binary,
-    so Key_Type is this project's.
+    so KeyType is this project's.
     """
 
-WA_PROVIDED: Key_Type.ValueType  # 0
+WA_PROVIDED: KeyType.ValueType  # 0
 """WhatsApp holds the key: crypt12 and crypt14"""
-E2EE_DEPRECATED: Key_Type.ValueType  # 1
+E2EE_DEPRECATED: KeyType.ValueType  # 1
 """end-to-end, from before the kind of key was spelled out"""
-E2EE_PASSWORD: Key_Type.ValueType  # 2
+E2EE_PASSWORD: KeyType.ValueType  # 2
 """derived from a user password"""
-E2EE_ENCRYPTION_KEY: Key_Type.ValueType  # 3
+E2EE_ENCRYPTION_KEY: KeyType.ValueType  # 3
 """the 64-digit key: what crypt15 backups carry today"""
-E2EE_PASSKEY: Key_Type.ValueType  # 4
+E2EE_PASSKEY: KeyType.ValueType  # 4
 """derived from a passkey"""
-Global___Key_Type: _TypeAlias = Key_Type  # noqa: Y015
+Global___KeyType: _TypeAlias = KeyType  # noqa: Y015

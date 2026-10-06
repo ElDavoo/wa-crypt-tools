@@ -1,10 +1,10 @@
-edition = "2023";
+edition = "2026";
 // This describes the metadata, e.g. the version, the ph number and various features.
 //
 // The names are WhatsApp's own. What this project called the "feature table" is a set of
 // database migration flags: every one of fields 5 to 37 is named <migration>_migration_finished
 // in the app, and says that that migration had already run when the backup was written.
-message BackupExpiry {
+export message BackupExpiry {
     string app_version = 1; // Whatsapp version, for example "2.22.4.14"
     string device_model = 2;
     string jid_suffix = 3; // The last two numbers of the user's Jid (phone number)

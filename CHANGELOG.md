@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **The protobuf schema moved to edition 2026**, from 2023. Nothing on the wire changes, but
+  the generated classes follow the edition's naming rules now: `C14_cipher` is `C14Cipher`,
+  `C15_IV` is `C15IV` and `Key_Type` is `KeyType`. The modules keep their names. Code that
+  imports `wa_crypt_tools.proto` directly has to follow the rename, and the `protobuf` runtime
+  floor is 7.36.2, which the regenerated code checks for.
+
 - **A screenshot of the key can be used as the key** (issue #14). WhatsApp shows the
   64-digit key once and never again, so most people photograph it; the screenshot now goes
   in the same argument the key file goes in, with no new flag -- `wadecrypt shot.png

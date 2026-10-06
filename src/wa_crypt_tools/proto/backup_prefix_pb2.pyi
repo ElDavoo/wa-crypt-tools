@@ -38,21 +38,21 @@ class BackupPrefix(_message.Message):
     BACKUP_METADATA_FIELD_NUMBER: _builtins.int
     PASSKEY_ENCRYPTION_METADATA_FIELD_NUMBER: _builtins.int
     KEY_TYPE_NEW_FIELD_NUMBER: _builtins.int
-    key_type_deprecated: _key_type_pb2.Key_Type.ValueType
+    key_type_deprecated: _key_type_pb2.KeyType.ValueType
     """Which of the two ciphers a backup uses is really told by whichever of fields 2 and 3 is
     set. This one has been deprecated in favour of key_type_new, but is still written.
     """
-    key_type_new: _key_type_pb2.Key_Type.ValueType
+    key_type_new: _key_type_pb2.KeyType.ValueType
     """What key_type_deprecated became once password and passkey backups arrived, and it was no
     longer enough to say only whether the key is end-to-end. Every crypt15 backup seen from
     WhatsApp 2.26 carries E2EE_ENCRYPTION_KEY here.
     """
     @_builtins.property
-    def wa_provided_key_data(self) -> _C14_cipher_pb2.C14_cipher:
+    def wa_provided_key_data(self) -> _C14_cipher_pb2.C14Cipher:
         """If DB is crypt14"""
 
     @_builtins.property
-    def e2ee_key_data(self) -> _C15_IV_pb2.C15_IV:
+    def e2ee_key_data(self) -> _C15_IV_pb2.C15IV:
         """If DB is crypt15"""
 
     @_builtins.property
@@ -64,12 +64,12 @@ class BackupPrefix(_message.Message):
     def __init__(
         self,
         *,
-        key_type_deprecated: _key_type_pb2.Key_Type.ValueType | None = ...,
-        wa_provided_key_data: _C14_cipher_pb2.C14_cipher | None = ...,
-        e2ee_key_data: _C15_IV_pb2.C15_IV | None = ...,
+        key_type_deprecated: _key_type_pb2.KeyType.ValueType | None = ...,
+        wa_provided_key_data: _C14_cipher_pb2.C14Cipher | None = ...,
+        e2ee_key_data: _C15_IV_pb2.C15IV | None = ...,
         backup_metadata: _backup_expiry_pb2.BackupExpiry | None = ...,
         passkey_encryption_metadata: _passkey_encryption_metadata_pb2.PasskeyEncryptionMetadata | None = ...,
-        key_type_new: _key_type_pb2.Key_Type.ValueType | None = ...,
+        key_type_new: _key_type_pb2.KeyType.ValueType | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["backup_metadata", b"backup_metadata", "e2ee_key_data", b"e2ee_key_data", "key_type_deprecated", b"key_type_deprecated", "key_type_new", b"key_type_new", "passkey_encryption_metadata", b"passkey_encryption_metadata", "wa_provided_key_data", b"wa_provided_key_data"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...

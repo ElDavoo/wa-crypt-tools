@@ -83,8 +83,8 @@ class TestTheHeaderIsCurrent:
 
     def test_the_key_type_says_which_kind_of_e2e_key(self):
         header = parsed(MSGSTORE).prefix
-        assert header.key_type_new == key_type.Key_Type.E2EE_ENCRYPTION_KEY
-        assert header.key_type_deprecated == key_type.Key_Type.E2EE_DEPRECATED
+        assert header.key_type_new == key_type.KeyType.E2EE_ENCRYPTION_KEY
+        assert header.key_type_deprecated == key_type.KeyType.E2EE_DEPRECATED
 
     def test_the_backup_version_is_one(self):
         assert parsed(MSGSTORE).prefix.backup_metadata.backup_version == 1

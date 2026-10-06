@@ -48,7 +48,7 @@ class C:
     # E2EE_ENCRYPTION_KEY -- the 64-digit key -- and is what every 2.26 crypt15 backup carries.
     # Backups from before the field existed are reproduced by passing None instead.
     DEFAULT_KEY_TYPE = 3
-    # C14_cipher.key_version, the crypt14 header's own key version, spelled in ASCII -- the
+    # C14Cipher.key_version, the crypt14 header's own key version, spelled in ASCII -- the
     # key file stores the same number as a raw byte (b'\x02'), so neither can be derived from
     # the other and a backup with no reference has to fall back to a constant. Every crypt14
     # off a 2.26 device says '2'. A reference's own value wins over this.
