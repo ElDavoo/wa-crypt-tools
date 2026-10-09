@@ -18,8 +18,9 @@ log = logging.getLogger(__name__)
 # a Key15, and the two are not interchangeable: Database14.encrypt reaches for
 # get_serversalt() and get_googleid(), which only exist on a Key14.
 #
-# Declared with TypeVar rather than PEP 695's `class Database[K: Key]`, which needs 3.12 and
-# would be the only thing in the tree to. It says exactly the same thing.
+# Declared with TypeVar rather than PEP 695's `class Database[K: Key]`, which needs 3.12 -- one
+# release above the 3.11 floor -- and would be the only thing in the tree to. It says exactly
+# the same thing.
 K = TypeVar("K", bound=Key)
 
 
