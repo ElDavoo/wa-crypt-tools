@@ -79,6 +79,60 @@ import logging
 log = logging.getLogger(__name__)
 
 
+class ProgressBar:
+    """Show streaming progress on an interactive terminal when tqdm is installed."""
+
+    def __init__(self, file):
+        self.visible = False
+        try:
+            stream = sys.stderr
+            if not stream.isatty():
+                return
+            self.start = file.tell()
+            file.seek(0, io.SEEK_END)
+            self.total = file.tell() - self.start
+            file.seek(self.start)
+        except (AttributeError, OSError):
+            return
+
+        try:
+            from tqdm import tqdm
+            from tqdm.contrib.logging import logging_redirect_tqdm
+        except ImportError:
+            return
+
+        self._last_position = self.start
+        self._bar = tqdm(
+            total=self.total,
+            desc="Decrypting",
+            unit="B",
+            unit_scale=True,
+            file=stream,
+            disable=False,
+        )
+        self._logging_context = logging_redirect_tqdm(
+            loggers=[log, logging.getLogger("wa_crypt_tools.lib")],
+            tqdm_class=tqdm,
+        )
+        self._logging_context.__enter__()
+        self.visible = True
+
+    def update(self, file, finished: bool = False):
+        if not self.visible:
+            return
+        position = self.start + self.total if finished else file.tell()
+        self._bar.update(max(0, position - self._last_position))
+        self._last_position = position
+
+    def close(self):
+        if self.visible:
+            try:
+                self._bar.close()
+            finally:
+                self._logging_context.__exit__(None, None, None)
+                self.visible = False
+
+
 def parsecmdline() -> argparse.Namespace:
     """Sets up the argument parser"""
     parser = argparse.ArgumentParser(description="Decrypts WhatsApp backup files encrypted with crypt12, 14 or 15")
@@ -147,6 +201,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
     if cipher is None:
         raise DecryptionError("Could not create a decryption cipher")
 
+    progress = ProgressBar(encrypted)
     try:
         if buffer_size < 17:
             log.info("Invalid buffer size, will use default of %d", io.DEFAULT_BUFFER_SIZE)
@@ -257,6 +312,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
                     integrity_problems.append(
                         f"Authentication tag mismatch: {e}.\n    This probably means your backup is corrupted."
                     )
+                progress.update(encrypted, finished=True)
                 break
 
             # If there is no more data, we should already have seen a checksum.
@@ -266,6 +322,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
 
             # Move the sliding window forward.
             chunk = next_chunk
+            progress.update(encrypted)
 
         if is_zip and not no_decompress and not z_obj.eof:
             integrity_problems.append("The encrypted database file is truncated (damaged).")
@@ -276,6 +333,7 @@ def chunked_decrypt(file_hash, cipher, encrypted, decrypted, buffer_size: int = 
         raise DecryptionError(f"I/O error: {e}") from e
 
     finally:
+        progress.close()
         decrypted.close()
         encrypted.close()
 

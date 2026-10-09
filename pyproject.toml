@@ -46,6 +46,9 @@ wainfo = "wa_crypt_tools.wainfo:main"
 wagui = "wa_crypt_tools.gui:main"
 
 [project.optional-dependencies]
+progress = [
+    "tqdm >= 4.66.0"
+]
 # Reading a key off a screenshot (KeyFactory.new on an image). Needs the tesseract binary too:
 # Debian/Ubuntu "apt install tesseract-ocr", macOS "brew install tesseract",
 # Windows "winget install UB-Mannheim.TesseractOCR".

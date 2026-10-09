@@ -41,6 +41,15 @@ for the development version.
 
 You might have to create a virtual environment to avoid conflicts with other packages.  
 
+For an in-terminal progress bar while using `wadecrypt -nm` or `--buffer-size`, install the
+optional `progress` extra:
+
+```bash
+python -m pip install 'wa-crypt-tools[progress]'
+```
+
+Without it, decryption works as usual and no progress bar is shown.
+
 # The window: wagui
 
 If you would rather not use a terminal at all, `wagui` is a small window that decrypts a
