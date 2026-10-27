@@ -104,10 +104,16 @@ def one_digit(key: str, order: Iterable[int] | None = None) -> Iterator[dict]:
     it means *any* key wrong in one digit is found -- whether or not the lookalike table saw
     it coming. The table and `order` only decide which of the 960 comes first.
     """
+    # The order depends only on the digit being replaced, so work it out once per digit.
+    orders: dict[str, list[str]] = {}
     for position in order if order is not None else range(len(key)):
-        rest = [d for d in HEX_DIGITS if d != key[position]]
-        likely = [d for d in LOOKALIKES[key[position]] if d in rest]
-        for digit in likely + [d for d in rest if d not in likely]:
+        current = key[position]
+        digits = orders.get(current)
+        if digits is None:
+            rest = [d for d in HEX_DIGITS if d != current]
+            likely = [d for d in LOOKALIKES[current] if d in rest]
+            digits = orders[current] = likely + [d for d in rest if d not in likely]
+        for digit in digits:
             yield {position: digit}
 
 
@@ -172,14 +178,14 @@ def near_misses(key: str, tiers: Iterable[Iterator[dict]], limit: int = GUESS_LI
     in a table then costs one wasted guess instead of crashing the caller. It has happened.
     """
     seen, given = {key}, 0
+    remember = seen.add
     for tier in tiers:
         for changes in tier:
             candidate = swap(key, changes)
-            if candidate in seen or len(candidate) != KEY_LENGTH:
+            # Stripping the hex digits off leaves something only if there was something else.
+            if len(candidate) != KEY_LENGTH or candidate in seen or candidate.strip(HEX_DIGITS):
                 continue
-            if any(d not in HEX_DIGITS for d in candidate):
-                continue
-            seen.add(candidate)
+            remember(candidate)
             yield candidate
             given += 1
             if given >= limit:
