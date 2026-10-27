@@ -63,7 +63,7 @@ test = [
     # Rule selection lives in [tool.ruff.lint] below. The upper bound is deliberate: ruff adds
     # rules to existing groups in minor releases, so an unbounded range lets a routine dependabot
     # bump turn CI red on code nobody touched.
-    "ruff >= 0.16.5, < 0.17",
+    "ruff >= 0.16.5, < 0.18",
     # Advisory only -- CI reports mypy but does not fail on it. See the workflow for why.
     "mypy >= 1.18.0",
     # The stubs for the protobuf runtime. Without them google.protobuf is Any under
