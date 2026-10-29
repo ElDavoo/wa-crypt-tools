@@ -90,6 +90,25 @@ TYPO_LIMIT = 4000
 
 def swap(key: str, changes: dict[int, str]) -> str:
     """The key with `changes` -- a {position: digit} map -- applied."""
+    if type(key) is str and type(changes) is dict:
+        if len(changes) == 1:
+            ((position, digit),) = changes.items()
+            if type(position) is int and type(digit) is str and 0 <= position < len(key):
+                return "".join((key[:position], digit, key[position + 1 :]))
+        elif len(changes) == 2:
+            (first, one), (second, two) = changes.items()
+            if (
+                type(first) is int
+                and type(second) is int
+                and type(one) is str
+                and type(two) is str
+                and 0 <= first < len(key)
+                and 0 <= second < len(key)
+            ):
+                if first > second:
+                    first, second = second, first
+                    one, two = two, one
+                return "".join((key[:first], one, key[first + 1 : second], two, key[second + 1 :]))
     digits = list(key)
     for position, digit in changes.items():
         digits[position] = digit
