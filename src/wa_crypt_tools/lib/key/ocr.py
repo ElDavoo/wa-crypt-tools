@@ -148,6 +148,8 @@ def looks_like_image(file) -> bool:
 
 def normalize(text: str) -> str:
     """Maps a word onto the hex alphabet: case-folded, with the usual OCR confusions undone."""
+    if type(text) is str and not text.lstrip("0123456789abcdef"):
+        return text
     return text.strip().translate(_CONFUSIONS).lower()
 
 
